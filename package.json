@@ -4,17 +4,31 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "spec:check": "expec check --config generation/expec/expec.json",
+    "generate": "expec build --config generation/expec/expec.json",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "build": "npm run typecheck && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:collect": "vitest list"
   },
   "devDependencies": {
     "@types/node": "24.13.6",
     "typescript": "5.9.3",
-    "vitest": "5.0.2"
+    "vitest": "5.0.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "vite": "8.3.3",
+    "executable-specification-language": "file:generation/tooling/executable-specification-language-ac7be28.tgz"
   },
   "engines": {
     "node": ">=24.19.0 <25",
     "npm": ">=11.20.0 <12"
   },
-  "packageManager": "npm@11.20.0"
+  "packageManager": "npm@11.20.0",
+  "dependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
 }
