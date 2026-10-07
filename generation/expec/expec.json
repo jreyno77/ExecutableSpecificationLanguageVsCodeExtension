@@ -1,0 +1,40 @@
+{
+  "formatVersion": 1,
+  "version": "0.1.0",
+  "project": {
+    "root": "../.."
+  },
+  "build": {
+    "entries": [
+      "src/core/workspace.expec",
+      "src/ui/output-tabs.expec",
+      "src/vscode/editor-adapter.expec"
+    ]
+  },
+  "outputs": [
+    {
+      "id": "typescript",
+      "options": {
+        "sourceRoot": ".",
+        "directory": ".",
+        "configFile": "tsconfig.json"
+      }
+    },
+    {
+      "id": "uml",
+      "options": {
+        "directory": "generation/uml",
+        "views": [
+          "structure"
+        ]
+      }
+    },
+    {
+      "id": "acceptance",
+      "options": {
+        "domain": "workspace",
+        "configFile": "tsconfig.json"
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+use WorkspaceCore, OutputTab from "../core/workspace.expec"
+
+component OutputTabs {
+  construction(core: WorkspaceCore)
+  public present
+
+  capability present(tabs: List<OutputTab>) returns Nothing {
+    promises "Render core-supplied tabs; keep output policy and generation in core."
+  }
+}

@@ -1,0 +1,45 @@
+// EXT-01: horizontal contracts. Generated operations remain unimplemented.
+type SourceDocument {
+  uri: Text
+  text: Text
+}
+
+type OutputTab {
+  id: Text
+  label: Text
+  content: Text
+}
+
+component WorkspaceCore {
+  construction(outputIds: List<Text>)
+  public preview, generate
+
+  capability preview(source: SourceDocument) returns List<OutputTab> {
+    promises "Prepare one preview per configured output without applying project files."
+  }
+
+  capability generate(source: SourceDocument) returns Nothing {
+    promises "Apply enabled configured outputs while preserving handwritten work."
+  }
+}
+
+examples {
+  fixture document: SourceDocument = {
+    uri: "file:///workspace/library.expec",
+    text: "type Book { title: Text }"
+  }
+
+  setup configuredOutputs(ids: List<Text>) returns Nothing
+  action requestPreview(source: SourceDocument) returns Nothing
+  observation previewOutputIds() returns List<Text>
+  check expectPreviewOutputs(expected: List<Text>) {
+    let actual = previewOutputIds()
+    assert actual == expected
+  }
+
+  scenario "preview every configured output" {
+    given configuredOutputs(["uml", "typescript", "markdown"])
+    when requestPreview(document)
+    then expectPreviewOutputs(["uml", "typescript", "markdown"])
+  }
+}

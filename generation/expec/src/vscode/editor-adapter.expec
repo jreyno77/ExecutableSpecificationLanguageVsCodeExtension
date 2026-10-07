@@ -1,0 +1,10 @@
+use WorkspaceCore, SourceDocument from "../core/workspace.expec"
+
+component EditorAdapter {
+  construction(core: WorkspaceCore)
+  public documentSaved
+
+  capability documentSaved(source: SourceDocument) returns Nothing {
+    promises "Translate the editor save event into a core request; core decides whether generation is enabled."
+  }
+}
