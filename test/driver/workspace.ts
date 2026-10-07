@@ -52,4 +52,12 @@ export class WorkspaceDriver {
   async editorPreviewTabs(): Promise<Array<OutputTab>> {
     throw new Error("Not implemented: workspace.editorPreviewTabs");
   }
+
+async disposeOutputTabs(): Promise<void> {
+    throw new Error("Not implemented: workspace.disposeOutputTabs");
+  }
+
+async outputHostExists(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.outputHostExists");
+  }
 }

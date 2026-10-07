@@ -89,4 +89,17 @@ export class Workspace {
     const actual = await this.driver.editorPreviewTabs();
     expectData(actual, expected);
   }
+
+async disposeOutputTabs(): Promise<void> {
+    return await this.driver.disposeOutputTabs();
+  }
+
+async outputHostExists(): Promise<boolean> {
+    return await this.driver.outputHostExists();
+  }
+
+async expectOutputHostRetained(): Promise<void> {
+    const actual = await this.driver.outputHostExists();
+    expectData(actual, true);
+  }
 }

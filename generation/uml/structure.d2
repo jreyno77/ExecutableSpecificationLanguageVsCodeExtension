@@ -41,11 +41,16 @@ s_9a5426fd73f66fb45d60aa198ca6c00452d06457bb91702af27264b8d71f1df8: "«component
   "sourceSaved(source: SourceDocument)": Nothing
 }
 s_4c96ae5bc2762c430db798ddca458d331561f49cc6bf79cfde1f7b44a726aee3_promise_0: "Unverified intent: Present exactly these tabs, in order, using their IDs, labels and content. A new presentation replaces the previous set. Selecting a tab shows its supplied content; presentation never compiles or generates outputs." {shape: page}
+s_0a790cd4e9345457c3cf3057768a78e5dbeb46dcfbead1f440fd07e0aa449a31_promise_0: "Unverified intent: Unmount this view and release its handlers. Keep the supplied host element in the page. Repeated disposal is harmless; present after disposal reports a clear error." {shape: page}
 # expec-uml: eyJmb3JtYXQiOjEsIm91dHB1dElkIjoidW1sIiwidmlldyI6InN0cnVjdHVyZSIsImRlZmluaXRpb24iOiJmMTMxNDFlMy01NzdhLTQxNTctODY3MC04MzY4OGU1ZTM5ODUiLCJraW5kIjoiY29tcG9uZW50IiwibmFtZSI6Ik91dHB1dFRhYnMifQ
 s_3ca299356d77cf5fcb4b370654e20488ba4e2c2312b9c80a8e94c176ac05f44c: "«component»\nOutputTabs" {
   shape: class
+  # expec-uml: eyJmb3JtYXQiOjEsIm91dHB1dElkIjoidW1sIiwidmlldyI6InN0cnVjdHVyZSIsIm1lbWJlciI6IjQ4ZjVlZGNjLWYxYTMtNDkwNi1iZDdkLTY0ZTYxNGFmYWQwMiIsIm93bmVyIjoic18zY2EyOTkzNTZkNzdjZjVmY2I0YjM3MDY1NGUyMDQ4OGJhNGUyYzIzMTJiOWM4MGE4ZTk0YzE3NmFjMDVmNDRjIiwicGFyYW1ldGVycyI6WyI2ZWEzNTQzMy1kMDIxLTQxZWUtYWQxNy0xMjM4ODk1NDcxNjMiXX0
+  "construction(hostElementId: Text)": unspecified
   # expec-uml: eyJmb3JtYXQiOjEsIm91dHB1dElkIjoidW1sIiwidmlldyI6InN0cnVjdHVyZSIsIm1lbWJlciI6ImE1ZDMyMGFiLTA5MzgtNGFkNi1hZjI3LTQzN2RiYWZkNjQ4YSIsIm93bmVyIjoic18zY2EyOTkzNTZkNzdjZjVmY2I0YjM3MDY1NGUyMDQ4OGJhNGUyYzIzMTJiOWM4MGE4ZTk0YzE3NmFjMDVmNDRjIiwicGFyYW1ldGVycyI6WyI4ZWNlNDY2NC0wOGYyLTRlZmItOWVmYS1mMWQyYWViMmIwNzUiXX0
   "present(tabs: List<OutputTab>)": Nothing
+  # expec-uml: eyJmb3JtYXQiOjEsIm91dHB1dElkIjoidW1sIiwidmlldyI6InN0cnVjdHVyZSIsIm1lbWJlciI6ImUzZThkYzBmLTJjYjQtNDU1Zi05MTA0LTAyZTk5MzY5YmFiNiIsIm93bmVyIjoic18zY2EyOTkzNTZkNzdjZjVmY2I0YjM3MDY1NGUyMDQ4OGJhNGUyYzIzMTJiOWM4MGE4ZTk0YzE3NmFjMDVmNDRjIiwicGFyYW1ldGVycyI6W119
+  "dispose()": Nothing
 }
 s_f57e61db43cd4063fb290b2a52d07bdf41a3c977463c0909dc06abad4571628d_promise_0: "Unverified intent: Translate an editor document change into core.preview with the exact URI and current text. Return core's tabs unchanged, without sending a save request." {shape: page}
 s_b859ec04ff07d6303f751a129db917b265a99d4a401d841894baabfea703ac5a_promise_0: "Unverified intent: Translate an editor save into core.sourceSaved with the exact URI and saved text. Core owns the generation policy." {shape: page}

@@ -26,3 +26,13 @@ test("replace the previous tabs when the available outputs change", async ({ wor
   await workspace.expectOutputLabels(["Notes"]);
   await workspace.expectOutputContent("# Updated Book");
 });
+
+/* @expec-test "d61e35d7-2c4e-4beb-8815-e1909ced875a" */
+test("closing the tabs leaves the host available to its owner", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.previews);
+  await workspace.disposeOutputTabs();
+  await workspace.disposeOutputTabs();
+  await workspace.expectOutputLabels([]);
+  await workspace.expectOutputHostRetained();
+});

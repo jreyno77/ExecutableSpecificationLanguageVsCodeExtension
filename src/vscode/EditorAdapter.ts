@@ -1,6 +1,12 @@
 import type { WorkspaceCore } from "../core/WorkspaceCore.js";
 import type { SourceDocument } from "../core/SourceDocument.js";
 import type { OutputTab } from "../core/OutputTab.js";
+/**
+ * Unverified implementation obligation.
+ * Requires package: typescript (build)
+ * Requires package: vite (build)
+ * Requires package: vitest (test)
+ */
 export class EditorAdapter {
     constructor(core: WorkspaceCore) {
         throw new Error("Not implemented: EditorAdapter.construction");

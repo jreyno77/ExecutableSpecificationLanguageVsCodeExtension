@@ -1,6 +1,12 @@
 import type { ProjectOutputs } from "./ProjectOutputs.js";
 import type { SourceDocument } from "./SourceDocument.js";
 import type { OutputTab } from "./OutputTab.js";
+/**
+ * Unverified implementation obligation.
+ * Requires package: typescript (build)
+ * Requires package: vite (build)
+ * Requires package: vitest (test)
+ */
 export class WorkspaceCore {
     constructor(outputs: ProjectOutputs, generateOnSave: boolean) {
         throw new Error("Not implemented: WorkspaceCore.construction");
