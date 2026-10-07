@@ -20,7 +20,7 @@ The first components implement preview routing, opt-in generation on save, edito
 
 ## Work from the specification
 
-`npm run generate` updates TypeScript, tests and UML in the originating connected checkout. The current language CLI cannot yet reconnect a fresh clone to existing generated files ([language issue #61](https://github.com/jreyno77/ExecutableSpecificationLanguage/issues/61)): its ignored `.expec/` state belongs to the original project location. A fresh checkout can check, build and test the committed outputs using the commands above. Do not copy private connection state, remove existing output, or edit managed files to bypass that limitation.
+`npm run generate` updates TypeScript, tests and UML in the originating connected checkout. The current language CLI cannot yet reconnect a fresh clone to existing generated files ([language issue #61](https://github.com/jreyno77/ExecutableSpecificationLanguage/issues/61)): its ignored `.expec/` state belongs to the original project location. A fresh checkout can check, build and test the committed outputs using the commands above. Regenerating the current Playwright-backed implementation is also blocked by optional Electron declaration capture ([language issue #62](https://github.com/jreyno77/ExecutableSpecificationLanguage/issues/62)); implementation preservation has not yet been verified. Do not add unused Electron to bypass this check. Do not copy private connection state, remove existing output, or edit managed files to bypass that limitation.
 
 1. **Specifying:** edit and review `.expec` contracts and examples.
 2. **Generating:** run the generator, inspect its outputs and verify them.
