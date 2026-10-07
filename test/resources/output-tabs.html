@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Output tabs</title></head>
+<body><div id="output-host"></div><aside id="neighbor">Connection settings</aside>
+<script type="module">
+import { OutputTabs } from '/src/ui/OutputTabs.ts';
+window.createOutputTabs = (hostElementId = 'output-host') => { window.outputTabs = new OutputTabs(hostElementId); };
+</script></body></html>

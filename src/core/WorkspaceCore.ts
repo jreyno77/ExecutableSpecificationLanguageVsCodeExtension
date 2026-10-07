@@ -8,21 +8,24 @@ import type { OutputTab } from "./OutputTab.js";
  * Requires package: vitest (test)
  */
 export class WorkspaceCore {
+    private readonly outputs: ProjectOutputs;
+    private readonly generateOnSave: boolean;
     constructor(outputs: ProjectOutputs, generateOnSave: boolean) {
-        throw new Error("Not implemented: WorkspaceCore.construction");
+        this.outputs = outputs;
+        this.generateOnSave = generateOnSave;
     }
     /**
      * Unverified implementation obligation.
      * Ask the connected outputs to preview this exact document and return their tabs unchanged. Do not request generation.
      */
     preview(source: SourceDocument): Array<OutputTab> {
-        throw new Error("Not implemented: WorkspaceCore.preview");
+        return this.outputs.preview(source);
     }
     /**
      * Unverified implementation obligation.
      * If generateOnSave is enabled, request generation of this exact document once. Otherwise request nothing. This observes an editor save; it does not save the source file.
      */
     sourceSaved(source: SourceDocument): void {
-        throw new Error("Not implemented: WorkspaceCore.sourceSaved");
+        if (this.generateOnSave) this.outputs.generate(source);
     }
 }

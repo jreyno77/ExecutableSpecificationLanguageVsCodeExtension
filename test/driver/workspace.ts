@@ -1,63 +1,79 @@
+import { WorkspaceCore } from '../../src/core/WorkspaceCore.js';
+import { EditorAdapter } from '../../src/vscode/EditorAdapter.js';
+import { RecordingCore } from './recording-core.js';
+import { OutputTabsBrowser } from './output-tabs-browser.js';
 import { OutputTab } from "../../src/core/OutputTab.js";
 import { SourceDocument } from "../../src/core/SourceDocument.js";
 export class WorkspaceDriver {
+  private core!: WorkspaceCore;
+  private editor!: EditorAdapter;
+  private recording!: RecordingCore;
+  private ui!: OutputTabsBrowser;
+  private previewRequests: SourceDocument[] = [];
+  private generationRequests: SourceDocument[] = [];
+  private tabs: OutputTab[] = [];
+  private editorTabs: OutputTab[] = [];
   async connectedOutputs(previews: Array<OutputTab>, generateOnSave: boolean): Promise<void> {
-    throw new Error("Not implemented: workspace.connectedOutputs");
+    this.core = new WorkspaceCore({
+      preview: source => { this.previewRequests.push(source); return previews; },
+      generate: source => { this.generationRequests.push(source); },
+    }, generateOnSave);
   }
   async openOutputTabs(): Promise<void> {
-    throw new Error("Not implemented: workspace.openOutputTabs");
+    this.ui = await OutputTabsBrowser.open();
   }
   async editorCoreReturns(tabs: Array<OutputTab>): Promise<void> {
-    throw new Error("Not implemented: workspace.editorCoreReturns");
+    this.recording = new RecordingCore(tabs);
+    this.editor = new EditorAdapter(this.recording);
   }
   async requestPreview(source: SourceDocument): Promise<void> {
-    throw new Error("Not implemented: workspace.requestPreview");
+    this.tabs = this.core.preview(source);
   }
   async saveSource(source: SourceDocument): Promise<void> {
-    throw new Error("Not implemented: workspace.saveSource");
+    this.core.sourceSaved(source);
   }
   async presentOutputs(tabs: Array<OutputTab>): Promise<void> {
-    throw new Error("Not implemented: workspace.presentOutputs");
+    await this.ui.present(tabs);
   }
   async selectOutput(id: string): Promise<void> {
-    throw new Error("Not implemented: workspace.selectOutput");
+    await this.ui.select(id);
   }
   async changeEditorDocument(source: SourceDocument): Promise<void> {
-    throw new Error("Not implemented: workspace.changeEditorDocument");
+    this.editorTabs = this.editor.documentChanged(source);
   }
   async saveEditorDocument(source: SourceDocument): Promise<void> {
-    throw new Error("Not implemented: workspace.saveEditorDocument");
+    this.editor.documentSaved(source);
   }
   async returnedTabs(): Promise<Array<OutputTab>> {
-    throw new Error("Not implemented: workspace.returnedTabs");
+    return this.tabs;
   }
   async outputPreviewRequests(): Promise<Array<SourceDocument>> {
-    throw new Error("Not implemented: workspace.outputPreviewRequests");
+    return this.previewRequests;
   }
   async outputGenerationRequests(): Promise<Array<SourceDocument>> {
-    throw new Error("Not implemented: workspace.outputGenerationRequests");
+    return this.generationRequests;
   }
   async outputLabels(): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.outputLabels");
+    return this.ui.labels();
   }
   async selectedOutputContent(): Promise<string> {
-    throw new Error("Not implemented: workspace.selectedOutputContent");
+    return this.ui.content();
   }
   async corePreviewRequests(): Promise<Array<SourceDocument>> {
-    throw new Error("Not implemented: workspace.corePreviewRequests");
+    return this.recording.previews;
   }
   async coreSaveRequests(): Promise<Array<SourceDocument>> {
-    throw new Error("Not implemented: workspace.coreSaveRequests");
+    return this.recording.saves;
   }
   async editorPreviewTabs(): Promise<Array<OutputTab>> {
-    throw new Error("Not implemented: workspace.editorPreviewTabs");
+    return this.editorTabs;
   }
 
 async disposeOutputTabs(): Promise<void> {
-    throw new Error("Not implemented: workspace.disposeOutputTabs");
+    await this.ui.dispose();
   }
 
 async outputHostExists(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.outputHostExists");
+    return this.ui.hostExists();
   }
 }

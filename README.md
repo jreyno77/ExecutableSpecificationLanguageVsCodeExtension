@@ -10,13 +10,13 @@ Use Node 24.19+ (24.x) and npm 11.20+ (11.x).
 npm ci
 npm run spec:check
 npm run build
-npm run test:collect
+npx playwright install chromium
 npm test
 ```
 
 `generation/expec/src/` is the authored specification. Its folder layout maps to `src/core`, `src/ui`, and `src/vscode`. Scenarios in those same sources produce `test/acceptance`, `test/dsl`, and `test/driver`. Diagrams are generated in `generation/uml`.
 
-This first delivery is scaffolding. The generated drivers and operations throw until implemented. `npm test` reports those unfinished scenarios as failures; successful typechecking, collection and Vite bundling do not establish working extension behavior. No installable VSIX, language server or rendered React interface exists yet. Vite is configured for the three generated module entries; React and Vitest tooling are installed for subsequent work.
+The first components implement preview routing, opt-in generation on save, editor-event forwarding and React tabs for supplied outputs. Nine generated scenarios exercise these contracts; focused UI tests cover mounting and disposal. Core/editor tests run in-process. UI tests use real Chromium, sharing browser setup while isolating each test in its own context. This is the component foundation; VS Code activation, a language server and an installable VSIX are subsequent work.
 
 ## Work from the specification
 
@@ -26,7 +26,9 @@ This first delivery is scaffolding. The generated drivers and operations throw u
 2. **Generating:** run the generator, inspect its outputs and verify them.
 3. **Implementing:** fill only the handwritten areas the generator preserves.
 
-During implementation, do not edit `.expec`, generated declarations, imports, signatures, assertions or diagrams. If one must change, record the finding on the task, return to Specifying, review, and regenerate before continuing implementation.
+During implementation, do not edit `.expec`, generated declarations, imports, signatures, assertions or diagrams. Bodies, unassociated private state/helpers and separate handwritten imports are preserved implementation areas. If a managed part or dependency must change, record the finding on the task, return to Specifying, review, and regenerate before continuing implementation. Package requirements belong in the owning `.expec` components and `generation/expec/expec.json`; keep `package.json` and its lockfile aligned. Preserve the captured language archive dependency described below.
+
+PR CI tests affected components on Windows and Ubuntu; main runs the complete extension suite. Browser installation is needed only for UI tests. On Linux CI, Playwright also installs its required system libraries.
 
 ## Development language build
 

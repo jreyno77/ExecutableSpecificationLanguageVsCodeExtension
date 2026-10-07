@@ -12,6 +12,6 @@ export default defineConfig({
       },
       formats: ['es'],
     },
-    rolldownOptions: { external: ['react', 'react-dom', 'react/jsx-runtime', 'vscode'] },
+    rolldownOptions: { external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime', 'vscode'] },
   },
 });
