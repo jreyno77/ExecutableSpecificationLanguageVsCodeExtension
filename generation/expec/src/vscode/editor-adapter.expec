@@ -1,28 +1,43 @@
 use WorkspaceCore, SourceDocument, OutputTab from "../core/workspace.expec"
 
+// Bound to VS Code's TextDocument by the TypeScript output configuration.
+opaque type VsCodeDocument
+
 component EditorAdapter {
   requires package "typescript" for build
+  requires package "vscode-types" for build
   requires package "vite" for build
   requires package "vitest" for test
 
   construction(core: WorkspaceCore)
   public documentChanged, documentSaved
 
-  capability documentChanged(source: SourceDocument) returns List<OutputTab> {
-    promises "Translate an editor document change into core.preview with the exact URI and current text. Return core's tabs unchanged, without sending a save request."
+  capability documentChanged(document: VsCodeDocument) returns List<OutputTab> {
+    promises "For the supplied editor change, capture a new SourceDocument from document.uri.toString() and document.getText() at this call. Pass that snapshot to core.preview once and return core's tabs unchanged. Preserve the full URI for file, untitled and remote documents; do not read files or request a save. Later edits must not change an earlier snapshot."
   }
 
-  capability documentSaved(source: SourceDocument) returns Nothing {
-    promises "Translate an editor save into core.sourceSaved with the exact URI and saved text. Core owns the generation policy."
+  capability documentSaved(document: VsCodeDocument) returns Nothing {
+    promises "For the supplied save notification, capture a new SourceDocument from document.uri.toString() and document.getText() at this call. Pass that snapshot to core.sourceSaved once without requesting a preview or another save. Core owns the generation policy."
   }
 }
 
-// Routing examples use the real adapter with a recording core boundary.
-// They do not stand in for a VS Code host, language server or output implementation.
+// The host owns document subscriptions and supplies the event's current document.
+// These examples exercise the real adapter with a recording core and native-shaped
+// documents whose uri.toString() and getText() supply the fixture's values. Actions
+// for the same URI edit the same document; observations inspect actual core requests.
+// They prove conversion and routing, not VS Code event registration or disk writes.
 examples for EditorAdapter {
   fixture editedDocument: SourceDocument = {
     uri: "file:///workspace/src/library.expec",
     text: "type Book {\n  title: Text\n  copies: Number\n}"
+  }
+  fixture latestDocument: SourceDocument = {
+    uri: "file:///workspace/src/library.expec",
+    text: "type Book {\n  title: Text\n  copies: Number\n  available: Boolean\n}"
+  }
+  fixture untitledDocument: SourceDocument = {
+    uri: "untitled:Untitled-1",
+    text: "type Draft {"
   }
   fixture previewTabs: List<OutputTab> = [
     { id: "markdown", label: "Markdown", content: "# Edited Book" }
@@ -57,5 +72,20 @@ examples for EditorAdapter {
     given editorCoreReturns(previewTabs)
     when saveEditorDocument(editedDocument)
     then expectCoreRequests([], [editedDocument])
+  }
+
+  scenario "preview an untitled document without a filesystem path" {
+    given editorCoreReturns(previewTabs)
+    when changeEditorDocument(untitledDocument)
+    then expectCoreRequests([untitledDocument], [])
+    then expectEditorPreviews(previewTabs)
+  }
+
+  scenario "keep each edit's text snapshot for the same document" {
+    given editorCoreReturns(previewTabs)
+    when changeEditorDocument(editedDocument)
+    when changeEditorDocument(latestDocument)
+    then expectCoreRequests([editedDocument, latestDocument], [])
+    then expectEditorPreviews(previewTabs)
   }
 }

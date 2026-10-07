@@ -17,7 +17,14 @@
       "options": {
         "sourceRoot": ".",
         "directory": ".",
-        "configFile": "tsconfig.json"
+        "configFile": "tsconfig.json",
+        "imports": [
+          {
+            "declaration": ["VsCodeDocument"],
+            "name": "TextDocument",
+            "from": "vscode"
+          }
+        ]
       }
     },
     {
@@ -92,6 +99,14 @@
       "alias": "react-dom-types",
       "name": "npm:@types/react-dom",
       "version": "19.3.0",
+      "phases": [
+        "build"
+      ]
+    },
+    {
+      "alias": "vscode-types",
+      "name": "npm:@types/vscode",
+      "version": "1.100.0",
       "phases": [
         "build"
       ]
