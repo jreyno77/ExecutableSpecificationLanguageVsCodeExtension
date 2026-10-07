@@ -67,7 +67,8 @@
       "name": "npm:vite",
       "version": "8.3.3",
       "phases": [
-        "build"
+        "build",
+        "test"
       ]
     },
     {
@@ -75,7 +76,8 @@
       "name": "npm:@vitejs/plugin-react",
       "version": "6.1.2",
       "phases": [
-        "build"
+        "build",
+        "test"
       ]
     },
     {
@@ -105,14 +107,6 @@
     {
       "alias": "vitest",
       "name": "npm:vitest",
-      "version": "5.0.2",
-      "phases": [
-        "test"
-      ]
-    },
-    {
-      "alias": "browser-tests",
-      "name": "npm:@vitest/browser-playwright",
       "version": "5.0.2",
       "phases": [
         "test"

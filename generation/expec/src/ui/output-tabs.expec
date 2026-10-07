@@ -7,9 +7,10 @@ component OutputTabs {
   requires package "react-types" for build
   requires package "react-dom-types" for build
   requires package "vite" for build
+  requires package "vite" for test
   requires package "vite-react" for build
+  requires package "vite-react" for test
   requires package "vitest" for test
-  requires package "browser-tests" for test
   requires package "playwright" for test
 
   // The UI host supplies the ID of an existing empty DOM element.
