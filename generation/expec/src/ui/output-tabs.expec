@@ -1,10 +1,28 @@
 use OutputTab from "../core/workspace.expec"
 
 component OutputTabs {
-  public present
+  requires package "react" for runtime
+  requires package "react-dom" for runtime
+  requires package "typescript" for build
+  requires package "react-types" for build
+  requires package "react-dom-types" for build
+  requires package "vite" for build
+  requires package "vite-react" for build
+  requires package "vitest" for test
+  requires package "browser-tests" for test
+  requires package "playwright" for test
+
+  // The UI host supplies the ID of an existing empty DOM element.
+  // Missing or occupied hosts are rejected; this view owns only its rendered children.
+  construction(hostElementId: Text)
+  public present, dispose
 
   capability present(tabs: List<OutputTab>) returns Nothing {
     promises "Present exactly these tabs, in order, using their IDs, labels and content. A new presentation replaces the previous set. Selecting a tab shows its supplied content; presentation never compiles or generates outputs."
+  }
+
+  capability dispose() returns Nothing {
+    promises "Unmount this view and release its handlers. Keep the supplied host element in the page. Repeated disposal is harmless; present after disposal reports a clear error."
   }
 }
 
@@ -19,8 +37,10 @@ examples for OutputTabs {
   setup openOutputTabs() returns Nothing
   action presentOutputs(tabs: List<OutputTab>) returns Nothing
   action selectOutput(id: Text) returns Nothing
+  action disposeOutputTabs() returns Nothing
   observation outputLabels() returns List<Text>
   observation selectedOutputContent() returns Text
+  observation outputHostExists() returns Boolean
 
   check expectOutputLabels(expected: List<Text>) {
     let actual = outputLabels()
@@ -29,6 +49,11 @@ examples for OutputTabs {
   check expectOutputContent(expected: Text) {
     let actual = selectedOutputContent()
     assert actual == expected
+  }
+
+  check expectOutputHostRetained() {
+    let actual = outputHostExists()
+    assert actual == true
   }
 
   scenario "see a tab for each supplied output" {
@@ -52,4 +77,14 @@ examples for OutputTabs {
     then expectOutputLabels(["Notes"])
     then expectOutputContent("# Updated Book")
   }
+
+  scenario "closing the tabs leaves the host available to its owner" {
+    given openOutputTabs()
+    when presentOutputs(previews)
+    when disposeOutputTabs()
+    when disposeOutputTabs()
+    then expectOutputLabels([])
+    then expectOutputHostRetained()
+  }
+
 }

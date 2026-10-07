@@ -25,6 +25,10 @@ interface ProjectOutputs {
 }
 
 component WorkspaceCore {
+  requires package "typescript" for build
+  requires package "vite" for build
+  requires package "vitest" for test
+
   construction(outputs: ProjectOutputs, generateOnSave: Boolean)
   public preview, sourceSaved
 

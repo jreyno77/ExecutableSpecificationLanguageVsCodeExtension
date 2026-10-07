@@ -14,13 +14,15 @@
   },
   "devDependencies": {
     "@types/node": "24.13.6",
-    "typescript": "5.9.3",
-    "vitest": "5.0.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
+    "@vitest/browser-playwright": "5.0.2",
+    "executable-specification-language": "file:generation/tooling/executable-specification-language-ac7be28.tgz",
+    "playwright": "1.63.0",
+    "typescript": "5.9.3",
     "vite": "8.3.3",
-    "executable-specification-language": "file:generation/tooling/executable-specification-language-ac7be28.tgz"
+    "vitest": "5.0.2"
   },
   "engines": {
     "node": ">=24.19.0 <25",

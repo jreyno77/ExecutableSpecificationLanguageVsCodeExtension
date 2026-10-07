@@ -1,6 +1,10 @@
 use WorkspaceCore, SourceDocument, OutputTab from "../core/workspace.expec"
 
 component EditorAdapter {
+  requires package "typescript" for build
+  requires package "vite" for build
+  requires package "vitest" for test
+
   construction(core: WorkspaceCore)
   public documentChanged, documentSaved
 
