@@ -1,10 +1,55 @@
-use WorkspaceCore, OutputTab from "../core/workspace.expec"
+use OutputTab from "../core/workspace.expec"
 
 component OutputTabs {
-  construction(core: WorkspaceCore)
   public present
 
   capability present(tabs: List<OutputTab>) returns Nothing {
-    promises "Render core-supplied tabs; keep output policy and generation in core."
+    promises "Present exactly these tabs, in order, using their IDs, labels and content. A new presentation replaces the previous set. Selecting a tab shows its supplied content; presentation never compiles or generates outputs."
+  }
+}
+
+// The driver presents through OutputTabs and observes the rendered UI, not its input copy.
+examples for OutputTabs {
+  fixture previews: List<OutputTab> = [
+    { id: "uml", label: "UML", content: "Book: { title: Text }" },
+    { id: "typescript", label: "TypeScript", content: "export interface Book { title: string }" },
+    { id: "markdown", label: "Markdown", content: "# Book" }
+  ]
+
+  setup openOutputTabs() returns Nothing
+  action presentOutputs(tabs: List<OutputTab>) returns Nothing
+  action selectOutput(id: Text) returns Nothing
+  observation outputLabels() returns List<Text>
+  observation selectedOutputContent() returns Text
+
+  check expectOutputLabels(expected: List<Text>) {
+    let actual = outputLabels()
+    assert actual == expected
+  }
+  check expectOutputContent(expected: Text) {
+    let actual = selectedOutputContent()
+    assert actual == expected
+  }
+
+  scenario "see a tab for each supplied output" {
+    given openOutputTabs()
+    when presentOutputs(previews)
+    then expectOutputLabels(["UML", "TypeScript", "Markdown"])
+  }
+
+  scenario "read the selected output" {
+    given openOutputTabs()
+    when presentOutputs(previews)
+    when selectOutput("typescript")
+    then expectOutputContent("export interface Book { title: string }")
+  }
+
+  scenario "replace the previous tabs when the available outputs change" {
+    given openOutputTabs()
+    when presentOutputs(previews)
+    when presentOutputs([{ id: "markdown", label: "Notes", content: "# Updated Book" }])
+    when selectOutput("markdown")
+    then expectOutputLabels(["Notes"])
+    then expectOutputContent("# Updated Book")
   }
 }
