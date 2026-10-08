@@ -102,4 +102,8 @@ async expectOutputHostRetained(): Promise<void> {
     const actual = await this.driver.outputHostExists();
     expectData(actual, true);
   }
+
+readonly latestDocument: SourceDocument = { ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book {\n  title: Text\n  copies: Number\n  available: Boolean\n}" };
+
+readonly untitledDocument: SourceDocument = { ["uri"]: "untitled:Untitled-1", ["text"]: "type Draft {" };
 }

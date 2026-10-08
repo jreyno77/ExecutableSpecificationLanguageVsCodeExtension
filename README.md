@@ -16,7 +16,7 @@ npm test
 
 `generation/expec/src/` is the authored specification. Its folder layout maps to `src/core`, `src/ui`, and `src/vscode`. Scenarios in those same sources produce `test/acceptance`, `test/dsl`, and `test/driver`. Diagrams are generated in `generation/uml`.
 
-The first components implement preview routing, opt-in generation on save, editor-event forwarding and React tabs for supplied outputs. Nine generated scenarios exercise these contracts; focused UI tests cover mounting and disposal. Core/editor tests run in-process. UI tests use real Chromium, sharing browser setup while isolating each test in its own context. This is the component foundation; VS Code activation, a language server and an installable VSIX are subsequent work.
+The first components implement preview routing, opt-in generation on save, editor-event forwarding and React tabs for supplied outputs. Eleven generated scenarios exercise these contracts; focused UI tests cover mounting and disposal. Core/editor tests run in-process. UI tests use real Chromium, sharing browser setup while isolating each test in its own context. This is the component foundation; VS Code activation, a language server and an installable VSIX are subsequent work.
 
 ## Work from the specification
 
