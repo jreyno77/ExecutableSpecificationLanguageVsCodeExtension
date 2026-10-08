@@ -1,6 +1,8 @@
 use WorkspaceCore, SourceDocument, OutputTab from "../core/workspace.expec"
 
 // Bound to VS Code's TextDocument by the TypeScript output configuration.
+// Acceptance output explicitly retains its established native parameter name "source".
+// The TypeScript adapter below still receives document: vscode.TextDocument.
 opaque type VsCodeDocument
 
 component EditorAdapter {

@@ -40,7 +40,17 @@
       "id": "acceptance",
       "options": {
         "domain": "workspace",
-        "configFile": "tsconfig.json"
+        "configFile": "tsconfig.json",
+        "names": [
+          {
+            "declaration": ["EditorAdapter", "documentChanged", "document"],
+            "name": "source"
+          },
+          {
+            "declaration": ["EditorAdapter", "documentSaved", "document"],
+            "name": "source"
+          }
+        ]
       }
     }
   ],
