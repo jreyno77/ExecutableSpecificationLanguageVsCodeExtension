@@ -1,9 +1,12 @@
 import type { WorkspaceCore } from "../core/WorkspaceCore.js";
 import type { SourceDocument } from "../core/SourceDocument.js";
 import type { OutputTab } from "../core/OutputTab.js";
+import type { TextDocument } from "vscode";
+
 /**
  * Unverified implementation obligation.
  * Requires package: typescript (build)
+ * Requires package: vscode-types (build)
  * Requires package: vite (build)
  * Requires package: vitest (test)
  */
@@ -14,16 +17,16 @@ export class EditorAdapter {
     }
     /**
      * Unverified implementation obligation.
-     * Translate an editor document change into core.preview with the exact URI and current text. Return core's tabs unchanged, without sending a save request.
+     * For the supplied editor change, capture a new SourceDocument from document.uri.toString() and document.getText() at this call. Pass that snapshot to core.preview once and return core's tabs unchanged. Preserve the full URI for file, untitled and remote documents; do not read files or request a save. Later edits must not change an earlier snapshot.
      */
-    documentChanged(source: SourceDocument): Array<OutputTab> {
-        return this.core.preview(source);
+    documentChanged(document: TextDocument): Array<OutputTab> {
+        return this.core.preview(document);
     }
     /**
      * Unverified implementation obligation.
-     * Translate an editor save into core.sourceSaved with the exact URI and saved text. Core owns the generation policy.
+     * For the supplied save notification, capture a new SourceDocument from document.uri.toString() and document.getText() at this call. Pass that snapshot to core.sourceSaved once without requesting a preview or another save. Core owns the generation policy.
      */
-    documentSaved(source: SourceDocument): void {
-        this.core.sourceSaved(source);
+    documentSaved(document: TextDocument): void {
+        this.core.sourceSaved(document);
     }
 }

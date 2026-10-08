@@ -20,7 +20,7 @@ The first components implement preview routing, opt-in generation on save, edito
 
 ## Work from the specification
 
-`npm run generate` updates TypeScript, tests and UML in the originating connected checkout. The current language CLI cannot yet reconnect a fresh clone to existing generated files ([language issue #61](https://github.com/jreyno77/ExecutableSpecificationLanguage/issues/61)): its ignored `.expec/` state belongs to the original project location. A fresh checkout can check, build and test the committed outputs using the commands above. Regenerating the current Playwright-backed implementation is also blocked by optional Electron declaration capture ([language issue #62](https://github.com/jreyno77/ExecutableSpecificationLanguage/issues/62)); implementation preservation has not yet been verified. Do not add unused Electron to bypass this check. Do not copy private connection state, remove existing output, or edit managed files to bypass that limitation.
+`npm run generate` updates TypeScript, tests and UML in the originating connected checkout. The current language CLI cannot yet reconnect a fresh clone to existing generated files ([language issue #61](https://github.com/jreyno77/ExecutableSpecificationLanguage/issues/61)): its ignored `.expec/` state belongs to the original project location. A fresh checkout can check, build and test the committed outputs using the commands above. The captured tool includes the optional Electron capture repair; regeneration of the original implementation preserved all 25 source/test/generation files. Do not copy private connection state, remove existing output, or edit managed files to bypass that limitation.
 
 1. **Specifying:** edit and review `.expec` contracts and examples.
 2. **Generating:** run the generator, inspect its outputs and verify them.
@@ -32,8 +32,8 @@ PR CI tests affected components on Windows and Ubuntu; main runs the complete ex
 
 ## Development language build
 
-For this bootstrap, `generation/tooling/executable-specification-language-ac7be28.tgz` pins a captured development build of [language PR #58](https://github.com/jreyno77/ExecutableSpecificationLanguage/pull/58), source `ac7be28b1c9453ddbc79a9c6ba46db80d575f0fa`. It supplies source-folder mirroring. The local dependency and lockfile let `npm ci` reproduce this tool without rebuilding native language resources. This is not a released language version; replace it with a verified release dependency when available.
+For this bootstrap, `generation/tooling/executable-specification-language-5fd7805.tgz` pins a captured development build of [language PR #67](https://github.com/jreyno77/ExecutableSpecificationLanguage/pull/67), source `5fd78058fa798f3a6b0f8e7b7505fd36aa0854eb`. It includes source-folder mirroring, native dependency compatibility and portable ambient type bindings and byte-safe snapshot validation. Its upstream CI and release remain pending. The local dependency and lockfile let `npm ci` reproduce this tool without rebuilding native language resources. This is not a released language version; replace it with a verified release dependency when available.
 
-SHA-512 integrity: `sha512-8ggNLaFwzsLf52pPhmRVEVg0O1lT2RW7iC2DBH8ug9pj0aKkjAmz/V2IdRoJmG1ta/0HAsbNFM32KvljzLfQVw==`.
+SHA-512 integrity: `sha512-rV9NH+1fHUeAS4N4w0GPuuaBa6I9t3a4Qhau0znNNNPpVknSbyCdeflC+Xdmls+ziozPMa24CXyezcnSa/IKLQ==`.
 
 TypeScript preserves JSX for the Vite React plugin to transform. The captured language tool currently rejects a relative directory import in React automatic-runtime declarations ([language issue #60](https://github.com/jreyno77/ExecutableSpecificationLanguage/issues/60)); no native-input or writer check is disabled.
