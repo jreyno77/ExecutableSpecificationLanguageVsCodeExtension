@@ -1,3 +1,4 @@
+import type { TextDocument } from 'vscode';
 import { WorkspaceCore } from '../../src/core/WorkspaceCore.js';
 import { EditorAdapter } from '../../src/vscode/EditorAdapter.js';
 import { RecordingCore } from './recording-core.js';
@@ -7,6 +8,7 @@ import { SourceDocument } from "../../src/core/SourceDocument.js";
 export class WorkspaceDriver {
   private core!: WorkspaceCore;
   private editor!: EditorAdapter;
+  private readonly documents = new Map<string, { content: { text: string }; document: TextDocument }>();
   private recording!: RecordingCore;
   private ui!: OutputTabsBrowser;
   private previewRequests: SourceDocument[] = [];
@@ -39,10 +41,20 @@ export class WorkspaceDriver {
     await this.ui.select(id);
   }
   async changeEditorDocument(source: SourceDocument): Promise<void> {
-    this.editorTabs = this.editor.documentChanged(source);
+    this.editorTabs = this.editor.documentChanged(this.editorDocument(source));
   }
   async saveEditorDocument(source: SourceDocument): Promise<void> {
-    this.editor.documentSaved(source);
+    this.editor.documentSaved(this.editorDocument(source));
+  }
+  private editorDocument(source: SourceDocument): TextDocument {
+    let stored = this.documents.get(source.uri);
+    if (!stored) {
+      const content = { text: source.text };
+      stored = { content, document: { uri: { toString: () => source.uri }, getText: () => content.text } as TextDocument };
+      this.documents.set(source.uri, stored);
+    }
+    stored.content.text = source.text;
+    return stored.document;
   }
   async returnedTabs(): Promise<Array<OutputTab>> {
     return this.tabs;
