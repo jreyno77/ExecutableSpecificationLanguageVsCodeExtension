@@ -32,7 +32,7 @@ During implementation, do not edit `.expec`, generated declarations, imports, si
 
 Build an installable package with `npm run package:vsix` after `npm run build`, then use VS Code's **Extensions: Install from VSIX** command with `dist/expec-vscode-extension.vsix`. CI retains the VSIX from each platform.
 
-PR CI tests affected components on Windows and Ubuntu; main runs the complete extension suite. Browser installation is needed only for UI tests. On Linux CI, Playwright also installs its required system libraries, and the native VS Code tests run under Xvfb. Native tests reuse the VSIX installation and immutable grammar/WASM, while each document and token stack stays isolated.
+PR CI tests affected components on Windows and Ubuntu; main runs the complete extension suite. Browser installation is needed only for UI tests. On Linux CI, Playwright also installs its required system libraries, and the native VS Code tests run under Xvfb. The native syntax suite shares one VSIX installation and one owned VS Code host; each example uses a fresh document URI and token stack. The SDK download cache is keyed by its pinned version and platform. Extra isolated native test files will need project-level session ownership.
 
 ## Development language build
 
