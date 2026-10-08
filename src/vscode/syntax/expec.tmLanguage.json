@@ -1,0 +1,54 @@
+{
+  "name": "expec",
+  "scopeName": "source.expec",
+  "fileTypes": [
+    ".expec"
+  ],
+  "patterns": [
+    {
+      "name": "entity.name.expec",
+      "match": "`(\\\\[^\\r\\n]|[^`\\\\\\r\\n])*`"
+    },
+    {
+      "include": "#comments"
+    },
+    {
+      "name": "keyword.control.expec",
+      "match": "\\b(construction|interaction|observation|participant|capability|component|interface|satisfies|examples|function|promises|requires|scenario|concept|depends|ensures|example|fixture|include|message|package|returns|runtime|action|assert|extend|opaque|public|return|build|check|class|error|fails|false|given|local|setup|from|test|then|true|type|when|with|and|for|let|not|use|as|do|on|or)\\b"
+    },
+    {
+      "name": "string.quoted.double.expec",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "include": "#string-character-escape"
+        }
+      ]
+    },
+    {
+      "name": "entity.name.expec",
+      "match": "[A-Za-z_][A-Za-z_0-9]*"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "begin": "//",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.whitespace.comment.leading.expec"
+            }
+          },
+          "end": "(?=$)",
+          "name": "comment.line.expec"
+        }
+      ]
+    },
+    "string-character-escape": {
+      "name": "constant.character.escape.expec",
+      "match": "\\\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|u\\{[0-9A-Fa-f]+\\}|[0-2][0-7]{0,2}|3[0-6][0-7]?|37[0-7]?|[4-7][0-7]?|.|$)"
+    }
+  }
+}

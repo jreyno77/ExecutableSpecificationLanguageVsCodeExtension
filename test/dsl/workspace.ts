@@ -106,4 +106,46 @@ async expectOutputHostRetained(): Promise<void> {
 readonly latestDocument: SourceDocument = { ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book {\n  title: Text\n  copies: Number\n  available: Boolean\n}" };
 
 readonly untitledDocument: SourceDocument = { ["uri"]: "untitled:Untitled-1", ["text"]: "type Draft {" };
+
+async preparedExpecEditor(): Promise<void> {
+    return await this.driver.preparedExpecEditor();
+  }
+
+async preparedExpecGrammar(): Promise<void> {
+    return await this.driver.preparedExpecGrammar();
+  }
+
+async openSyntaxFile(fileName: string, text: string): Promise<void> {
+    return await this.driver.openSyntaxFile(fileName, text);
+  }
+
+async tokenizeSyntax(text: string): Promise<void> {
+    return await this.driver.tokenizeSyntax(text);
+  }
+
+async editorLanguageId(): Promise<string> {
+    return await this.driver.editorLanguageId();
+  }
+
+async syntaxScopeAt(line: number, column: number): Promise<string> {
+    return await this.driver.syntaxScopeAt(line, column);
+  }
+
+async expectEditorLanguage(expected: string): Promise<void> {
+    const actual = await this.driver.editorLanguageId();
+    expectData(actual, expected);
+  }
+
+async expectSyntaxScope(line: number, column: number, expected: string): Promise<void> {
+    const actual = await this.driver.syntaxScopeAt(line, column);
+    expectData(actual, expected);
+  }
+
+readonly syntaxDeclaration: string = "type Book { title: Text }";
+
+readonly syntaxString: string = "component Store {\n  capability save() {\n    promises \"type is text // still text\"\n  }\n}";
+
+readonly syntaxComment: string = "// type Book { title: Text }\nconcept Store {}";
+
+readonly syntaxQuotedName: string = "concept `type // Book` {}";
 }
