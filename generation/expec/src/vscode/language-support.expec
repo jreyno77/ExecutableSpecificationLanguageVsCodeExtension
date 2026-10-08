@@ -1,0 +1,74 @@
+// EXT-08 packages an unchanged syntax asset supplied by CORE-34's language package.
+// Its export is executable-specification-language/syntax/expec.tmLanguage.json.
+// Copy it under src/vscode/syntax/ with exact source/grammar hash provenance.
+// The language package generates it from the existing Langium grammar.
+// Keep the current captured compiler for project generation; it need not export this asset.
+// The extension copies it unchanged; it authors no grammar, keyword table or token regex.
+// Plain and quoted names have lexical entity.name.expec scopes, not semantic type claims.
+// The editor observes the actual VSIX installed in an isolated VS Code host.
+// The real TextMate/Oniguruma engine reads that same packaged grammar before these actions.
+// Each example owns its mutable documents and token state; scopes come from the real engine.
+// Build/test tools are declared by phase in expec.json. This contract needs no core runtime API.
+examples {
+  fixture syntaxDeclaration: Text = "type Book { title: Text }"
+  fixture syntaxString: Text = "component Store {\n  capability save() {\n    promises \"type is text // still text\"\n  }\n}"
+  fixture syntaxComment: Text = "// type Book { title: Text }\nconcept Store {}"
+  fixture syntaxQuotedName: Text = "concept `type // Book` {}"
+
+  setup preparedExpecEditor() returns Nothing
+  setup preparedExpecGrammar() returns Nothing
+  action openSyntaxFile(fileName: Text, text: Text) returns Nothing
+  action tokenizeSyntax(text: Text) returns Nothing
+  observation editorLanguageId() returns Text
+  // One-based position; return the actual token's most specific TextMate scope.
+  observation syntaxScopeAt(line: Number, column: Number) returns Text
+
+  check expectEditorLanguage(expected: Text) {
+    let actual = editorLanguageId()
+    assert actual == expected
+  }
+  check expectSyntaxScope(line: Number, column: Number, expected: Text) {
+    let actual = syntaxScopeAt(line, column)
+    assert actual == expected
+  }
+
+  scenario "an installed extension recognizes an expec file" {
+    given preparedExpecEditor()
+    when openSyntaxFile("library.expec", syntaxDeclaration)
+    then expectEditorLanguage("expec")
+  }
+
+  scenario "read declaration keywords and lexical names using theme scopes" {
+    given preparedExpecGrammar()
+    when tokenizeSyntax(syntaxDeclaration)
+    then expectSyntaxScope(1, 1, "keyword.control.expec")
+    then expectSyntaxScope(1, 6, "entity.name.expec")
+  }
+
+  scenario "read quoted strings without interpreting their words as code" {
+    given preparedExpecGrammar()
+    when tokenizeSyntax(syntaxString)
+    then expectSyntaxScope(3, 15, "string.quoted.double.expec")
+    then expectSyntaxScope(3, 28, "string.quoted.double.expec")
+  }
+
+  scenario "read comments without carrying their scope into the next line" {
+    given preparedExpecGrammar()
+    when tokenizeSyntax(syntaxComment)
+    then expectSyntaxScope(1, 4, "comment.line.expec")
+    then expectSyntaxScope(2, 1, "keyword.control.expec")
+  }
+
+  scenario "read a quoted name containing keyword and comment text" {
+    given preparedExpecGrammar()
+    when tokenizeSyntax(syntaxQuotedName)
+    then expectSyntaxScope(1, 10, "entity.name.expec")
+    then expectSyntaxScope(1, 15, "entity.name.expec")
+  }
+
+  scenario "keep an unrelated file in its existing language" {
+    given preparedExpecEditor()
+    when openSyntaxFile("notes.txt", syntaxDeclaration)
+    then expectEditorLanguage("plaintext")
+  }
+}
