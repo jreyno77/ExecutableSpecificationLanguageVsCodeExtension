@@ -1,0 +1,36 @@
+{
+  "name": "expec-vscode-extension",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "spec:check": "expec check --config generation/expec/expec.json",
+    "generate": "expec build --config generation/expec/expec.json",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:collect": "vitest list"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/vscode": "1.100.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "executable-specification-language": "file:generation/tooling/executable-specification-language-167dc68.tgz",
+    "playwright": "1.63.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.3",
+    "vitest": "5.0.2"
+  },
+  "engines": {
+    "node": ">=24.19.0 <25",
+    "npm": ">=11.20.0 <12"
+  },
+  "packageManager": "npm@11.20.0",
+  "dependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
+}

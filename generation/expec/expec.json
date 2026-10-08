@@ -1,0 +1,157 @@
+{
+  "formatVersion": 1,
+  "version": "0.1.0",
+  "project": {
+    "root": "../.."
+  },
+  "build": {
+    "entries": [
+      "src/core/workspace.expec",
+      "src/ui/output-tabs.expec",
+      "src/vscode/editor-adapter.expec"
+    ]
+  },
+  "outputs": [
+    {
+      "id": "typescript",
+      "options": {
+        "sourceRoot": ".",
+        "directory": ".",
+        "configFile": "tsconfig.json",
+        "imports": [
+          {
+            "declaration": ["VsCodeDocument"],
+            "name": "TextDocument",
+            "from": "vscode"
+          }
+        ]
+      }
+    },
+    {
+      "id": "uml",
+      "options": {
+        "directory": "generation/uml",
+        "views": [
+          "structure"
+        ]
+      }
+    },
+    {
+      "id": "acceptance",
+      "options": {
+        "domain": "workspace",
+        "configFile": "tsconfig.json",
+        "names": [
+          {
+            "declaration": ["EditorAdapter", "documentChanged", "document"],
+            "name": "source"
+          },
+          {
+            "declaration": ["EditorAdapter", "documentSaved", "document"],
+            "name": "source"
+          }
+        ]
+      }
+    }
+  ],
+  "packages": [
+    {
+      "alias": "react",
+      "name": "npm:react",
+      "version": "19.3.0",
+      "phases": [
+        "runtime"
+      ]
+    },
+    {
+      "alias": "react-dom",
+      "name": "npm:react-dom",
+      "version": "19.3.0",
+      "phases": [
+        "runtime"
+      ]
+    },
+    {
+      "alias": "typescript",
+      "name": "npm:typescript",
+      "version": "5.9.3",
+      "phases": [
+        "build"
+      ]
+    },
+    {
+      "alias": "vite",
+      "name": "npm:vite",
+      "version": "8.3.3",
+      "phases": [
+        "build",
+        "test"
+      ]
+    },
+    {
+      "alias": "vite-react",
+      "name": "npm:@vitejs/plugin-react",
+      "version": "6.1.2",
+      "phases": [
+        "build",
+        "test"
+      ]
+    },
+    {
+      "alias": "react-types",
+      "name": "npm:@types/react",
+      "version": "19.3.0",
+      "phases": [
+        "build"
+      ]
+    },
+    {
+      "alias": "react-dom-types",
+      "name": "npm:@types/react-dom",
+      "version": "19.3.0",
+      "phases": [
+        "build"
+      ]
+    },
+    {
+      "alias": "vscode-types",
+      "name": "npm:@types/vscode",
+      "version": "1.100.0",
+      "phases": [
+        "build"
+      ]
+    },
+    {
+      "alias": "node-types",
+      "name": "npm:@types/node",
+      "version": "24.13.6",
+      "phases": [
+        "build"
+      ]
+    },
+    {
+      "alias": "vitest",
+      "name": "npm:vitest",
+      "version": "5.0.2",
+      "phases": [
+        "test"
+      ]
+    },
+    {
+      "alias": "playwright",
+      "name": "npm:playwright",
+      "version": "1.63.0",
+      "phases": [
+        "test"
+      ]
+    },
+    {
+      "alias": "expec",
+      "name": "npm:executable-specification-language",
+      "version": "0.1.0",
+      "phases": [
+        "build"
+      ]
+    }
+  ]
+}

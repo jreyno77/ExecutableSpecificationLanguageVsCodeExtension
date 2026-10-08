@@ -1,0 +1,93 @@
+use WorkspaceCore, SourceDocument, OutputTab from "../core/workspace.expec"
+
+// Bound to VS Code's TextDocument by the TypeScript output configuration.
+// Acceptance output explicitly retains its established native parameter name "source".
+// The TypeScript adapter below still receives document: vscode.TextDocument.
+opaque type VsCodeDocument
+
+component EditorAdapter {
+  requires package "typescript" for build
+  requires package "vscode-types" for build
+  requires package "vite" for build
+  requires package "vitest" for test
+
+  construction(core: WorkspaceCore)
+  public documentChanged, documentSaved
+
+  capability documentChanged(document: VsCodeDocument) returns List<OutputTab> {
+    promises "For the supplied editor change, capture a new SourceDocument from document.uri.toString() and document.getText() at this call. Pass that snapshot to core.preview once and return core's tabs unchanged. Preserve the full URI for file, untitled and remote documents; do not read files or request a save. Later edits must not change an earlier snapshot."
+  }
+
+  capability documentSaved(document: VsCodeDocument) returns Nothing {
+    promises "For the supplied save notification, capture a new SourceDocument from document.uri.toString() and document.getText() at this call. Pass that snapshot to core.sourceSaved once without requesting a preview or another save. Core owns the generation policy."
+  }
+}
+
+// The host owns document subscriptions and supplies the event's current document.
+// These examples exercise the real adapter with a recording core and native-shaped
+// documents whose uri.toString() and getText() supply the fixture's values. Actions
+// for the same URI edit the same document; observations inspect actual core requests.
+// They prove conversion and routing, not VS Code event registration or disk writes.
+examples for EditorAdapter {
+  fixture editedDocument: SourceDocument = {
+    uri: "file:///workspace/src/library.expec",
+    text: "type Book {\n  title: Text\n  copies: Number\n}"
+  }
+  fixture latestDocument: SourceDocument = {
+    uri: "file:///workspace/src/library.expec",
+    text: "type Book {\n  title: Text\n  copies: Number\n  available: Boolean\n}"
+  }
+  fixture untitledDocument: SourceDocument = {
+    uri: "untitled:Untitled-1",
+    text: "type Draft {"
+  }
+  fixture previewTabs: List<OutputTab> = [
+    { id: "markdown", label: "Markdown", content: "# Edited Book" }
+  ]
+
+  setup editorCoreReturns(tabs: List<OutputTab>) returns Nothing
+  action changeEditorDocument(source: SourceDocument) returns Nothing
+  action saveEditorDocument(source: SourceDocument) returns Nothing
+  observation corePreviewRequests() returns List<SourceDocument>
+  observation coreSaveRequests() returns List<SourceDocument>
+  observation editorPreviewTabs() returns List<OutputTab>
+
+  check expectCoreRequests(previews: List<SourceDocument>, saves: List<SourceDocument>) {
+    let actualPreviews = corePreviewRequests()
+    let actualSaves = coreSaveRequests()
+    assert actualPreviews == previews
+    assert actualSaves == saves
+  }
+  check expectEditorPreviews(expected: List<OutputTab>) {
+    let actual = editorPreviewTabs()
+    assert actual == expected
+  }
+
+  scenario "preview the current unsaved editor text" {
+    given editorCoreReturns(previewTabs)
+    when changeEditorDocument(editedDocument)
+    then expectCoreRequests([editedDocument], [])
+    then expectEditorPreviews(previewTabs)
+  }
+
+  scenario "forward a saved document to core's save policy" {
+    given editorCoreReturns(previewTabs)
+    when saveEditorDocument(editedDocument)
+    then expectCoreRequests([], [editedDocument])
+  }
+
+  scenario "preview an untitled document without a filesystem path" {
+    given editorCoreReturns(previewTabs)
+    when changeEditorDocument(untitledDocument)
+    then expectCoreRequests([untitledDocument], [])
+    then expectEditorPreviews(previewTabs)
+  }
+
+  scenario "keep each edit's text snapshot for the same document" {
+    given editorCoreReturns(previewTabs)
+    when changeEditorDocument(editedDocument)
+    when changeEditorDocument(latestDocument)
+    then expectCoreRequests([editedDocument, latestDocument], [])
+    then expectEditorPreviews(previewTabs)
+  }
+}

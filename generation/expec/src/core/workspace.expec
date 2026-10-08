@@ -1,0 +1,94 @@
+// EXT-01 specifies the horizontal structure; callable bodies are not implemented.
+type SourceDocument {
+  uri: Text
+  text: Text
+}
+
+type OutputTab {
+  id: Text
+  label: Text
+  content: Text
+}
+
+// One already configured project connection. Its outputs own language and file mechanics.
+// Registration IDs are unique within that connection, not names of output formats.
+interface ProjectOutputs {
+  public preview, generate
+
+  capability preview(source: SourceDocument) returns List<OutputTab> {
+    promises "Use the supplied document text, including unsaved edits, without writing project files. Return one tab per configured output in configuration order, retaining its registration ID and label."
+  }
+
+  capability generate(source: SourceDocument) returns Nothing {
+    promises "Generate from the supplied document through this connection's configured outputs and existing ownership and preservation rules. Never overwrite handwritten work."
+  }
+}
+
+component WorkspaceCore {
+  requires package "typescript" for build
+  requires package "vite" for build
+  requires package "vitest" for test
+
+  construction(outputs: ProjectOutputs, generateOnSave: Boolean)
+  public preview, sourceSaved
+
+  capability preview(source: SourceDocument) returns List<OutputTab> {
+    promises "Ask the connected outputs to preview this exact document and return their tabs unchanged. Do not request generation."
+  }
+
+  capability sourceSaved(source: SourceDocument) returns Nothing {
+    promises "If generateOnSave is enabled, request generation of this exact document once. Otherwise request nothing. This observes an editor save; it does not save the source file."
+  }
+}
+
+// Policy examples use the real WorkspaceCore with a recording ProjectOutputs.
+// Observations read requests received by that collaborator and tabs returned by core.
+// They establish policy and forwarding, not output rendering or filesystem preservation.
+examples for WorkspaceCore {
+  fixture document: SourceDocument = {
+    uri: "file:///workspace/src/library.expec",
+    text: "type Book { title: Text }"
+  }
+  fixture tabs: List<OutputTab> = [
+    { id: "uml", label: "UML", content: "Book: { title: Text }" },
+    { id: "typescript", label: "TypeScript", content: "export interface Book { title: string }" },
+    { id: "markdown", label: "Markdown", content: "# Book" }
+  ]
+
+  setup connectedOutputs(previews: List<OutputTab>, generateOnSave: Boolean) returns Nothing
+  action requestPreview(source: SourceDocument) returns Nothing
+  action saveSource(source: SourceDocument) returns Nothing
+  observation returnedTabs() returns List<OutputTab>
+  observation outputPreviewRequests() returns List<SourceDocument>
+  observation outputGenerationRequests() returns List<SourceDocument>
+
+  check expectPreviewTabs(expected: List<OutputTab>) {
+    let actual = returnedTabs()
+    assert actual == expected
+  }
+  check expectOutputRequests(previews: List<SourceDocument>, generations: List<SourceDocument>) {
+    let actualPreviews = outputPreviewRequests()
+    let actualGenerations = outputGenerationRequests()
+    assert actualPreviews == previews
+    assert actualGenerations == generations
+  }
+
+  scenario "preview every configured output while typing without requesting generation" {
+    given connectedOutputs(tabs, true)
+    when requestPreview(document)
+    then expectPreviewTabs(tabs)
+    then expectOutputRequests([document], [])
+  }
+
+  scenario "saving leaves generation disabled until it is enabled for the connection" {
+    given connectedOutputs(tabs, false)
+    when saveSource(document)
+    then expectOutputRequests([], [])
+  }
+
+  scenario "saving requests generation when enabled for the connection" {
+    given connectedOutputs(tabs, true)
+    when saveSource(document)
+    then expectOutputRequests([], [document])
+  }
+}

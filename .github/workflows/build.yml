@@ -1,0 +1,88 @@
+name: Build and test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Node 24 / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.19.0
+          cache: npm
+      - name: Select affected tests
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { appendFileSync } from 'node:fs';
+          const selected = new Set();
+          let all = process.env.GITHUB_EVENT_NAME !== 'pull_request';
+          if (!all) {
+            const files = execFileSync('git', ['diff', '--name-only', '--no-renames', '-z',
+              `${process.env.BASE_SHA}...${process.env.HEAD_SHA}`], { encoding: 'utf8' }).split('\0').filter(Boolean);
+            for (const file of files) {
+              if (/\.md$/.test(file) || file.startsWith('generation/uml/')) continue;
+              if (/^(src\/core\/|generation\/expec\/src\/core\/|test\/(?:unit\/)?core\/|test\/acceptance\/WorkspaceCore(?:\.|\/))/.test(file)) {
+                selected.add('core'); selected.add('editor'); selected.add('ui');
+              } else if (/^(src\/vscode\/|generation\/expec\/src\/vscode\/|test\/(?:unit\/)?vscode\/|test\/acceptance\/EditorAdapter(?:\.|\/))/.test(file)) {
+                selected.add('editor');
+              } else if (/^(src\/ui\/|generation\/expec\/src\/ui\/|test\/(?:unit\/)?ui\/|test\/acceptance\/OutputTabs(?:\.|\/)|test\/resources\/)/.test(file)) {
+                selected.add('ui');
+              } else {
+                // Shared configuration, DSL/drivers, tooling and unmapped code affect every component.
+                all = true;
+              }
+            }
+          }
+          const filters = {
+            core: ['test/acceptance/WorkspaceCore', 'test/unit/core/', 'test/core/'],
+            editor: ['test/acceptance/EditorAdapter', 'test/unit/vscode/', 'test/vscode/'],
+            ui: ['test/acceptance/OutputTabs', 'test/unit/ui/', 'test/ui/'],
+          };
+          const tests = all || selected.size > 0;
+          appendFileSync(process.env.GITHUB_OUTPUT, `tests=${tests}\nui=${all || selected.has('ui')}\nfilters=${all ? '' : [...selected].flatMap(part => filters[part]).join(' ')}\n`);
+          console.log(all ? 'Full extension suite' : tests ? `Affected components: ${[...selected].join(', ')}` : 'Documentation only; no tests selected');
+          NODE
+      - name: Install dependencies
+        run: |
+          npm install --global npm@11.20.0 --ignore-scripts
+          npm ci
+      - name: Check the specification
+        run: npm run spec:check
+      - name: Build
+        run: npm run build
+      - name: Install Chromium for UI tests
+        if: steps.scope.outputs.ui == 'true'
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Test affected components
+        if: steps.scope.outputs.tests == 'true'
+        env:
+          TEST_FILTERS: ${{ steps.scope.outputs.filters }}
+        run: npm test -- $TEST_FILTERS
