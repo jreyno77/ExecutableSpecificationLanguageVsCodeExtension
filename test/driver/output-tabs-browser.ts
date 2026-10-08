@@ -1,39 +1,28 @@
-import { afterAll, onTestFinished } from 'vitest';
+import { afterAll, beforeAll, inject, onTestFinished } from 'vitest';
 import type { Browser, Page } from 'playwright';
-import type { ViteDevServer } from 'vite';
+import type {} from './output-tabs-setup.js';
 import type { OutputTabs } from '../../src/ui/OutputTabs.js';
 import type { OutputTab } from '../../src/core/OutputTab.js';
 
 declare global {
   interface Window { outputTabs: OutputTabs; createOutputTabs(hostElementId?: string): void }
 }
-let shared: Promise<{ browser: Browser; server: ViteDevServer; url: string }> | undefined;
-async function start() {
-  const [{ createServer }, { chromium }, { default: react }] = await Promise.all([
-    import('vite'), import('playwright'), import('@vitejs/plugin-react'),
-  ]);
-  const server = await createServer({ configFile: false, plugins: [react()],
-    server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' });
-  let browser: Browser | undefined;
-  try {
-    await server.listen();
-    browser = await chromium.launch({ headless: true });
-    return { browser, server, url: server.resolvedUrls!.local[0]! };
-  } catch (error) {
-    try { await browser?.close(); } finally { await server.close(); }
-    throw error;
+let shared: Promise<Browser> | undefined;
+beforeAll(async () => {
+  if (inject('outputTabs')) {
+    shared = import('playwright').then(({ chromium }) => chromium.launch({ headless: true }));
+    await shared;
   }
-}
-afterAll(async () => {
-  const session = await shared?.catch(() => undefined);
-  if (session) try { await session.browser.close(); } finally { await session.server.close(); }
 });
+afterAll(async () => { await (await shared?.catch(() => undefined))?.close(); });
 
 export class OutputTabsBrowser {
   private constructor(readonly page: Page) {}
   static async open(): Promise<OutputTabsBrowser> {
-    const session = await (shared ??= start());
-    const context = await session.browser.newContext();
+    const session = inject('outputTabs');
+    const browser = await shared;
+    if (!browser) throw new Error('Output tabs require the UI test project.');
+    const context = await browser.newContext();
     onTestFinished(() => context.close());
     const page = await context.newPage();
     page.setDefaultTimeout(3000);
