@@ -1,13 +1,24 @@
-// EXT-01 specifies the horizontal structure; callable bodies are not implemented.
+// EXT-01's source-only forwarding remains separate from EXT-05's live report pipeline.
+// Its examples prove forwarding/save policy; they do not establish async rendering.
 type SourceDocument {
   uri: Text
   text: Text
 }
 
+// Supported registered UTF-8 text/SVG documents, decoded strictly without replacement.
+// Paths/media types/content retain the real renderer reply; no target files are read.
+type OutputDocument {
+  path: Text
+  mediaType: Text
+  content: Text
+}
+
 type OutputTab {
   id: Text
   label: Text
-  content: Text
+  status: Text
+  documents: List<OutputDocument>
+  `message`: Text?
 }
 
 // One already configured project connection. Its outputs own language and file mechanics.
@@ -16,7 +27,7 @@ interface ProjectOutputs {
   public preview, generate
 
   capability preview(source: SourceDocument) returns List<OutputTab> {
-    promises "Use the supplied document text, including unsaved edits, without writing project files. Return one tab per configured output in configuration order, retaining its registration ID and label."
+    promises "Use the supplied document text, including unsaved edits, without writing project files. Return one tab per configured output in configuration order, retaining its registration ID and label. This established synchronous seam forwards supplied tabs; EXT-05's native live previews instead receive current DocumentReport publications through OutputPreviews, without another parser or a duplicate live pipeline."
   }
 
   capability generate(source: SourceDocument) returns Nothing {
@@ -50,9 +61,15 @@ examples for WorkspaceCore {
     text: "type Book { title: Text }"
   }
   fixture tabs: List<OutputTab> = [
-    { id: "uml", label: "UML", content: "Book: { title: Text }" },
-    { id: "typescript", label: "TypeScript", content: "export interface Book { title: string }" },
-    { id: "markdown", label: "Markdown", content: "# Book" }
+    { id: "uml", label: "UML", status: "ready", documents: [
+      { path: "structure.d2", mediaType: "text/vnd.d2", content: "Book: { title: Text }" }
+    ] },
+    { id: "typescript", label: "TypeScript", status: "ready", documents: [
+      { path: "Book.ts", mediaType: "text/typescript", content: "export interface Book { title: string }" }
+    ] },
+    { id: "markdown", label: "Markdown", status: "ready", documents: [
+      { path: "Book.md", mediaType: "text/markdown", content: "# Book" }
+    ] }
   ]
 
   setup connectedOutputs(previews: List<OutputTab>, generateOnSave: Boolean) returns Nothing

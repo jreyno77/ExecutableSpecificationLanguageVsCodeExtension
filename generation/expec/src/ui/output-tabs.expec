@@ -19,29 +19,60 @@ component OutputTabs {
   public present, dispose
 
   capability present(tabs: List<OutputTab>) returns Nothing {
-    promises "Present exactly these tabs, in order, using their IDs, labels and content. A new presentation replaces the previous set. Selecting a tab shows its supplied content; presentation never compiles or generates outputs."
+    promises "Present exactly the supplied output IDs/labels/order, statuses, explanations and ordered documents. Replace the previous presentation. Preserve selected output ID and document path while retained; otherwise choose the first current item. Show pending, blocked or refused explanations without old documents; ready with no documents visibly says No authored documents. Select documents by their actual paths within one output tab. Display supported text media literally, including TypeScript, Markdown, D2 and JSON. Display image/svg+xml as an inert image from its supplied UTF-8 content, never injected markup or a target-file path. Use a scroll viewport with default 100 percent scale, author-controlled zoom and reset to 100 percent; do not shrink wide images to fit. Dispose replaced image resources and bind image events to the actual content's current node. Unsupported presentation media shows a clear explanation and retains its path/type. Selection and image navigation never compile, generate, write, fetch external resources or implement report freshness."
   }
 
   capability dispose() returns Nothing {
-    promises "Unmount this view and release its handlers. Keep the supplied host element in the page. Repeated disposal is harmless; present after disposal reports a clear error."
+    promises "Unmount this view and release its handlers and owned image resources. Keep the supplied host element in the page. Repeated disposal is harmless; present after disposal reports a clear error."
   }
 }
 
-// The driver presents through OutputTabs and observes the rendered UI, not its input copy.
+// The driver presents through OutputTabs and observes rendered DOM/image geometry,
+// never its own input copy. The owned browser viewport is 640 by 480 pixels.
+// Supplied presentation fixtures prove UI behavior, not real language rendering.
+// Core examples use actual registered renderers. SVG image load/natural/displayed
+// dimensions prove browser rendering here; zoom/scroll observations read actual UI.
 examples for OutputTabs {
+  fixture emptyPaths: List<Text> = []
   fixture previews: List<OutputTab> = [
-    { id: "uml", label: "UML", content: "Book: { title: Text }" },
-    { id: "typescript", label: "TypeScript", content: "export interface Book { title: string }" },
-    { id: "markdown", label: "Markdown", content: "# Book" }
+    { id: "uml", label: "UML", status: "ready", documents: [
+      { path: "structure.d2", mediaType: "text/vnd.d2", content: "Book: { title: Text }" }
+    ] },
+    { id: "typescript", label: "TypeScript", status: "ready", documents: [
+      { path: "Book.ts", mediaType: "text/typescript", content: "export interface Book { title: string }" }
+    ] },
+    { id: "markdown", label: "Markdown", status: "ready", documents: [
+      { path: "Book.md", mediaType: "text/markdown", content: "# Book" }
+    ] }
+  ]
+  fixture diagrams: List<OutputTab> = [
+    { id: "uml", label: "UML", status: "ready", documents: [
+      { path: "structure.d2", mediaType: "text/vnd.d2", content: "Book: { title: Text }" },
+      { path: "structure.svg", mediaType: "image/svg+xml", content: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1800\" height=\"1200\" viewBox=\"0 0 1800 1200\"><rect width=\"1800\" height=\"1200\" fill=\"white\"/><text x=\"40\" y=\"60\" font-size=\"20\">Book</text></svg>" }
+    ] }
   ]
 
   setup openOutputTabs() returns Nothing
   action presentOutputs(tabs: List<OutputTab>) returns Nothing
   action selectOutput(id: Text) returns Nothing
+  action selectOutputDocument(path: Text) returns Nothing
+  action setDiagramZoom(percent: Number) returns Nothing
+  action resetDiagramZoom() returns Nothing
+  action scrollDiagram(horizontal: Number, vertical: Number) returns Nothing
   action disposeOutputTabs() returns Nothing
   observation outputLabels() returns List<Text>
   observation selectedOutputContent() returns Text
   observation outputHostExists() returns Boolean
+  observation selectedOutputId() returns Text
+  observation selectedOutputStatus() returns Text
+  observation selectedOutputExplanation() returns Text
+  observation selectedDocumentPaths() returns List<Text>
+  observation selectedDocumentPath() returns Text
+  observation diagramImageLoaded() returns Boolean
+  observation diagramZoomPercent() returns Number
+  observation diagramDisplayedWidth() returns Number
+  observation diagramScrollLeft() returns Number
+  observation diagramScrollTop() returns Number
 
   check expectOutputLabels(expected: List<Text>) {
     let actual = outputLabels()
@@ -51,10 +82,41 @@ examples for OutputTabs {
     let actual = selectedOutputContent()
     assert actual == expected
   }
-
   check expectOutputHostRetained() {
     let actual = outputHostExists()
     assert actual == true
+  }
+  check expectSelectedOutput(id: Text) {
+    let actual = selectedOutputId()
+    assert actual == id
+  }
+  check expectOutputStatus(status: Text, explanation: Text) {
+    let actualStatus = selectedOutputStatus()
+    let actualExplanation = selectedOutputExplanation()
+    let documents = selectedDocumentPaths()
+    assert actualStatus == status
+    assert actualExplanation == explanation
+    assert documents == emptyPaths
+  }
+  check expectSelectedDocument(path: Text, paths: List<Text>) {
+    let actual = selectedDocumentPath()
+    let actualPaths = selectedDocumentPaths()
+    assert actual == path
+    assert actualPaths == paths
+  }
+  check expectLoadedDiagram(percent: Number, width: Number) {
+    let loaded = diagramImageLoaded()
+    let actualPercent = diagramZoomPercent()
+    let actualWidth = diagramDisplayedWidth()
+    assert loaded == true
+    assert actualPercent == percent
+    assert actualWidth == width
+  }
+  check expectDiagramScroll(horizontal: Number, vertical: Number) {
+    let actualHorizontal = diagramScrollLeft()
+    let actualVertical = diagramScrollTop()
+    assert actualHorizontal == horizontal
+    assert actualVertical == vertical
   }
 
   scenario "see a tab for each supplied output" {
@@ -73,7 +135,9 @@ examples for OutputTabs {
   scenario "replace the previous tabs when the available outputs change" {
     given openOutputTabs()
     when presentOutputs(previews)
-    when presentOutputs([{ id: "markdown", label: "Notes", content: "# Updated Book" }])
+    when presentOutputs([{ id: "markdown", label: "Notes", status: "ready", documents: [
+      { path: "Book.md", mediaType: "text/markdown", content: "# Updated Book" }
+    ] }])
     when selectOutput("markdown")
     then expectOutputLabels(["Notes"])
     then expectOutputContent("# Updated Book")
@@ -88,4 +152,98 @@ examples for OutputTabs {
     then expectOutputHostRetained()
   }
 
+  scenario "preserve a selected output while it remains configured" {
+    given openOutputTabs()
+    when presentOutputs(previews)
+    when selectOutput("markdown")
+    when presentOutputs([{ id: "markdown", label: "Notes", status: "ready", documents: [
+      { path: "Book.md", mediaType: "text/markdown", content: "# Updated Book" }
+    ] }])
+    then expectSelectedOutput("markdown")
+    then expectOutputContent("# Updated Book")
+  }
+
+  scenario "fall back to the first output when the selected ID is removed" {
+    given openOutputTabs()
+    when presentOutputs(previews)
+    when selectOutput("typescript")
+    when presentOutputs([{ id: "markdown", label: "Markdown", status: "ready", documents: [
+      { path: "Book.md", mediaType: "text/markdown", content: "# Book" }
+    ] }])
+    then expectSelectedOutput("markdown")
+    then expectOutputContent("# Book")
+  }
+
+  scenario "pending feedback withdraws the previous document" {
+    given openOutputTabs()
+    when presentOutputs(previews)
+    when selectOutput("typescript")
+    when presentOutputs([{ id: "typescript", label: "TypeScript", status: "pending", documents: [], `message`: "Previewing current source." }])
+    then expectOutputStatus("pending", "Previewing current source.")
+  }
+
+  scenario "show a refused output's actual explanation without documents" {
+    given openOutputTabs()
+    when presentOutputs([
+      { id: "typescript", label: "TypeScript", status: "refused", documents: [], `message`: "invalid-native-mapping: Missing" },
+      { id: "markdown", label: "Markdown", status: "ready", documents: [
+        { path: "Book.md", mediaType: "text/markdown", content: "# Book" }
+      ] }
+    ])
+    then expectOutputLabels(["TypeScript", "Markdown"])
+    then expectOutputStatus("refused", "invalid-native-mapping: Missing")
+  }
+
+  scenario "a refused output leaves another output readable" {
+    given openOutputTabs()
+    when presentOutputs([
+      { id: "typescript", label: "TypeScript", status: "refused", documents: [], `message`: "invalid-native-mapping: Missing" },
+      { id: "markdown", label: "Markdown", status: "ready", documents: [
+        { path: "Book.md", mediaType: "text/markdown", content: "# Book" }
+      ] }
+    ])
+    when selectOutput("markdown")
+    then expectOutputLabels(["TypeScript", "Markdown"])
+    then expectOutputContent("# Book")
+  }
+
+  scenario "the first returned document path is initially selected" {
+    given openOutputTabs()
+    when presentOutputs(diagrams)
+    then expectSelectedDocument("structure.d2", ["structure.d2", "structure.svg"])
+  }
+
+  scenario "select real document paths within one output tab" {
+    given openOutputTabs()
+    when presentOutputs(diagrams)
+    when selectOutputDocument("structure.svg")
+    then expectSelectedDocument("structure.svg", ["structure.d2", "structure.svg"])
+    then expectLoadedDiagram(100, 1800)
+  }
+
+  scenario "zoom and scroll a readable wide diagram" {
+    given openOutputTabs()
+    when presentOutputs(diagrams)
+    when selectOutputDocument("structure.svg")
+    when setDiagramZoom(150)
+    when scrollDiagram(100, 80)
+    then expectLoadedDiagram(150, 2700)
+    then expectDiagramScroll(100, 80)
+  }
+
+  scenario "zoom and scroll a readable wide diagram then reset its scale" {
+    given openOutputTabs()
+    when presentOutputs(diagrams)
+    when selectOutputDocument("structure.svg")
+    when setDiagramZoom(150)
+    when scrollDiagram(100, 80)
+    when resetDiagramZoom()
+    then expectLoadedDiagram(100, 1800)
+  }
+
+  scenario "ready with no authored documents is a visible successful empty result" {
+    given openOutputTabs()
+    when presentOutputs([{ id: "typescript", label: "TypeScript", status: "ready", documents: [], `message`: "No authored documents" }])
+    then expectOutputStatus("ready", "No authored documents")
+  }
 }

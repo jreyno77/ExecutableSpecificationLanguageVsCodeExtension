@@ -1,0 +1,360 @@
+use SourceDocument, OutputTab from "./workspace.expec"
+use DocumentReport from "./document-analysis.expec"
+use ConnectionConfiguration from "./project-connection.expec"
+
+// Bound to the real public OutputRegistration. Absent construction registrations
+// select shipped built-ins; an explicit list replaces that set, including for
+// custom-output consumers and focused coordination tests.
+opaque type RegisteredOutput
+
+type PreviewPublication {
+  uri: Text?
+  version: Number?
+  tabs: List<OutputTab>
+  `message`: Text?
+}
+
+interface PreviewFeedback {
+  public present
+  capability present(publication: PreviewPublication) returns Nothing {
+    promises "Present this complete plain-data view in order. URI/version identify its authored source for the title and observations. Tabs have unique configured IDs, labels, status, ordered UTF-8 documents and any actual explanation. Whole-view message explains absent/invalid configuration or selection. This accepted view is authoritative; host/UI adapters do not compare report revisions or implement another freshness policy. Keep the latest complete accepted presentation for native ready replay. No model, Specification, native buffer, function or Error crosses transport."
+  }
+}
+
+// Native sidebar forwards its same selected saved configuration snapshot to this
+// event port. Each core consumer uses the real ConfigurationReader independently;
+// this is JSON validation, never a second .expec reader/compiler.
+interface PreviewConfigurationFeedback {
+  public configurationChanged
+  capability configurationChanged(configuration: ConnectionConfiguration?) returns Nothing {
+    promises "Forward the current selected saved manifest snapshot or absence, preserving its absolute filename/text and selection lifetime. Dirty manifest editing retains its saved snapshot policy. Switching away from a selected local manifest withdraws the prior snapshot. This event grants no permission to write, capture targets or claim connection/generation readiness."
+  }
+}
+
+component OutputPreviews {
+  requires package "expec" for runtime
+  requires package "typescript" for build
+  requires package "vitest" for test
+
+  construction(feedback: PreviewFeedback, registrations: List<RegisteredOutput>?)
+  public configurationChanged, selected, published, closed, dispose
+
+  capability configurationChanged(configuration: ConnectionConfiguration?) returns Nothing {
+    promises "Capture this current saved manifest or absence and advance private currentness before further work. Prepare the real Outputs registry and ConfigurationReader from supplied registrations, or shipped built-ins when absent. An explicit list replaces built-ins. Validate through ConfigurationReader without discovering files. Missing/invalid configuration withdraws old tabs with its actual explanation. Preserve configured output IDs/order/options; duplicate IDs remain a configuration error. Changed options replace queued requests. Valid outputs may preview without a project or with an unavailable target; target availability is not authored-preview readiness. Use this absolute native manifest filename as OutputContext.manifestLocation. Do not install, capture targets, rewrite configuration or request generation."
+  }
+  capability selected(uri: Text?) returns Nothing {
+    promises "Select the exact authored document URI or absence, advancing private currentness. Retain current reports for open documents so switching selections requires no recompile. A selected document without a current report has a visible waiting explanation. A preview panel taking focus is not a new authored selection. Selection replaces queued requests and cannot let a previous document's completion restore old content."
+  }
+  capability published(source: SourceDocument, version: Number, report: DocumentReport) returns Nothing {
+    promises "Receive the real current immutable DocumentAnalysis publication before native diagnostic conversion loses its Compilation. Keep the source/version and complete report inside core; never parse, compile, discover files or rebuild models here. Each publication is a new private report revision even at the same editor version after imported-source changes. Only the selected current report drives previews. Rejected syntax or absent/failed/deferred Compilation blocks configured tabs with actual syntax/compiler codes/messages or requirement reasons/requires and no old documents. From its checked Specification call public Outputs.preview independently for each configured ID/options with captured report source URIs as workspaceModules and the selected manifest filename. Publish pending tabs with no previous documents before starting work; each current completion updates only its tab while others progress. Retain actual document paths/media types/order. Strictly decode supported UTF-8 text media, application/json and image/svg+xml from their exact byte spans; invalid UTF-8 or unsupported binary presentation refuses that output with an explicit unsupported-presentation explanation and no silent replacement. Successful empty documents are ready with No authored documents; refused checks retain actual diagnostic codes/messages or requirement reasons/requires. Provider/contract exceptions are visibly refused rather than fabricated upstream findings or empty success. Status is pending, ready, blocked or refused. Private work currentness covers source lifetime/version, report/configuration/selection revisions and coordinator lifetime; check it after every await and discard stale success/refusal/error. Keep at most one invocation per output ID in flight and only its latest requested report/configuration queued; after settlement render that latest request and skip superseded intermediate edits. Other IDs progress independently. Do not open project adapters, capture a target, plan/apply writes, generate acceptance output, execute scenarios or claim handwritten preservation/write readiness."
+  }
+  capability closed(uri: Text) returns Nothing {
+    promises "Forget this open report lifetime, clear selection if it owns the selected source, invalidate pending work and clear queued requests for it. Later old completions cannot publish. Reopening the same URI may start at a lower version and is a distinct report lifetime. Other retained open reports remain usable."
+  }
+  capability dispose() returns Nothing {
+    promises "End this coordinator lifetime, clear retained reports/queued work and prevent new invocations or later publication. Repeated disposal is harmless. Already started callbacks have rejection handlers and settle through their own cleanup; this operation does not claim synchronous worker termination. Real UML callbacks own one engine per invocation, reuse it across documents and dispose before settlement."
+  }
+}
+
+// Strong acceptance examples assemble the real DocumentAnalysis with captured
+// in-memory DocumentSources, real OutputPreviews and actual shipped registrations.
+// Driver feedback fans each real report into previews and records actual full views.
+// Source actions reach DocumentAnalysis; selection/configuration actions reach core.
+// settleCurrentPreviews waits for the actual current feedback, not an input copy.
+// Observations locate actual returned path/media/content or parsed actual SVG labels;
+// they never parse .expec text or derive expected declarations from fixture names.
+// Configuration metadata uses an owned absolute native filename. No project capture
+// is supplied. Target preservation compares the actual owned fixture tree's paths/
+// bytes; unchanged bytes alone do not prove no reads or same-byte writes. Retain the
+// real OUT-24 no-target-open evidence and focused no-adapter-open boundary tests.
+//
+// Controlled races decorate actual registration callbacks with an invocation gate.
+// gatedPreviewAuthoring installs the gate before opening source; awaitHeldOutput waits until that callback is really running. Other callbacks retain
+// their actual renderer behavior. Release/drain all started work, even on assertion
+// failure. Invocation/max-concurrency observations prove bounded scheduling only;
+// current bytes/path/version observations establish the intended visible outcome.
+examples for OutputPreviews {
+  fixture emptyPaths: List<Text> = []
+  fixture threeOutputs: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"uml\",\"options\":{\"directory\":\"draft/uml\",\"views\":[\"structure\"]}},{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\"}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}"
+  fixture textOutputs: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\"}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}"
+  fixture typeScriptOnly: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\"}}]}"
+
+  setup previewAuthoring(configuration: Text) returns Nothing
+  setup gatedPreviewAuthoring(configuration: Text, id: Text) returns Nothing
+  action openPreviewSource(source: SourceDocument, version: Number) returns Nothing
+  action changePreviewSource(source: SourceDocument, version: Number) returns Nothing
+  action changePreviewConfiguration(configuration: Text) returns Nothing
+  action settleCurrentPreviews() returns Nothing
+  action savePreviewImport(uri: Text, text: Text) returns Nothing
+  action closePreviewSource(uri: Text) returns Nothing
+  action disposePreviews() returns Nothing
+  action awaitHeldOutput(id: Text) returns Nothing
+  action releaseHeldOutput(id: Text) returns Nothing
+  action drainPreviewWork() returns Nothing
+  // These replace only one custom callback's reply with a valid Check/document:
+  // text/typescript with byte FF, or application/octet-stream with bytes 00/FF.
+  // They prove transport refusal, not a shipped renderer's output behavior.
+  setup undecodableTextOutput() returns Nothing
+  setup unsupportedBinaryOutput() returns Nothing
+  observation previewOutputIds() returns List<Text>
+  observation previewOutputLabels() returns List<Text>
+  observation previewOutputStatus(id: Text) returns Text
+  observation previewDocumentPaths(id: Text) returns List<Text>
+  observation previewDocumentMediaType(id: Text, path: Text) returns Text
+  observation previewDocumentContains(id: Text, path: Text, content: Text) returns Boolean
+  observation previewSvgHasLabel(id: Text, path: Text, label: Text) returns Boolean
+  observation previewExplanationContains(id: Text, text: Text) returns Boolean
+  observation previewViewExplanation() returns Text
+  observation previewSourceUri() returns Text
+  observation previewSourceVersion() returns Number
+  observation previewTargetPathsAndBytesUnchanged() returns Boolean
+  observation outputInvocationCount(id: Text) returns Number
+  observation outputMaximumConcurrentInvocations(id: Text) returns Number
+  observation postDisposalPublicationCount() returns Number
+
+  check expectConfiguredOutputs(ids: List<Text>, labels: List<Text>) {
+    let actualIds = previewOutputIds()
+    let actualLabels = previewOutputLabels()
+    assert actualIds == ids
+    assert actualLabels == labels
+  }
+  check expectPreviewStatus(id: Text, status: Text) {
+    let actual = previewOutputStatus(id)
+    assert actual == status
+  }
+  check expectPreviewDocument(id: Text, path: Text, mediaType: Text, content: Text) {
+    let actualMediaType = previewDocumentMediaType(id, path)
+    let contains = previewDocumentContains(id, path, content)
+    assert actualMediaType == mediaType
+    assert contains == true
+  }
+  check expectPreviewSvgLabel(id: Text, path: Text, label: Text) {
+    let actualMediaType = previewDocumentMediaType(id, path)
+    let hasLabel = previewSvgHasLabel(id, path, label)
+    assert actualMediaType == "image/svg+xml"
+    assert hasLabel == true
+  }
+  check expectPreviewExplanation(id: Text, text: Text) {
+    let contains = previewExplanationContains(id, text)
+    assert contains == true
+  }
+  check expectNoPreviewDocuments(id: Text) {
+    let paths = previewDocumentPaths(id)
+    assert paths == emptyPaths
+  }
+  check expectCurrentPreviewSource(uri: Text, version: Number) {
+    let actualUri = previewSourceUri()
+    let actualVersion = previewSourceVersion()
+    assert actualUri == uri
+    assert actualVersion == version
+  }
+  check expectTargetsPreserved() {
+    let unchanged = previewTargetPathsAndBytesUnchanged()
+    assert unchanged == true
+  }
+  check expectBoundedOutputWork(id: Text, invocations: Number) {
+    let actualInvocations = outputInvocationCount(id)
+    let actualMaximum = outputMaximumConcurrentInvocations(id)
+    assert actualInvocations == invocations
+    assert actualMaximum == 1
+  }
+  check expectNoPublicationAfterDisposal() {
+    let actual = postDisposalPublicationCount()
+    assert actual == 0
+  }
+  check expectNoSelectedPreview() {
+    let ids = previewOutputIds()
+    let explanation = previewViewExplanation()
+    assert ids == emptyPaths
+    assert explanation != ""
+  }
+
+  scenario "show three registered outputs from the current unsaved text" {
+    given previewAuthoring(threeOutputs)
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when changePreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Number }" }, 2)
+    when settleCurrentPreviews()
+    then expectConfiguredOutputs(["uml", "typescript", "markdown"], ["UML", "TypeScript", "Markdown"])
+    then expectCurrentPreviewSource("file:///workspace/src/library.expec", 2)
+    then expectPreviewDocument("typescript", "draft/types/Book.ts", "text/typescript", "title: number;")
+    then expectPreviewDocument("markdown", "draft/docs/Book.md", "text/markdown", "type Book")
+    then expectPreviewSvgLabel("uml", "draft/uml/structure.svg", "Book")
+    then expectTargetsPreserved()
+  }
+
+  scenario "a rejected current edit withdraws old successful documents" {
+    given previewAuthoring(textOutputs)
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when settleCurrentPreviews()
+    when changePreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book {" }, 2)
+    when settleCurrentPreviews()
+    then expectPreviewStatus("typescript", "blocked")
+    then expectPreviewStatus("markdown", "blocked")
+    then expectPreviewExplanation("typescript", "expected-token")
+    then expectNoPreviewDocuments("typescript")
+    then expectNoPreviewDocuments("markdown")
+  }
+
+  scenario "a native mapping refusal leaves documentation available" {
+    given previewAuthoring("{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\",\"names\":[{\"declaration\":[\"Missing\"],\"name\":\"Renamed\"}]}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}")
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when settleCurrentPreviews()
+    then expectPreviewStatus("typescript", "refused")
+    then expectPreviewExplanation("typescript", "invalid-native-mapping")
+    then expectNoPreviewDocuments("typescript")
+    then expectPreviewStatus("markdown", "ready")
+    then expectPreviewDocument("markdown", "draft/docs/Book.md", "text/markdown", "type Book")
+  }
+
+  scenario "registered outputs sharing Markdown presentation retain distinct IDs" {
+    given previewAuthoring("{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}},{\"id\":\"contract-list\",\"options\":{\"directory\":\"draft/contracts\"}}]}")
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when settleCurrentPreviews()
+    then expectConfiguredOutputs(["markdown", "contract-list"], ["Markdown", "contract-list"])
+    then expectPreviewStatus("markdown", "ready")
+    then expectPreviewStatus("contract-list", "ready")
+  }
+
+  scenario "configuration changes replace output IDs and actual document paths" {
+    given previewAuthoring(textOutputs)
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when settleCurrentPreviews()
+    when changePreviewConfiguration("{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"revised/docs\"}}]}")
+    when settleCurrentPreviews()
+    then expectConfiguredOutputs(["markdown"], ["Markdown"])
+    then expectPreviewDocument("markdown", "revised/docs/Book.md", "text/markdown", "type Book")
+  }
+
+  scenario "saved imports update previews without a newer entry editor version" {
+    given previewAuthoring(typeScriptOnly)
+    when savePreviewImport("file:///workspace/src/book.expec", "type Book { title: Text }")
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "use Book from \"./book.expec\"\ntype Shelf { book: Book }" }, 1)
+    when settleCurrentPreviews()
+    when savePreviewImport("file:///workspace/src/book.expec", "type Book { title: Number }")
+    when settleCurrentPreviews()
+    then expectCurrentPreviewSource("file:///workspace/src/library.expec", 1)
+    then expectPreviewDocument("typescript", "draft/types/Book.ts", "text/typescript", "title: number;")
+  }
+
+  scenario "an empty authored projection is a visible successful result" {
+    given previewAuthoring(typeScriptOnly)
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "" }, 1)
+    when settleCurrentPreviews()
+    then expectPreviewStatus("typescript", "ready")
+    then expectNoPreviewDocuments("typescript")
+    then expectPreviewExplanation("typescript", "No authored documents")
+  }
+
+  scenario "a configured output without a preview does not hide another output" {
+    given previewAuthoring("{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"java\",\"options\":{\"directory\":\"draft/java\"}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}")
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when settleCurrentPreviews()
+    then expectPreviewStatus("java", "refused")
+    then expectPreviewExplanation("java", "output-preview-unavailable")
+    then expectPreviewStatus("markdown", "ready")
+    then expectPreviewDocument("markdown", "draft/docs/Book.md", "text/markdown", "type Book")
+  }
+
+  scenario "an unresolved declaration blocks preview rather than succeeding empty" {
+    given previewAuthoring(typeScriptOnly)
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Boook }" }, 1)
+    when settleCurrentPreviews()
+    then expectPreviewStatus("typescript", "blocked")
+    then expectPreviewExplanation("typescript", "unresolved-reference")
+    then expectNoPreviewDocuments("typescript")
+  }
+
+  scenario "a running output presents pending state with no previous documents" {
+    given gatedPreviewAuthoring(typeScriptOnly, "typescript")
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when awaitHeldOutput("typescript")
+    then expectPreviewStatus("typescript", "pending")
+    then expectNoPreviewDocuments("typescript")
+    then expectBoundedOutputWork("typescript", 1)
+  }
+
+  scenario "rapid edits coalesce running output work to only the latest request" {
+    given gatedPreviewAuthoring(typeScriptOnly, "typescript")
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when awaitHeldOutput("typescript")
+    when changePreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Boolean }" }, 2)
+    when changePreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Novel { title: Number }" }, 3)
+    when releaseHeldOutput("typescript")
+    when settleCurrentPreviews()
+    then expectBoundedOutputWork("typescript", 2)
+    then expectCurrentPreviewSource("file:///workspace/src/library.expec", 3)
+    then expectPreviewDocument("typescript", "draft/types/Novel.ts", "text/typescript", "title: number;")
+  }
+
+  scenario "a new rejected report prevents an older completion restoring content" {
+    given gatedPreviewAuthoring(typeScriptOnly, "typescript")
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when awaitHeldOutput("typescript")
+    when changePreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book {" }, 2)
+    when releaseHeldOutput("typescript")
+    when drainPreviewWork()
+    then expectCurrentPreviewSource("file:///workspace/src/library.expec", 2)
+    then expectPreviewStatus("typescript", "blocked")
+    then expectNoPreviewDocuments("typescript")
+    then expectBoundedOutputWork("typescript", 1)
+  }
+
+  scenario "changed output options supersede a running projection" {
+    given gatedPreviewAuthoring(typeScriptOnly, "typescript")
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when awaitHeldOutput("typescript")
+    when changePreviewConfiguration("{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"directory\":\"latest/types\"}}]}")
+    when releaseHeldOutput("typescript")
+    when settleCurrentPreviews()
+    then expectBoundedOutputWork("typescript", 2)
+    then expectPreviewDocument("typescript", "latest/types/Book.ts", "text/typescript", "title: string;")
+  }
+
+  scenario "selection discards another document's running preview" {
+    given gatedPreviewAuthoring(typeScriptOnly, "typescript")
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when awaitHeldOutput("typescript")
+    when openPreviewSource({ uri: "file:///workspace/src/novel.expec", text: "type Novel { title: Number }" }, 1)
+    when releaseHeldOutput("typescript")
+    when settleCurrentPreviews()
+    then expectCurrentPreviewSource("file:///workspace/src/novel.expec", 1)
+    then expectPreviewDocument("typescript", "draft/types/Novel.ts", "text/typescript", "title: number;")
+  }
+
+  scenario "closing a selected source prevents its running result from returning" {
+    given gatedPreviewAuthoring(typeScriptOnly, "typescript")
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when awaitHeldOutput("typescript")
+    when closePreviewSource("file:///workspace/src/library.expec")
+    when releaseHeldOutput("typescript")
+    when drainPreviewWork()
+    then expectNoSelectedPreview()
+  }
+
+  scenario "disposal prevents a running callback from publishing afterward" {
+    given gatedPreviewAuthoring(typeScriptOnly, "typescript")
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when awaitHeldOutput("typescript")
+    when disposePreviews()
+    when releaseHeldOutput("typescript")
+    when drainPreviewWork()
+    then expectNoPublicationAfterDisposal()
+  }
+  scenario "invalid UTF-8 is explicitly refused without replacement content" {
+    given undecodableTextOutput()
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when settleCurrentPreviews()
+    then expectPreviewStatus("typescript", "refused")
+    then expectPreviewExplanation("typescript", "unsupported-presentation")
+    then expectNoPreviewDocuments("typescript")
+  }
+
+  scenario "unsupported binary presentation remains visibly refused" {
+    given unsupportedBinaryOutput()
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when settleCurrentPreviews()
+    then expectPreviewStatus("binary", "refused")
+    then expectPreviewExplanation("binary", "unsupported-presentation")
+    then expectNoPreviewDocuments("binary")
+  }
+}
