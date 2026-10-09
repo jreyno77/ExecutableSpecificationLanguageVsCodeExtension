@@ -5,6 +5,10 @@ import type { DocumentAnalysis } from "../core/DocumentAnalysis.js";
 import type { Connection } from "vscode-languageserver/node";
 import type { SourceDocument } from "../core/SourceDocument.js";
 import type { SyntaxDiagnostic } from "executable-specification-language";
+import type { DocumentSources } from "../core/DocumentSources.js";
+
+import type { DocumentReport } from "../core/DocumentReport.js";
+
 /** Number profile: JavaScript binary64. */
 
 
@@ -26,13 +30,13 @@ export class LanguageServerAdapter {
     private readonly reports = new Map<string, { version: number; items: Diagnostic[] }>();
     private started = false;
     private disposed = false;
-    constructor(connection: Connection) {
+    constructor(connection: Connection, sources: DocumentSources) {
         this.connection = connection;
         this.analysis = new CoreDocumentAnalysis(this);
     }
     /**
      * Unverified implementation obligation.
-     * Register native LSP initialization and document events once, using TextDocuments to reconstruct incremental text. Feed actual open/change/close snapshots and versions to core DocumentAnalysis. Opening must check exactly once despite TextDocuments also emitting a content-change event. Core owns checking and version/lifetime policy; this adapter owns protocol registration and translation. Register standard LSP document diagnostic pull with no cross-file/workspace diagnostics yet, and negotiate UTF-16 positions.
+     * Register native LSP initialization and document events once, using TextDocuments to reconstruct incremental text. Feed actual open/change/close snapshots and versions to core DocumentAnalysis. Opening must check exactly once despite TextDocuments also emitting a content-change event. Core owns checking and version/lifetime policy; this adapter owns protocol registration and translation. Register standard LSP document diagnostic pull with inter-file dependencies and no workspace diagnostic enumeration, and negotiate UTF-16 positions. Register standard LSP watched-file notifications for requested dependency URIs, including currently missing files, using native relative-pattern registration. Core chooses relevant invalidation; forward creation/change/deletion to sourceChanged. Reconcile capture-to-watch gaps by rechecking after each newly established registration. Retain registrations only for dependency URIs requested by current open entries, and dispose them when unneeded or on shutdown. Unsupported native watch capabilities remain an observable limitation rather than a promised live update. Do not scan or compile in the adapter.
      */
     start(): void {
         if (this.started || this.disposed) return;
@@ -55,9 +59,9 @@ export class LanguageServerAdapter {
     }
     /**
      * Unverified implementation obligation.
-     * Retain the real error diagnostics for this exact source URI, text and version as the current native pull-response cache. Convert Unicode scalar ranges, including related ranges, to zero-based UTF-16 using the supplied snapshot; preserve explanation and category. An empty list replaces the cached problems and yields an empty full diagnostic report when the native client requests it. Never guess a location, reparse source, generate files or read disk.
+     * Retain real syntax and compiler errors whose primary source URI matches this document in its current native pull cache. Foreign primary findings remain in the raw Compilation and output log; an open imported document receives its own entry analysis. Never attach a foreign primary range to the requesting document. Convert each scalar range with the captured text for that range's exact URI, including cross-file related information. Preserve messages and codes. Keep nonlocated problems and deferred requirements observable in the language-client output log without inventing editor positions. Replace old feedback, including an empty full report when findings clear. Give each accepted publication an opaque analysis resultId; editor version alone cannot identify changed imports. Request the SDK diagnostic refresh after dependent feedback changes. Never reparse, generate or make semantic decisions here.
      */
-    publish(source: SourceDocument, version: number, problems: Array<SyntaxDiagnostic>): void {
+    publish(source: SourceDocument, version: number, report: DocumentReport): void {
         if (this.disposed) return;
         const document = TextDocument.create(source.uri, 'expec', version, source.text);
         const offsets = [0];
