@@ -3,6 +3,7 @@ import { readFile, readdir, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Frame } from 'playwright';
 import { GenerationProject } from '../generation-on-save.js';
+import { svgBrowser, svgTextLabels } from '../svg-labels.js';
 import { NativeCleanupError } from './native-process.js';
 import { VsCodeSession, type GenerationEditorObservation } from './vscode-session.js';
 
@@ -96,7 +97,7 @@ export class NativeGenerationCase {
     const deadline = Date.now() + 60_000;
     let last: NativeGenerationPresentation | undefined;
     while (Date.now() < deadline) {
-      last = await this.observe();
+      last = await this.observe(deadline);
       const terminal = last.status !== '' && !['generating', 'queued'].includes(last.status);
       const fresh = !this.savedIntent || /^\[(?:built|blocked|disabled|failed|refused|cancelled|idle)\]/m.test(last.log.slice(this.publicationOffset));
       if (terminal && fresh) { this.presentation = last; return; }
@@ -106,15 +107,17 @@ export class NativeGenerationCase {
   }
   private async settledSelection(status: string): Promise<void> {
     const deadline = Date.now() + 30_000;
+    let last: NativeGenerationPresentation | undefined;
     while (Date.now() < deadline) {
-      const actual = await this.observe(); if (actual.status === status) { this.presentation = actual; return; }
+      last = await this.observe(deadline); if (last.status === status) { this.presentation = last; return; }
       await new Promise(resolve => setTimeout(resolve, 20));
     }
-    throw new Error('The actual native selection did not present ' + status + '.');
+    throw new Error('The actual native selection did not present ' + status + ': '
+      + JSON.stringify({ actual: last?.status, explanation: last?.explanation, tail: last?.log.slice(-1200) }));
   }
-  private async productFrame(): Promise<Frame> {
+  private async productFrame(deadline = Date.now() + 30_000): Promise<Frame> {
     if (this.frame && !this.frame.isDetached()) return this.frame;
-    const browser = await this.session!.webviewBrowser(), deadline = Date.now() + 30_000;
+    const browser = await this.session!.webviewBrowser();
     while (Date.now() < deadline) {
       const found: Frame[] = [];
       for (const context of browser.contexts()) for (const page of context.pages()) for (const frame of page.frames()) {
@@ -126,21 +129,29 @@ export class NativeGenerationCase {
     }
     throw new Error('The owned native workbench did not expose its actual status bar.');
   }
-  private async observe(): Promise<NativeGenerationPresentation> {
+  private async observe(deadline = Date.now() + 30_000): Promise<NativeGenerationPresentation> {
     if (!this.session || !this.editor) throw new Error('No actual native generation editor is open.');
-    this.editor = await this.session.observeGenerationEditor(this.id);
-    const frame = await this.productFrame();
-    const rendered = await frame.evaluate(() => {
-      const items = Array.from(document.querySelectorAll<HTMLElement>('.statusbar-item'))
-        .filter(item => item.textContent?.trim().startsWith('.expec Generation: ') && item.getBoundingClientRect().width > 0);
-      return items.map(item => ({ text: item.textContent?.trim() ?? '', title: item.getAttribute('title') ?? '' }));
-    });
-    if (rendered.length !== 1) throw new Error('Expected one actually rendered .expec Generation status item, observed ' + rendered.length);
-    const documents = this.editor.outputDocuments.filter(document => decodeURIComponent(document.uri).includes('.expec Generation'));
-    if (documents.length !== 1) throw new Error('Expected the actual shown generation output document, observed ' + documents.length);
-    const log = documents[0].text, status = rendered[0].text.slice('.expec Generation: '.length);
-    const lines = log.split(/\r?\n/), line = [...lines].reverse().find(value => value.startsWith('[' + status + '] '));
-    return { status, explanation: line?.slice(status.length + 3) ?? rendered[0].title, log };
+    const frame = await this.productFrame(deadline);
+    let actual: { rendered: { text: string; title: string }[]; outputUris: string[] } | undefined;
+    while (Date.now() < deadline) {
+      const rendered = await frame.evaluate(() => {
+        const items = Array.from(document.querySelectorAll<HTMLElement>('.statusbar-item'))
+          .filter(item => item.textContent?.trim().startsWith('.expec Generation: ') && item.getBoundingClientRect().width > 0);
+        return items.map(item => ({ text: item.textContent?.trim() ?? '', title: item.getAttribute('title') ?? '' }));
+      });
+      // OutputChannel.show returns void; command completion does not acknowledge its async text model.
+      this.editor = await this.session.observeGenerationEditor(this.id);
+      const documents = this.editor.outputDocuments.filter(document => decodeURIComponent(document.uri).includes('.expec Generation'));
+      actual = { rendered, outputUris: this.editor.outputDocuments.map(document => document.uri) };
+      if (rendered.length > 1 || documents.length > 1) throw new Error('Multiple actual native generation presentations: ' + JSON.stringify(actual));
+      if (rendered.length === 1 && documents.length === 1) {
+        const log = documents[0].text, status = rendered[0].text.slice('.expec Generation: '.length);
+        const line = [...log.split(/\r?\n/)].reverse().find(value => value.startsWith('[' + status + '] '));
+        if (line) return { status, explanation: line.slice(status.length + 3), log };
+      }
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    throw new Error('The actual native generation status/output model did not become ready: ' + JSON.stringify(actual));
   }
   async status(): Promise<string> { return (await this.observe()).status; }
   async explanation(): Promise<string> { return (await this.observe()).explanation; }
@@ -164,17 +175,26 @@ export class NativeGenerationCase {
     await this.open(); const directory = join(this.selected!.target, 'diagrams');
     const files = (await readdir(directory)).filter(name => name.endsWith('.svg'));
     if (!files.length) throw new Error('The actual configured UML output has no saved SVG.');
-    const frame = await this.productFrame();
-    for (const name of files) {
-      const saved = await readFile(join(directory, name), 'utf8');
-      const labels = await frame.evaluate(svg => {
-        const actual = new DOMParser().parseFromString(svg, 'image/svg+xml');
-        if (actual.querySelector('parsererror')) throw new Error('The actual saved SVG is malformed.');
-        return Array.from(actual.querySelectorAll('text, tspan')).map(node => node.textContent ?? '').join('\n');
-      }, saved);
-      if (labels.includes(text)) return true;
+    const context = await (await svgBrowser()).newContext();
+    let failure: unknown;
+    const observed: { file: string; labels: readonly string[] }[] = [];
+    try {
+      await context.route('**/*', route => route.abort());
+      const page = await context.newPage();
+      for (const name of files) {
+        const saved = await readFile(join(directory, name), 'utf8');
+        const labels = await svgTextLabels(page, saved);
+        observed.push({ file: name, labels });
+        if (labels.join('\n').includes(text)) return true;
+      }
+      console.info('Actual saved SVG labels:', JSON.stringify({ expected: text, observed }));
+      return false;
+    } catch (error) { failure = error; throw error; }
+    finally {
+      try { await context.close(); }
+      catch (cleanup) { throw new NativeCleanupError('The owned SVG observation context did not close.',
+        { cause: failure === undefined ? cleanup : new AggregateError([failure, cleanup], 'SVG observation and cleanup failed.') }); }
     }
-    return false;
   }
   dispose(): Promise<void> { return this.disposal ??= this.disposeOwnedEditor(); }
   private async disposeOwnedEditor(): Promise<void> {
@@ -186,7 +206,7 @@ export class NativeGenerationCase {
         // A disabled publication alone does not establish that an admitted child settled.
         const deadline = Date.now() + 60_000;
         while (true) {
-          const actual = await this.observe(), tail = actual.log.slice(this.publicationOffset);
+          const actual = await this.observe(deadline), tail = actual.log.slice(this.publicationOffset);
           const cleanup = generationCleanupState(tail);
           if (cleanup === 'unconfirmed') {
             throw new NativeCleanupError('The actual generation record reports unconfirmed child/descendant cleanup; its owned target is retained.');

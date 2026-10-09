@@ -1485,9 +1485,9 @@ readonly generationLibraryInitial: string = "component Library { capability coun
 
 readonly generationLibraryChanged: string = "component Library {\n  capability count() returns Number\n  capability title() returns Text\n}";
 
-readonly nativeGenerationLibrary: string = "component Library { capability count() returns Number }";
+readonly nativeGenerationLibrary: string = "component Library {\n  public count\n  capability count() returns Number\n}";
 
-readonly nativeGenerationAddition: string = "component Library {\n  capability count() returns Number\n  capability title() returns Text\n}";
+readonly nativeGenerationAddition: string = "component Library {\n  public count, title\n  capability count() returns Number\n  capability title() returns Text\n}";
 
 readonly nativeGenerationShelf: string = "type Shelf { copies: Number }";
 }

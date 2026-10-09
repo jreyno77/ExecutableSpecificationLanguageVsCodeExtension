@@ -175,19 +175,19 @@ export class InstalledExpecEditor {
 
   dispose(): Promise<void> { return this.disposal ??= this.finishDisposal(); }
   private async finishDisposal(): Promise<void> {
-    await within(Promise.allSettled([...this.activeOpens]), 70_000, 'Active native observations did not settle before disposal.');
+    const failures: unknown[] = [];
     try {
-      try {
-        const documents = await Promise.allSettled([...this.diagnosticDocuments].map(document => document.dispose())
-          .concat([...this.connectionSidebars].map(sidebar => sidebar.dispose()), [...this.previewEditors].map(editor => editor.dispose()), [...this.generationEditors].map(editor => editor.dispose())));
-        const failed = documents.find(result => result.status === 'rejected');
-        if (failed?.status === 'rejected') throw failed.reason;
-      } finally { await this.activeSession?.dispose(); }
-    } catch (error) { if (error instanceof NativeCleanupError) this.cleanupUnconfirmed = true; throw error; }
-    finally {
-      if (this.cleanupUnconfirmed) throw new Error('Native host cleanup is unconfirmed; retained installation ' + this.directory + '.');
-      await removeOwnedDirectory(this.directory);
-    }
+      const opened = await within(Promise.allSettled([...this.activeOpens]), 70_000, 'Active native observations did not settle before disposal.');
+      for (const result of opened) if (result.status === 'rejected') failures.push(result.reason);
+    } catch (error) { failures.push(error); }
+    const disposed = await Promise.allSettled([...this.diagnosticDocuments].map(document => document.dispose())
+      .concat([...this.connectionSidebars].map(sidebar => sidebar.dispose()), [...this.previewEditors].map(editor => editor.dispose()), [...this.generationEditors].map(editor => editor.dispose())));
+    for (const result of disposed) if (result.status === 'rejected') failures.push(result.reason);
+    try { await this.activeSession?.dispose(); } catch (error) { failures.push(error); }
+    if (failures.length) this.cleanupUnconfirmed = true;
+    if (this.cleanupUnconfirmed) throw new NativeCleanupError('Native host cleanup is unconfirmed; retained installation ' + this.directory + '.',
+      { cause: new AggregateError(failures, 'Actual native cleanup failures.') });
+    await removeOwnedDirectory(this.directory);
   }
 }
 function documentPath(file: string): string {

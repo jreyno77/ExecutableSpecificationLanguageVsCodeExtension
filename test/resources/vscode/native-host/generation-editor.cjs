@@ -24,7 +24,7 @@ exports.openGenerationEditor = async function openGenerationEditor(vscode, exten
     await until(async () => {
       const children = await provider.getChildren();
       if (!Array.isArray(children) || children.length !== 1 || children[0].configurationFile !== selected.configurationFile) return false;
-      return (await provider.getTreeItem(children[0])).contextValue !== 'checking';
+      return (await provider.getTreeItem(children[0])).contextValue === 'connected';
     }, 'The actual saved generation selection did not settle.');
     document = await open(selected.file);
     await vscode.window.showTextDocument(document, { preview: false });
@@ -41,9 +41,19 @@ exports.openGenerationEditor = async function openGenerationEditor(vscode, exten
   async function edit(file, text, save, hide) {
     const value = await open(file), before = value.version, change = new vscode.WorkspaceEdit();
     await vscode.window.showTextDocument(value, { preview: false });
-    change.replace(value.uri, new vscode.Range(value.positionAt(0), value.positionAt(value.getText().length)), text);
+    const edits = [vscode.TextEdit.replace(new vscode.Range(value.positionAt(0), value.positionAt(value.getText().length)), text)];
+    const newline = text.match(/\r?\n/);
+    if (newline) edits.push(vscode.TextEdit.setEndOfLine(newline[0] === '\r\n' ? vscode.EndOfLine.CRLF : vscode.EndOfLine.LF));
+    change.set(value.uri, edits);
     if (!await vscode.workspace.applyEdit(change)) throw new Error('The actual generation editor refused its owned edit.');
-    await until(() => value.version > before && value.getText() === text && value.isDirty, 'The actual native edit was not retained.');
+    try {
+      await until(() => value.version > before && value.getText() === text && value.isDirty, 'The actual native edit was not retained.');
+    } catch (error) {
+      throw new Error('The actual native edit was not retained: ' + JSON.stringify({ file, before,
+        version: value.version, eol: value.eol, text: value.getText(), expected: text, sameText: value.getText() === text, dirty: value.isDirty, closed: value.isClosed,
+        current: vscode.workspace.textDocuments.filter(item => item.uri.toString() === value.uri.toString())
+          .map(item => ({ version: item.version, sameText: item.getText() === text, dirty: item.isDirty, closed: item.isClosed })) }), { cause: error });
+    }
     if (save) {
       if (!await value.save()) throw new Error('The actual generation document did not save.');
       await until(async () => !value.isDirty && await fs.readFile(value.uri.fsPath, 'utf8') === text, 'The actual post-save bytes did not match the editor.');
@@ -63,7 +73,9 @@ exports.openGenerationEditor = async function openGenerationEditor(vscode, exten
         if (value.isClosed) continue;
         await vscode.window.showTextDocument(value, { preview: false });
         await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
-        await until(() => value.isClosed && !vscode.workspace.textDocuments.includes(value), 'An owned generation buffer remained open after discard.');
+        await until(() => !vscode.window.tabGroups.all.some(group => group.tabs.some(tab => tab.input?.uri?.toString() === value.uri.toString()))
+          && vscode.workspace.textDocuments.filter(item => item.uri.toString() === value.uri.toString()).every(item => !item.isDirty),
+          'An owned generation tab or dirty buffer remained after discard.');
       } catch (error) { errors.push(error); }
     }
     try { await configuration.update('nodeExecutable', previousRuntime, vscode.ConfigurationTarget.Workspace); } catch (error) { errors.push(error); }

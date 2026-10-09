@@ -43,6 +43,14 @@ Run **.expec: Show Output Previews** from the Command Palette. Add the desired o
 ```
 
 Select an output tab and then a document. Previews follow the selected `.expec` editor's unsaved text and saved output configuration. Each output shows its own progress or explanation. Diagrams start at their natural size, with scrolling, zoom and reset controls. Previewing leaves project files untouched; generated-file updates have a separate save policy.
+## Generate on save
+
+Run **.expec: Enable Generation on Save** for the selected saved project configuration. Saving a valid `.expec` source then builds all configured saved entries and outputs, preserving handwritten implementation. Typing continues to update previews without writing generated files. Use **.expec: Disable Generation on Save** to stop automatic generation; each selected configuration retains its own choice.
+
+Generation uses Node 24.19+ (24.x). Set `expec.nodeExecutable` to its executable path if `node` does not select that runtime. The **.expec Generation** status item opens the actual generation log, including the runtime version, build result and any failure or partial effects.
+
+Save or revert dirty configuration, source dependencies and target buffers before generating. Hidden dirty buffers are protected too. A blocked or refused build explains the conflict; it does not overwrite those buffers. A newer eligible save cancels the active run and queues the latest saved change until that run settles.
+
 ## Develop from the specification
 
 Core owns application behavior; `src/vscode` and `src/ui` adapt native host events and presentation into core. Authored contracts and scenarios live in `generation/expec/src/`, whose folder layout maps to the connected project's `src/`. Scenarios generate acceptance tests, DSL and driver seams under `test/`; diagrams go to `generation/uml`.
@@ -69,6 +77,6 @@ PR CI selects affected components on Windows and Ubuntu; main runs the full exte
 
 ## Captured language build
 
-`generation/tooling/executable-specification-language-e69ff4a.tgz` is a development capture from exact merged language commit `e69ff4a28355785572a019a649093615dffcdb03`, built in a clean source checkout with ordinary `npm ci`, `npm run build` and `npm pack`. It includes OUT-24 draft-output preview, OUT-25 literal diagram keys, PROJECT-40 numeric-array scope proof, PROJECT-41 confirmed read-only acquisition, and output-owned authored acceptance fixture regeneration (PR #104). The exact source build passed; official exact-main package release remains queued. Its SHA256 is `fdea39cae56914f680a245611d1301554160a1512e8722c0e67778ce890467bf`; `npm ci` also verifies lockfile integrity. This is a development capture, not an official release.
+`generation/tooling/executable-specification-language-ba88eb7.tgz` is a development capture from exact language commit `ba88eb75`, built and packed through the ordinary build. It adds the guarded `CliHost` boundary used by save generation to the existing previews and preserving outputs. Its SHA256 is `ae10d2f55870671a5c90c6586d13ed298546de1a18dbc16a19ae2c6e2339a99c`; `npm ci` also verifies lockfile integrity. This pinned archive is a development capture, distinct from the official [PR107 package release](https://github.com/jreyno77/ExecutableSpecificationLanguage/releases/tag/pr-107).
 
 TypeScript preserves JSX for Vite's React plugin. Automatic-runtime declaration capture remains [language issue60](https://github.com/jreyno77/ExecutableSpecificationLanguage/issues/60); native freshness and writer guards remain enabled.

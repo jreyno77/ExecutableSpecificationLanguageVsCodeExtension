@@ -57,8 +57,8 @@ component GenerationHost {
 // No runtime download or new dependency.
 // Clean up opt-in, source/target buffers, owned files and every worker on failure.
 examples for GenerationHost {
-  fixture nativeGenerationLibrary: Text = "component Library { capability count() returns Number }"
-  fixture nativeGenerationAddition: Text = "component Library {\n  capability count() returns Number\n  capability title() returns Text\n}"
+  fixture nativeGenerationLibrary: Text = "component Library {\n  public count\n  capability count() returns Number\n}"
+  fixture nativeGenerationAddition: Text = "component Library {\n  public count, title\n  capability count() returns Number\n  capability title() returns Text\n}"
   fixture nativeGenerationShelf: Text = "type Shelf { copies: Number }"
 
   setup generationEditor(source: Text, otherEntry: Text, enabled: Boolean) returns Nothing

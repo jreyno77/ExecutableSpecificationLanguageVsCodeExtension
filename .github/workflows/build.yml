@@ -67,7 +67,7 @@ jobs:
             ui: ['test/acceptance/OutputTabs', 'test/unit/ui/', 'test/ui/'],
           };
           const tests = all || selected.size > 0;
-          appendFileSync(process.env.GITHUB_OUTPUT, `tests=${tests}\nui=${all || selected.has('ui')}\nfilters=${all ? '' : [...selected].flatMap(part => filters[part]).join(' ')}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `tests=${tests}\nui=${all || selected.has('ui') || selected.has('editor')}\nfilters=${all ? '' : [...selected].flatMap(part => filters[part]).join(' ')}\n`);
           console.log(all ? 'Full extension suite' : tests ? `Affected components: ${[...selected].join(', ')}` : 'Documentation only; no tests selected');
           NODE
       - name: Install dependencies
@@ -85,7 +85,7 @@ jobs:
           name: expec-vsix-${{ matrix.os }}
           path: dist/expec-vscode-extension.vsix
           if-no-files-found: error
-      - name: Install Chromium for UI tests
+      - name: Install Chromium for browser observations
         if: steps.scope.outputs.ui == 'true'
         run: npx --no-install playwright install --with-deps chromium
       - name: Test affected components

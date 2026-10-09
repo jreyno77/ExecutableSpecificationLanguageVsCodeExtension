@@ -34,11 +34,11 @@ export class GenerationInputs {
                 refuse('source-not-current', source, 'The saved source is no longer the same current clean editor buffer.');
             if (savedText(source) !== request.source.text) refuse('source-not-saved', source, 'The save notification does not match actual saved source bytes.');
             if (savedText(manifest) !== request.configuration.text) refuse('configuration-not-saved', manifest, 'The selected configuration no longer matches actual saved bytes.');
-            const canonicalRoot = realpathSync(logicalRoot);
+            const canonicalRoot = realpathSync.native(logicalRoot);
             if (!statSync(canonicalRoot).isDirectory()) throw Error('The configured project root is not a directory.');
             if (suppliedRoot !== undefined && (!isAbsolute(suppliedRoot) || key(suppliedRoot) !== key(canonicalRoot)))
                 refuse('root-not-current', suppliedRoot, 'The SDK root no longer matches the selected configured project.');
-            const canonicalManifest = realpathSync(manifest);
+            const canonicalManifest = realpathSync.native(manifest);
             for (const buffer of buffers) {
                 if (!buffer.dirty) continue;
                 const path = filename(buffer.uri);
@@ -62,7 +62,7 @@ export class GenerationInputs {
         const libraries = configuration.libraries.length ? await new LibraryLoader(request.configuration.file).load(configuration) : undefined;
         const dependencies = { modules: libraries?.value?.modules ?? [], packages: [] };
         const loaded = await new SourceLoader(request.configuration.file).load(configuration, dependencies, libraries?.value);
-        const canonicalSource = realpathSync(filename(request.source.uri));
+        const canonicalSource = realpathSync.native(filename(request.source.uri));
         if (loaded.value) new SourceComposer(loaded.value.locate).compose(loaded.value.entries);
         // Captures include reached rejected source as well, so the full SDK can report its actual syntax findings.
         if (loaded.captures.some(capture => key(filename(capture.source.sourceId)) === key(canonicalSource))) return true;
@@ -113,7 +113,7 @@ function savedText(path: string): string {
 function canonicalCandidate(path: string): string {
     let ancestor = path;
     for (;;) {
-        try { return resolve(realpathSync(ancestor), relative(ancestor, path)); }
+        try { return resolve(realpathSync.native(ancestor), relative(ancestor, path)); }
         catch (error) {
             if (!error || typeof error !== 'object' || !('code' in error) || error.code !== 'ENOENT' || dirname(ancestor) === ancestor) throw error;
             ancestor = dirname(ancestor);
