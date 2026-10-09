@@ -1012,4 +1012,196 @@ async nativeGenerationDirtyTextIncludes(text: string): Promise<boolean> {
 async nativeGenerationLaunchExplanationIncludes(text: string): Promise<boolean> {
     return await this.nativeGeneration.launchExplanationIncludes(text);
   }
+
+async sourceNavigation(): Promise<void> {
+    throw new Error("Not implemented: workspace.sourceNavigation");
+  }
+
+async localDefinitionEditor(entry: string): Promise<void> {
+    throw new Error("Not implemented: workspace.localDefinitionEditor");
+  }
+
+async importedDefinitionEditor(entry: string, imported: string): Promise<void> {
+    throw new Error("Not implemented: workspace.importedDefinitionEditor");
+  }
+
+async ambiguousDefinitionEditor(entry: string, first: string, second: string): Promise<void> {
+    throw new Error("Not implemented: workspace.ambiguousDefinitionEditor");
+  }
+
+async definitionConversion(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.definitionConversion");
+  }
+
+async saveNavigationSource(source: SourceDocument): Promise<void> {
+    throw new Error("Not implemented: workspace.saveNavigationSource");
+  }
+
+async openNavigationSource(source: SourceDocument, version: number): Promise<void> {
+    throw new Error("Not implemented: workspace.openNavigationSource");
+  }
+
+async changeNavigationSource(source: SourceDocument, version: number): Promise<void> {
+    throw new Error("Not implemented: workspace.changeNavigationSource");
+  }
+
+async closeNavigationSource(uri: string): Promise<void> {
+    throw new Error("Not implemented: workspace.closeNavigationSource");
+  }
+
+async disposeNavigation(): Promise<void> {
+    throw new Error("Not implemented: workspace.disposeNavigation");
+  }
+
+async requestSourceDefinition(uri: string, version: number, line: number, column: number): Promise<void> {
+    throw new Error("Not implemented: workspace.requestSourceDefinition");
+  }
+
+async rememberNavigationWork(): Promise<void> {
+    throw new Error("Not implemented: workspace.rememberNavigationWork");
+  }
+
+async editDefinitionEntry(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.editDefinitionEntry");
+  }
+
+async editDefinitionImport(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.editDefinitionImport");
+  }
+
+async goToNativeDefinition(line: number, column: number): Promise<void> {
+    throw new Error("Not implemented: workspace.goToNativeDefinition");
+  }
+
+async requestConvertedDefinition(line: number, character: number): Promise<void> {
+    throw new Error("Not implemented: workspace.requestConvertedDefinition");
+  }
+
+async hasSourceDefinition(request: number): Promise<boolean> {
+    throw new Error("Not implemented: workspace.hasSourceDefinition");
+  }
+
+async sourceDefinitionUri(request: number): Promise<string> {
+    throw new Error("Not implemented: workspace.sourceDefinitionUri");
+  }
+
+async sourceDefinitionText(request: number): Promise<string> {
+    throw new Error("Not implemented: workspace.sourceDefinitionText");
+  }
+
+async sourceDefinitionName(request: number): Promise<string> {
+    throw new Error("Not implemented: workspace.sourceDefinitionName");
+  }
+
+async sourceDefinitionStartLine(request: number): Promise<number> {
+    throw new Error("Not implemented: workspace.sourceDefinitionStartLine");
+  }
+
+async sourceDefinitionStartColumn(request: number): Promise<number> {
+    throw new Error("Not implemented: workspace.sourceDefinitionStartColumn");
+  }
+
+async sourceDefinitionEndLine(request: number): Promise<number> {
+    throw new Error("Not implemented: workspace.sourceDefinitionEndLine");
+  }
+
+async sourceDefinitionEndColumn(request: number): Promise<number> {
+    throw new Error("Not implemented: workspace.sourceDefinitionEndColumn");
+  }
+
+async navigationWorkUnchanged(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.navigationWorkUnchanged");
+  }
+
+async navigationHasProblem(uri: string, code: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.navigationHasProblem");
+  }
+
+async nativeDefinitionCount(): Promise<number> {
+    throw new Error("Not implemented: workspace.nativeDefinitionCount");
+  }
+
+async nativeDefinitionFileName(): Promise<string> {
+    throw new Error("Not implemented: workspace.nativeDefinitionFileName");
+  }
+
+async nativeDefinitionUsesOwnedFile(fileName: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.nativeDefinitionUsesOwnedFile");
+  }
+
+async nativeDefinitionName(): Promise<string> {
+    throw new Error("Not implemented: workspace.nativeDefinitionName");
+  }
+
+async nativeDefinitionStartLine(): Promise<number> {
+    throw new Error("Not implemented: workspace.nativeDefinitionStartLine");
+  }
+
+async nativeDefinitionStartColumn(): Promise<number> {
+    throw new Error("Not implemented: workspace.nativeDefinitionStartColumn");
+  }
+
+async nativeDefinitionEndLine(): Promise<number> {
+    throw new Error("Not implemented: workspace.nativeDefinitionEndLine");
+  }
+
+async nativeDefinitionEndColumn(): Promise<number> {
+    throw new Error("Not implemented: workspace.nativeDefinitionEndColumn");
+  }
+
+async activeDefinitionFileName(): Promise<string> {
+    throw new Error("Not implemented: workspace.activeDefinitionFileName");
+  }
+
+async activeDefinitionUsesOwnedFile(fileName: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.activeDefinitionUsesOwnedFile");
+  }
+
+async activeDefinitionLine(): Promise<number> {
+    throw new Error("Not implemented: workspace.activeDefinitionLine");
+  }
+
+async activeDefinitionColumn(): Promise<number> {
+    throw new Error("Not implemented: workspace.activeDefinitionColumn");
+  }
+
+async definitionEntryIsDirty(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.definitionEntryIsDirty");
+  }
+
+async definitionImportIsDirty(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.definitionImportIsDirty");
+  }
+
+async definitionFilesUnchanged(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.definitionFilesUnchanged");
+  }
+
+async definitionEditorHasProblem(code: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.definitionEditorHasProblem");
+  }
+
+async hasConvertedDefinition(request: number): Promise<boolean> {
+    throw new Error("Not implemented: workspace.hasConvertedDefinition");
+  }
+
+async convertedDefinitionName(request: number): Promise<string> {
+    throw new Error("Not implemented: workspace.convertedDefinitionName");
+  }
+
+async convertedDefinitionStartLine(request: number): Promise<number> {
+    throw new Error("Not implemented: workspace.convertedDefinitionStartLine");
+  }
+
+async convertedDefinitionStartCharacter(request: number): Promise<number> {
+    throw new Error("Not implemented: workspace.convertedDefinitionStartCharacter");
+  }
+
+async convertedDefinitionEndLine(request: number): Promise<number> {
+    throw new Error("Not implemented: workspace.convertedDefinitionEndLine");
+  }
+
+async convertedDefinitionEndCharacter(request: number): Promise<number> {
+    throw new Error("Not implemented: workspace.convertedDefinitionEndCharacter");
+  }
 }
