@@ -1,3 +1,6 @@
+import { SourceDefinitionConversion } from './source-definition-conversion.js';
+import type { NativeDefinitionCase } from './vscode/native-definition.js';
+import { SourceNavigationRecording } from './source-navigation.js';
 import { GenerationOnSaveRecording } from './generation-on-save.js';
 import type { NativeGenerationCase } from './vscode/native-generation.js';
 import type { ConnectionSidebarCase } from './vscode/connection-sidebar.js';
@@ -19,6 +22,9 @@ import { SourceDocument } from "../../src/core/SourceDocument.js";
 import { OutputPreviewsRecording } from './output-previews.js';
 import type { NativePreviewCase } from './vscode/native-preview.js';
 export class WorkspaceDriver {
+  private definitionConversionRecording!: SourceDefinitionConversion;
+    private nativeDefinition!: NativeDefinitionCase;
+  private navigationRecording!: SourceNavigationRecording;
   private sidebarCase!: ConnectionSidebarCase;
   private connectionRecording!: ConnectionRecording;
   private diagnosticDocument!: DiagnosticDocument;
@@ -1014,194 +1020,194 @@ async nativeGenerationLaunchExplanationIncludes(text: string): Promise<boolean> 
   }
 
 async sourceNavigation(): Promise<void> {
-    throw new Error("Not implemented: workspace.sourceNavigation");
+    this.navigationRecording = SourceNavigationRecording.create();
   }
 
 async localDefinitionEditor(entry: string): Promise<void> {
-    throw new Error("Not implemented: workspace.localDefinitionEditor");
-  }
+        this.nativeDefinition = await (await InstalledExpecEditor.prepare()).definitionEditor({ 'entry.expec': entry });
+    }
 
 async importedDefinitionEditor(entry: string, imported: string): Promise<void> {
-    throw new Error("Not implemented: workspace.importedDefinitionEditor");
-  }
+        this.nativeDefinition = await (await InstalledExpecEditor.prepare()).definitionEditor({ 'entry.expec': entry, 'book.expec': imported });
+    }
 
 async ambiguousDefinitionEditor(entry: string, first: string, second: string): Promise<void> {
-    throw new Error("Not implemented: workspace.ambiguousDefinitionEditor");
-  }
+        this.nativeDefinition = await (await InstalledExpecEditor.prepare()).definitionEditor({ 'entry.expec': entry, 'shopping.expec': first, 'shipping.expec': second });
+    }
 
 async definitionConversion(text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.definitionConversion");
+    this.definitionConversionRecording = new SourceDefinitionConversion(text);
   }
 
 async saveNavigationSource(source: SourceDocument): Promise<void> {
-    throw new Error("Not implemented: workspace.saveNavigationSource");
+    this.navigationRecording.savedSource(source);
   }
 
 async openNavigationSource(source: SourceDocument, version: number): Promise<void> {
-    throw new Error("Not implemented: workspace.openNavigationSource");
+    this.navigationRecording.opened(source, version);
   }
 
 async changeNavigationSource(source: SourceDocument, version: number): Promise<void> {
-    throw new Error("Not implemented: workspace.changeNavigationSource");
+    this.navigationRecording.changed(source, version);
   }
 
 async closeNavigationSource(uri: string): Promise<void> {
-    throw new Error("Not implemented: workspace.closeNavigationSource");
+    this.navigationRecording.closed(uri);
   }
 
 async disposeNavigation(): Promise<void> {
-    throw new Error("Not implemented: workspace.disposeNavigation");
+    this.navigationRecording.disposed();
   }
 
 async requestSourceDefinition(uri: string, version: number, line: number, column: number): Promise<void> {
-    throw new Error("Not implemented: workspace.requestSourceDefinition");
+    this.navigationRecording.request(uri, version, line, column);
   }
 
 async rememberNavigationWork(): Promise<void> {
-    throw new Error("Not implemented: workspace.rememberNavigationWork");
+    this.navigationRecording.rememberWork();
   }
 
 async editDefinitionEntry(text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.editDefinitionEntry");
-  }
+        await this.nativeDefinition.editEntry(text);
+    }
 
 async editDefinitionImport(text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.editDefinitionImport");
-  }
+        await this.nativeDefinition.editImport(text);
+    }
 
 async goToNativeDefinition(line: number, column: number): Promise<void> {
-    throw new Error("Not implemented: workspace.goToNativeDefinition");
-  }
+        await this.nativeDefinition.goTo(line, column);
+    }
 
 async requestConvertedDefinition(line: number, character: number): Promise<void> {
-    throw new Error("Not implemented: workspace.requestConvertedDefinition");
+    this.definitionConversionRecording.request(line, character);
   }
 
 async hasSourceDefinition(request: number): Promise<boolean> {
-    throw new Error("Not implemented: workspace.hasSourceDefinition");
+    return this.navigationRecording.reply(request) !== undefined;
   }
 
 async sourceDefinitionUri(request: number): Promise<string> {
-    throw new Error("Not implemented: workspace.sourceDefinitionUri");
+    return this.navigationRecording.definition(request).source.uri;
   }
 
 async sourceDefinitionText(request: number): Promise<string> {
-    throw new Error("Not implemented: workspace.sourceDefinitionText");
+    return this.navigationRecording.definition(request).source.text;
   }
 
 async sourceDefinitionName(request: number): Promise<string> {
-    throw new Error("Not implemented: workspace.sourceDefinitionName");
+    return this.navigationRecording.name(request);
   }
 
 async sourceDefinitionStartLine(request: number): Promise<number> {
-    throw new Error("Not implemented: workspace.sourceDefinitionStartLine");
+    return this.navigationRecording.start(request).line;
   }
 
 async sourceDefinitionStartColumn(request: number): Promise<number> {
-    throw new Error("Not implemented: workspace.sourceDefinitionStartColumn");
+    return this.navigationRecording.start(request).column;
   }
 
 async sourceDefinitionEndLine(request: number): Promise<number> {
-    throw new Error("Not implemented: workspace.sourceDefinitionEndLine");
+    return this.navigationRecording.end(request).line;
   }
 
 async sourceDefinitionEndColumn(request: number): Promise<number> {
-    throw new Error("Not implemented: workspace.sourceDefinitionEndColumn");
+    return this.navigationRecording.end(request).column;
   }
 
 async navigationWorkUnchanged(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.navigationWorkUnchanged");
+    return this.navigationRecording.workUnchanged();
   }
 
 async navigationHasProblem(uri: string, code: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.navigationHasProblem");
+    return this.navigationRecording.hasProblem(uri, code);
   }
 
 async nativeDefinitionCount(): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeDefinitionCount");
-  }
+        return this.nativeDefinition.observation().locations.length;
+    }
 
 async nativeDefinitionFileName(): Promise<string> {
-    throw new Error("Not implemented: workspace.nativeDefinitionFileName");
-  }
+        return this.nativeDefinition.locationFileName();
+    }
 
 async nativeDefinitionUsesOwnedFile(fileName: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.nativeDefinitionUsesOwnedFile");
-  }
+        return this.nativeDefinition.locationUsesOwnedFile(fileName);
+    }
 
 async nativeDefinitionName(): Promise<string> {
-    throw new Error("Not implemented: workspace.nativeDefinitionName");
-  }
+        return this.nativeDefinition.observation().locations[0]?.name ?? '';
+    }
 
 async nativeDefinitionStartLine(): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeDefinitionStartLine");
-  }
+        const location = this.nativeDefinition.observation().locations[0]; return location ? location.range.start.line + 1 : -1;
+    }
 
 async nativeDefinitionStartColumn(): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeDefinitionStartColumn");
-  }
+        const location = this.nativeDefinition.observation().locations[0]; return location ? location.range.start.character + 1 : -1;
+    }
 
 async nativeDefinitionEndLine(): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeDefinitionEndLine");
-  }
+        const location = this.nativeDefinition.observation().locations[0]; return location ? location.range.end.line + 1 : -1;
+    }
 
 async nativeDefinitionEndColumn(): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeDefinitionEndColumn");
-  }
+        const location = this.nativeDefinition.observation().locations[0]; return location ? location.range.end.character + 1 : -1;
+    }
 
 async activeDefinitionFileName(): Promise<string> {
-    throw new Error("Not implemented: workspace.activeDefinitionFileName");
-  }
+        return this.nativeDefinition.activeFileName();
+    }
 
 async activeDefinitionUsesOwnedFile(fileName: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.activeDefinitionUsesOwnedFile");
-  }
+        return this.nativeDefinition.activeUsesOwnedFile(fileName);
+    }
 
 async activeDefinitionLine(): Promise<number> {
-    throw new Error("Not implemented: workspace.activeDefinitionLine");
-  }
+        return this.nativeDefinition.observation().active.line + 1;
+    }
 
 async activeDefinitionColumn(): Promise<number> {
-    throw new Error("Not implemented: workspace.activeDefinitionColumn");
-  }
+        return this.nativeDefinition.observation().active.character + 1;
+    }
 
 async definitionEntryIsDirty(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.definitionEntryIsDirty");
-  }
+        return this.nativeDefinition.observation().entryDirty;
+    }
 
 async definitionImportIsDirty(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.definitionImportIsDirty");
-  }
+        return this.nativeDefinition.observation().importDirty;
+    }
 
 async definitionFilesUnchanged(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.definitionFilesUnchanged");
-  }
+        return await this.nativeDefinition.filesUnchanged();
+    }
 
 async definitionEditorHasProblem(code: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.definitionEditorHasProblem");
-  }
+        return this.nativeDefinition.observation().problemCodes.includes(code);
+    }
 
 async hasConvertedDefinition(request: number): Promise<boolean> {
-    throw new Error("Not implemented: workspace.hasConvertedDefinition");
+    return this.definitionConversionRecording.reply(request) !== undefined;
   }
 
 async convertedDefinitionName(request: number): Promise<string> {
-    throw new Error("Not implemented: workspace.convertedDefinitionName");
+    return this.definitionConversionRecording.name(request);
   }
 
 async convertedDefinitionStartLine(request: number): Promise<number> {
-    throw new Error("Not implemented: workspace.convertedDefinitionStartLine");
+    return this.definitionConversionRecording.location(request).range.start.line;
   }
 
 async convertedDefinitionStartCharacter(request: number): Promise<number> {
-    throw new Error("Not implemented: workspace.convertedDefinitionStartCharacter");
+    return this.definitionConversionRecording.location(request).range.start.character;
   }
 
 async convertedDefinitionEndLine(request: number): Promise<number> {
-    throw new Error("Not implemented: workspace.convertedDefinitionEndLine");
+    return this.definitionConversionRecording.location(request).range.end.line;
   }
 
 async convertedDefinitionEndCharacter(request: number): Promise<number> {
-    throw new Error("Not implemented: workspace.convertedDefinitionEndCharacter");
+    return this.definitionConversionRecording.location(request).range.end.character;
   }
 }

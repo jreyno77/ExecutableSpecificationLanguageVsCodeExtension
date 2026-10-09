@@ -30,7 +30,14 @@ export type GenerationEditorObservation = {
 export type GenerationEditorSetup = { file: string; other: string; directory: string; workspace: string; configurationFile: string;
   resetFile: string; nodeExecutable: string; enabled: boolean };
 
-type Operation = 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
+export type NativeDefinitionObservation = {
+  entryUri: string; entryVersion: number; resultId: string; ownedUris: Record<string, string>;
+  entryDirty: boolean; importDirty: boolean; problemCodes: readonly string[];
+  locations: readonly { uri: string; name: string; range: DiagnosticRange }[];
+  active: { uri: string; line: number; character: number };
+};
+
+type Operation = 'definitionOpen' | 'definitionEdit' | 'definitionGoTo' | 'definitionDispose' | 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
 type Pending = { promise: Promise<unknown>; resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> };
 
 /** One owned native host, with only the observations needed by its test consumers. */
@@ -195,6 +202,28 @@ export class VsCodeSession {
     return value as DiagnosticMiddlewareObservation;
   }
 
+  openNativeDefinition(definitionId: string, extensionId: string, files: Readonly<Record<string, string>>): Promise<NativeDefinitionObservation> {
+    return this.definitionRequest('definitionOpen', { definitionId, extensionId, files });
+  }
+  editNativeDefinition(definitionId: string, kind: 'entry' | 'import', text: string): Promise<NativeDefinitionObservation> {
+    return this.definitionRequest('definitionEdit', { definitionId, kind, text });
+  }
+  goToNativeDefinition(definitionId: string, line: number, character: number): Promise<NativeDefinitionObservation> {
+    return this.definitionRequest('definitionGoTo', { definitionId, line, character });
+  }
+  async disposeNativeDefinition(definitionId: string): Promise<void> {
+    const value = await this.request('definitionDispose', { definitionId });
+    if (value !== null) throw new Error('The native definition disposal returned an invalid receipt.');
+  }
+  private async definitionRequest(operation: Operation, values: Record<string, unknown>): Promise<NativeDefinitionObservation> {
+    const value = await this.request(operation, values);
+    if (!isNativeDefinitionObservation(value)) {
+      const error = new Error('The native host returned an invalid definition observation.');
+      await this.poison(error); throw error;
+    }
+    return value;
+  }
+
   openDiagnosticDocument(documentId: string, extensionId: string, source: { text: string; file?: string; untitled: boolean; dependencyFile?: string }): Promise<DiagnosticObservation> {
     return this.diagnosticRequest('diagnosticOpen', { documentId, extensionId, ...source });
   }
@@ -356,6 +385,19 @@ export class VsCodeSession {
     }
     if (errors.length) throw new AggregateError(errors, 'Owned native browser/transport cleanup failed.', { cause: errors[0] });
   }
+}
+function isNativeDefinitionObservation(value: unknown): value is NativeDefinitionObservation {
+  if (!value || typeof value !== 'object') return false;
+  const packet = value as Partial<NativeDefinitionObservation>;
+  return typeof packet.entryUri === 'string' && Number.isInteger(packet.entryVersion) && (packet.entryVersion as number) >= 0
+    && typeof packet.resultId === 'string' && packet.resultId !== ''
+    && typeof packet.entryDirty === 'boolean' && typeof packet.importDirty === 'boolean'
+    && !!packet.ownedUris && typeof packet.ownedUris === 'object' && !Array.isArray(packet.ownedUris)
+    && Object.values(packet.ownedUris).every(uri => typeof uri === 'string')
+    && Array.isArray(packet.problemCodes) && packet.problemCodes.every(code => typeof code === 'string')
+    && Array.isArray(packet.locations) && packet.locations.every(location => typeof location?.uri === 'string'
+      && typeof location.name === 'string' && validPosition(location.range?.start) && validPosition(location.range?.end))
+    && typeof packet.active?.uri === 'string' && validPosition(packet.active);
 }
 function isDiagnosticObservation(value: unknown): value is DiagnosticObservation {
   if (!value || typeof value !== 'object') return false;

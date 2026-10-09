@@ -47,7 +47,28 @@ export class EditorLanguageSupport {
             return result;
         };
         middleware.provideDiagnostics = guard;
-        this.releaseMiddleware = () => { if (middleware.provideDiagnostics === guard) middleware.provideDiagnostics = previous; };
+        const previousDefinition = middleware.provideDefinition;
+        const definitionGuard: NonNullable<typeof previousDefinition> = async (document, position, token, next) => {
+            const current = (captured: typeof document, version: number) => !this.disposed && !token.isCancellationRequested &&
+                !captured.isClosed && captured.version === version && workspace.textDocuments.includes(captured);
+            const version = document.version;
+            if (!current(document, version)) throw new CancellationError();
+            const targets = new Map(workspace.textDocuments.filter(open => !open.isClosed)
+                .map(open => [open.uri.toString(), { document: open, version: open.version }]));
+            const result = await (previousDefinition ? previousDefinition(document, position, token, next) : next(document, position, token));
+            if (!current(document, version)) throw new CancellationError();
+            for (const location of Array.isArray(result) ? result : result ? [result] : []) {
+                const uri = 'targetUri' in location ? location.targetUri : location.uri;
+                const target = targets.get(uri.toString());
+                if (target && !current(target.document, target.version)) throw new CancellationError();
+            }
+            return result;
+        };
+        middleware.provideDefinition = definitionGuard;
+        this.releaseMiddleware = () => {
+            if (middleware.provideDiagnostics === guard) middleware.provideDiagnostics = previous;
+            if (middleware.provideDefinition === definitionGuard) middleware.provideDefinition = previousDefinition;
+        };
         this.context.subscriptions.push(this);
         void this.client.start().catch(error => this.client.error('.expec language server failed to start.', error, true));
     }

@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Connection, Disposable, DocumentDiagnosticReport } from 'vscode-languageserver/node';
+import { CancellationToken, CancellationTokenSource } from 'vscode-languageserver/node';
 import { LanguageServerAdapter } from '../../../src/vscode/LanguageServerAdapter.js';
 import type { DocumentSources } from '../../../src/core/DocumentSources.js';
 import type { DocumentReport } from '../../../src/core/DocumentReport.js';
@@ -10,16 +11,18 @@ import type { SourceDocument } from '../../../src/core/SourceDocument.js';
 // A narrow native-connection recorder: the real adapter registers and invokes these
 // protocol operations. It never parses source or supplies an expected compiler answer.
 function recordedServer(sources: DocumentSources = { read: () => undefined }) {
-  const callbacks = new Map<string, (params: any) => any>();
+  const callbacks = new Map<string, (params: any, token?: CancellationToken) => any>();
+  const listenerCounts = new Map<string, number>();
   const released: string[] = [], warnings: string[] = [], errors: string[] = [];
   const publications: PreviewPublication[] = [], publicationListeners = new Set<() => void>();
   const registrations: Array<{ options: unknown; complete: (registration: Disposable) => void }> = [];
   const listen = (name: string) => (callback: (params: any) => any) => {
+    listenerCounts.set(name, (listenerCounts.get(name) ?? 0) + 1);
     callbacks.set(name, callback);
     return { dispose: () => { released.push(name); } };
   };
   const connection = {
-    onInitialize: listen('initialize'), onInitialized: listen('initialized'),
+    onInitialize: listen('initialize'), onInitialized: listen('initialized'), onDefinition: listen('definition'),
     onNotification: (method: string, callback: (params: any) => void) => listen(method)(callback),
     sendNotification: (_method: string, value: PreviewPublication) => { publications.push(value); for (const receive of [...publicationListeners]) receive(); return Promise.resolve(); },
     onDidChangeWatchedFiles: listen('watched'),
@@ -32,17 +35,25 @@ function recordedServer(sources: DocumentSources = { read: () => undefined }) {
   } as unknown as Connection;
   const adapter = new LanguageServerAdapter(connection, sources);
   adapter.start();
-  callbacks.get('initialize')!({ capabilities: { workspace: {
+  const initialization = callbacks.get('initialize')!({ capabilities: { workspace: {
     didChangeWatchedFiles: { dynamicRegistration: true, relativePatternSupport: true },
     diagnostics: { refreshSupport: true },
   } } });
   callbacks.get('initialized')!({});
   return {
-    adapter, warnings, errors, released, registrations, publications,
+    adapter, warnings, errors, released, registrations, publications, initialization,
+    listenerCount: (name: string) => listenerCounts.get(name) ?? 0,
     notification: (method: string, value: unknown) => { const receive = callbacks.get(method); if (!receive) throw Error('No registered notification ' + method); receive(value); },
     waitPreview: (matches: (publication: PreviewPublication) => boolean) => new Promise<void>(resolve => { const receive = () => { if (publications.some(matches)) { publicationListeners.delete(receive); resolve(); } }; publicationListeners.add(receive); receive(); }),
     pull: (uri: string) => callbacks.get('diagnostics')!({ textDocument: { uri } }) as Extract<DocumentDiagnosticReport, { kind: 'full' }>,
     open: (source: SourceDocument) => callbacks.get('opened')!({ textDocument: { ...source, version: 1, languageId: 'expec' } }),
+    change: (source: SourceDocument, version: number) => callbacks.get('changed')!({ textDocument: { uri: source.uri, version }, contentChanges: [{ text: source.text }] }),
+    close: (uri: string) => callbacks.get('closed')!({ textDocument: { uri } }),
+    definition: async (uri: string, line: number, character: number, token = CancellationToken.None) => {
+      const handler = callbacks.get('definition');
+      if (!handler) throw new Error('No registered textDocument/definition handler.');
+      return (await handler({ textDocument: { uri }, position: { line, character } }, token)) ?? null;
+    },
   };
 }
 
@@ -167,7 +178,7 @@ describe('native semantic feedback at its protocol boundary', () => {
     expect(server.pull(source.uri).items).toEqual([]);
     expect(server.pull(source.uri).resultId).toBeUndefined();
     expect(releases).toBe(1);
-    expect(new Set(server.released)).toEqual(new Set(['initialize', 'initialized', 'watched', 'diagnostics', 'opened', 'changed', 'closed', 'willSave', 'willSaveWaitUntil', 'saved', 'expec/previewConfiguration', 'expec/previewSelection']));
+    expect(new Set(server.released)).toEqual(new Set(['initialize', 'initialized', 'watched', 'diagnostics', 'opened', 'changed', 'closed', 'willSave', 'willSaveWaitUntil', 'saved', 'expec/previewConfiguration', 'expec/previewSelection', 'definition']));
     expect(() => server.adapter.dispose()).not.toThrow();
   });
 });
@@ -197,5 +208,55 @@ describe('native preview adaptation', () => {
     server.adapter.dispose();
     server.adapter.publish(source, 2, emptyReport([source]));
     expect(server.publications).toHaveLength(count);
+  });
+});
+
+describe('native source definitions at their protocol boundary', () => {
+  it('advertises one standard definition provider and releases its one registration', () => {
+    const server = recordedServer();
+    try {
+      expect(server.initialization.capabilities.definitionProvider).toBe(true);
+      expect(server.listenerCount('definition')).toBe(1);
+      server.adapter.start();
+      expect(server.listenerCount('definition')).toBe(1);
+      server.adapter.dispose(); server.adapter.dispose();
+      expect(server.released.filter(name => name === 'definition')).toEqual(['definition']);
+    } finally { server.adapter.dispose(); }
+  });
+
+  it('uses the real current document and withdraws its definition after rejection and close', async () => {
+    const server = recordedServer();
+    const source = { uri: 'file:///workspace/catalog.expec', text: 'type Book { title: Text }\ntype Basket { book: Book }' };
+    try {
+      server.open(source);
+      expect(await server.definition(source.uri, 1, 20)).toEqual({ uri: source.uri,
+        range: { start: { line: 0, character: 5 }, end: { line: 0, character: 9 } } });
+      server.change({ ...source, text: 'type Magazine { title: Text }\ntype Basket { book: Magazine }' }, 2);
+      expect(await server.definition(source.uri, 1, 20)).toEqual({ uri: source.uri,
+        range: { start: { line: 0, character: 5 }, end: { line: 0, character: 13 } } });
+      server.change({ ...source, text: 'type Magazine { title: Text }\ntype Basket { book: Magazine ' }, 3);
+      expect(await server.definition(source.uri, 1, 20)).toBeNull();
+      server.change(source, 4);
+      expect(await server.definition(source.uri, 1, 20)).toEqual({ uri: source.uri,
+        range: { start: { line: 0, character: 5 }, end: { line: 0, character: 9 } } });
+      server.close(source.uri);
+      expect(await server.definition(source.uri, 1, 20)).toBeNull();
+    } finally { server.adapter.dispose(); }
+  });
+
+  it('returns no location for cancelled unavailable or disposed requests', async () => {
+    const server = recordedServer();
+    const source = { uri: 'file:///workspace/catalog.expec', text: 'type Book { title: Text }\ntype Basket { book: Book }' };
+    const cancellation = new CancellationTokenSource();
+    try {
+      server.open(source);
+      expect(await server.definition(source.uri, 1, 20)).toEqual({ uri: source.uri,
+        range: { start: { line: 0, character: 5 }, end: { line: 0, character: 9 } } });
+      cancellation.cancel();
+      expect(await server.definition(source.uri, 1, 20, cancellation.token)).toBeNull();
+      expect(await server.definition('file:///workspace/unopened.expec', 1, 20)).toBeNull();
+      server.adapter.dispose();
+      expect(await server.definition(source.uri, 1, 20)).toBeNull();
+    } finally { cancellation.dispose(); server.adapter.dispose(); }
   });
 });

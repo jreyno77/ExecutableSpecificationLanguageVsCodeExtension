@@ -1,4 +1,6 @@
 import { OutputPreviews as CoreOutputPreviews } from '../core/OutputPreviews.js';
+import { SourceNavigation as CoreSourceNavigation } from '../core/SourceNavigation.js';
+import { SourceDefinitionAdapter as NativeSourceDefinitionAdapter } from './SourceDefinitionAdapter.js';
 import { previewChannel } from './output-preview-channel.js';
 import type { ConnectionConfiguration } from '../core/ConnectionConfiguration.js';
 import { DidChangeWatchedFilesNotification } from 'vscode-languageserver/node';
@@ -39,6 +41,8 @@ export class LanguageServerAdapter {
     private readonly connection: Connection;
     private readonly analysis: DocumentAnalysis;
     private readonly previews: OutputPreviews;
+    private readonly navigation = new CoreSourceNavigation();
+    private readonly definitions = new NativeSourceDefinitionAdapter(this.navigation);
     private readonly documents = new TextDocuments(TextDocument);
     private readonly subscriptions: Disposable[] = [];
     private readonly reports = new Map<string, { resultId: string; items: Diagnostic[]; dependencies: readonly string[] }>();
@@ -76,6 +80,7 @@ export class LanguageServerAdapter {
                     positionEncoding: 'utf-16',
                     textDocumentSync: TextDocumentSyncKind.Incremental,
                     diagnosticProvider: { interFileDependencies: true, workspaceDiagnostics: false },
+                    definitionProvider: true,
                 } };
             }),
             this.connection.onInitialized(() => {
@@ -87,6 +92,11 @@ export class LanguageServerAdapter {
             this.documents.onDidClose(({ document }) => this.analysis.closed(document.uri)),
             this.connection.onDidChangeWatchedFiles(({ changes }) => {
                 if (!this.disposed) for (const change of changes) this.analysis.sourceChanged(change.uri);
+            }),
+            this.connection.onDefinition(({ textDocument, position }, token) => {
+                if (this.disposed || token.isCancellationRequested) return undefined;
+                const document = this.documents.get(textDocument.uri);
+                return document ? this.definitions.definition(document, position) : undefined;
             }),
             this.connection.languages.diagnostics.on(({ textDocument }) => {
                 const report = this.reports.get(textDocument.uri);
@@ -101,6 +111,7 @@ export class LanguageServerAdapter {
      */
     publish(source: SourceDocument, version: number, report: DocumentReport): void {
         if (this.disposed) return;
+        this.navigation.published(source, version, report);
         this.previews.published(source, version, report);
         const snapshots = new Map(report.sources.map(snapshot => [snapshot.uri, snapshot]));
         snapshots.set(source.uri, source);
@@ -168,6 +179,7 @@ export class LanguageServerAdapter {
      * Remove the closed document from the pull-response cache. Native document diagnostic pull owns editor close cleanup; never resurrect a cached response from an earlier lifetime. Forward this closed URI to core OutputPreviews so pending work and selected content from the closed lifetime are withdrawn. End the same core SourceNavigation report lifetime through closed(uri).
      */
     clear(uri: string): void {
+        this.navigation.closed(uri);
         this.previews.closed(uri);
         this.reports.delete(uri);
         this.updateWatches();
@@ -184,6 +196,7 @@ export class LanguageServerAdapter {
             try { operation(); } catch (error) { failures.push(error); }
         };
         for (const subscription of this.subscriptions.splice(0)) release(() => subscription.dispose());
+        release(() => this.navigation.dispose());
         release(() => this.previews.dispose());
         for (const uri of this.documents.keys()) release(() => this.analysis.closed(uri));
         this.reports.clear();
