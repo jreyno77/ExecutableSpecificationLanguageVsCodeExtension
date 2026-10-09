@@ -261,3 +261,5 @@ async function preparedWorkspaceWatch(vscode, dependencyFile) {
     await fs.rm(probe.fsPath, { force: true });
   }
 }
+
+exports.preparedWorkspaceWatch = preparedWorkspaceWatch;

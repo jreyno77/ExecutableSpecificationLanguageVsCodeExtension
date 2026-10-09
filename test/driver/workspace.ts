@@ -1,3 +1,7 @@
+import type { ConnectionSidebarCase } from './vscode/connection-sidebar.js';
+import { basename } from 'node:path';
+import { stat } from 'node:fs/promises';
+import { ConnectionRecording } from './connection-recording.js';
 import type { DiagnosticDocument } from './vscode/diagnostic-document.js';
 import type { DiagnosticObservation } from './vscode/vscode-session.js';
 import { DocumentAnalysisRecording } from './document-analysis.js';
@@ -11,6 +15,8 @@ import { OutputTabsBrowser } from './output-tabs-browser.js';
 import { OutputTab } from "../../src/core/OutputTab.js";
 import { SourceDocument } from "../../src/core/SourceDocument.js";
 export class WorkspaceDriver {
+  private sidebarCase!: ConnectionSidebarCase;
+  private connectionRecording!: ConnectionRecording;
   private diagnosticDocument!: DiagnosticDocument;
   private diagnosticObservation!: DiagnosticObservation;
   private analysisRecording!: DocumentAnalysisRecording;
@@ -359,138 +365,146 @@ async entryVersionUnchanged(): Promise<boolean> {
   }
 
 async connectionWorkspace(configuration: string, writable: boolean): Promise<void> {
-    throw new Error("Not implemented: workspace.connectionWorkspace");
+    this.connectionRecording = await ConnectionRecording.open(configuration, writable);
   }
 
 async missingConnectionWorkspace(writable: boolean): Promise<void> {
-    throw new Error("Not implemented: workspace.missingConnectionWorkspace");
+    this.connectionRecording = await ConnectionRecording.open(undefined, writable);
   }
 
 async connectionSidebar(configuration: string, directories: Array<string>): Promise<void> {
-    throw new Error("Not implemented: workspace.connectionSidebar");
+    this.installedEditor = await InstalledExpecEditor.prepare();
+    this.sidebarCase = await this.installedEditor.connectionSidebar(configuration, directories);
   }
 
 async unconfiguredSidebar(directories: Array<string>): Promise<void> {
-    throw new Error("Not implemented: workspace.unconfiguredSidebar");
+    this.installedEditor = await InstalledExpecEditor.prepare();
+    this.sidebarCase = await this.installedEditor.connectionSidebar(undefined, directories);
   }
 
 async inspectConnection(): Promise<void> {
-    throw new Error("Not implemented: workspace.inspectConnection");
+    await this.connectionRecording.inspect();
   }
 
 async chooseProjectDirectory(name: string): Promise<void> {
-    throw new Error("Not implemented: workspace.chooseProjectDirectory");
+    await this.connectionRecording.choose(name);
   }
 
 async confirmRequestedConfigurationSave(): Promise<void> {
-    throw new Error("Not implemented: workspace.confirmRequestedConfigurationSave");
+    await this.connectionRecording.confirmSave();
   }
 
 async rejectRequestedConfigurationSave(message: string): Promise<void> {
-    throw new Error("Not implemented: workspace.rejectRequestedConfigurationSave");
+    await this.connectionRecording.rejectSave(message);
   }
 
 async makeProjectUnavailable(name: string): Promise<void> {
-    throw new Error("Not implemented: workspace.makeProjectUnavailable");
+    await this.connectionRecording.remove(name);
   }
 
 async restoreProjectDirectory(name: string): Promise<void> {
-    throw new Error("Not implemented: workspace.restoreProjectDirectory");
+    await this.connectionRecording.restore(name);
   }
 
 async replaceConnectionConfiguration(text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.replaceConnectionConfiguration");
+    await this.connectionRecording.replace(text);
   }
 
 async observeSidebar(): Promise<void> {
-    throw new Error("Not implemented: workspace.observeSidebar");
+    await this.sidebarCase.observe();
   }
 
 async chooseProjectInSidebar(directory: string): Promise<void> {
-    throw new Error("Not implemented: workspace.chooseProjectInSidebar");
+    await this.sidebarCase.choose(directory);
   }
 
 async saveSidebarConfiguration(text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.saveSidebarConfiguration");
+    await this.sidebarCase.save(text);
   }
 
 async removeSidebarProject(directory: string): Promise<void> {
-    throw new Error("Not implemented: workspace.removeSidebarProject");
+    await this.sidebarCase.remove(directory);
   }
 
 async restoreSidebarProject(directory: string): Promise<void> {
-    throw new Error("Not implemented: workspace.restoreSidebarProject");
+    await this.sidebarCase.restore(directory);
   }
 
 async editConfigurationWithoutSaving(text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.editConfigurationWithoutSaving");
+    await this.sidebarCase.edit(text);
   }
 
 async connectionStatus(): Promise<string> {
-    throw new Error("Not implemented: workspace.connectionStatus");
+    return this.connectionRecording.latest.status;
   }
 
 async configuredProjectName(): Promise<string> {
-    throw new Error("Not implemented: workspace.configuredProjectName");
+    return basename(this.connectionRecording.latest.target ?? "");
   }
 
 async verifiedProjectName(): Promise<string> {
-    throw new Error("Not implemented: workspace.verifiedProjectName");
+    return basename(this.connectionRecording.latest.verifiedDirectory ?? "");
   }
 
 async connectionMessage(): Promise<string> {
-    throw new Error("Not implemented: workspace.connectionMessage");
+    return this.connectionRecording.latest.message;
   }
 
 async requestedConfigurationSaves(): Promise<number> {
-    throw new Error("Not implemented: workspace.requestedConfigurationSaves");
+    return this.connectionRecording.saves.length;
   }
 
 async actualConfigurationExists(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.actualConfigurationExists");
+    try { await stat(this.connectionRecording.file); return true; } catch (error) { if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return false; throw error; }
   }
 
 async requestedProjectName(): Promise<string> {
-    throw new Error("Not implemented: workspace.requestedProjectName");
+    const request = this.connectionRecording.saves.at(-1); if (!request) throw new Error("No configuration save was requested."); return basename(JSON.parse(request.text).project.root);
   }
 
 async requestedSettings(): Promise<string> {
-    throw new Error("Not implemented: workspace.requestedSettings");
+    const request = this.connectionRecording.saves.at(-1); if (!request) throw new Error("No configuration save was requested."); const { project, ...settings } = JSON.parse(request.text); return JSON.stringify(settings);
   }
 
 async connectedPublications(): Promise<number> {
-    throw new Error("Not implemented: workspace.connectedPublications");
+    return this.connectionRecording.states.filter(state => state.status === "connected").length;
   }
 
 async unavailablePublications(): Promise<number> {
-    throw new Error("Not implemented: workspace.unavailablePublications");
+    return this.connectionRecording.states.filter(state => state.status === "unavailable").length;
   }
 
 async connectionPublications(): Promise<number> {
-    throw new Error("Not implemented: workspace.connectionPublications");
+    return this.connectionRecording.states.length;
   }
 
 async sidebarConnectionStatus(): Promise<string> {
-    throw new Error("Not implemented: workspace.sidebarConnectionStatus");
+    return this.sidebarCase.last.status;
   }
 
 async sidebarProjectName(): Promise<string> {
-    throw new Error("Not implemented: workspace.sidebarProjectName");
+    return this.sidebarCase.last.project;
   }
 
 async sidebarConnectionExplanation(): Promise<string> {
-    throw new Error("Not implemented: workspace.sidebarConnectionExplanation");
+    return this.sidebarCase.last.explanation;
   }
 
 async sidebarSavedProjectName(): Promise<string> {
-    throw new Error("Not implemented: workspace.sidebarSavedProjectName");
+    const saved = this.sidebarCase.last.saved;
+    if (saved === undefined) throw new Error('The native sidebar has no saved configuration.');
+    return basename(JSON.parse(saved).project.root);
   }
 
 async sidebarSavedConfiguration(): Promise<string> {
-    throw new Error("Not implemented: workspace.sidebarSavedConfiguration");
+    const saved = this.sidebarCase.last.saved;
+    if (saved === undefined) throw new Error('The native sidebar has no saved configuration.');
+    return saved;
   }
 
 async sidebarUnsavedConfiguration(): Promise<string> {
-    throw new Error("Not implemented: workspace.sidebarUnsavedConfiguration");
+    const unsaved = this.sidebarCase.last.unsaved;
+    if (unsaved === undefined) throw new Error('The native sidebar has no unsaved configuration.');
+    return unsaved;
   }
 }

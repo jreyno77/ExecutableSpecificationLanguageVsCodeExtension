@@ -49,9 +49,9 @@ jobs:
               `${process.env.BASE_SHA}...${process.env.HEAD_SHA}`], { encoding: 'utf8' }).split('\0').filter(Boolean);
             for (const file of files) {
               if (/\.md$/.test(file) || file.startsWith('generation/uml/')) continue;
-              if (/^(src\/core\/|generation\/expec\/src\/core\/|test\/(?:unit\/)?core\/|test\/acceptance\/(?:WorkspaceCore|DocumentAnalysis)(?:\.|\/))/.test(file)) {
+              if (/^(src\/core\/|generation\/expec\/src\/core\/|test\/(?:unit\/)?core\/|test\/acceptance\/(?:WorkspaceCore|DocumentAnalysis|ConnectionController)(?:\.|\/))/.test(file)) {
                 selected.add('core'); selected.add('editor'); selected.add('ui');
-              } else if (/^(src\/vscode\/|generation\/expec\/src\/vscode\/|test\/(?:unit\/|driver\/|resources\/)?vscode\/|test\/acceptance\/(?:EditorAdapter(?:\.|\/)|EditorLanguageSupport\.test\.ts|native-editor\.test\.ts|workspace\.test\.ts))/.test(file)) {
+              } else if (/^(src\/vscode\/|generation\/expec\/src\/vscode\/|test\/(?:unit\/|driver\/|resources\/)?vscode\/|test\/acceptance\/(?:EditorAdapter(?:\.|\/)|EditorLanguageSupport\.test\.ts|ConnectionSidebar\.test\.ts|native-editor\.test\.ts|workspace\.test\.ts))/.test(file)) {
                 selected.add('editor');
               } else if (/^(src\/ui\/|generation\/expec\/src\/ui\/|test\/(?:unit\/)?ui\/|test\/acceptance\/OutputTabs(?:\.|\/)|test\/resources\/)/.test(file)) {
                 selected.add('ui');
@@ -62,7 +62,7 @@ jobs:
             }
           }
           const filters = {
-            core: ['test/acceptance/DocumentAnalysis', 'test/acceptance/WorkspaceCore', 'test/unit/core/', 'test/core/'],
+            core: ['test/acceptance/ConnectionController', 'test/acceptance/DocumentAnalysis', 'test/acceptance/WorkspaceCore', 'test/unit/core/', 'test/core/'],
             editor: ['test/acceptance/native-editor.test.ts', 'test/acceptance/EditorAdapter', 'test/acceptance/workspace.test.ts', 'test/unit/vscode/', 'test/vscode/'],
             ui: ['test/acceptance/OutputTabs', 'test/unit/ui/', 'test/ui/'],
           };
