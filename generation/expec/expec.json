@@ -54,6 +54,11 @@
             ],
             "name": "LanguageClient",
             "from": "vscode-languageclient/node"
+          },
+          {
+            "declaration": ["CompilerReport"],
+            "from": "executable-specification-language",
+            "name": "Compilation"
           }
         ]
       }
