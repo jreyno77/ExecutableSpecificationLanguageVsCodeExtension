@@ -1,0 +1,219 @@
+// Core owns connection policy; native callers supply saved configuration and events.
+// file is an absolute native manifest filename. Absence of text means missing file.
+type ConnectionConfiguration {
+  file: Text
+  text: Text?
+  writable: Boolean
+}
+
+type ConnectionState {
+  configurationFile: Text
+  status: Text
+  target: Text?
+  verifiedDirectory: Text?
+  `message`: Text
+}
+
+interface ConnectionFeedback {
+  public present, saveConfiguration
+  capability present(state: ConnectionState) returns Nothing {
+    promises "Present this immutable current state. Status is unconfigured, checking, connected, unavailable or invalid. Target is the absolute logical configured or currently requested directory. verifiedDirectory is the actual canonical directory from the existing connector, only while connected. Connected establishes valid configuration and usable filesystem identity; it does not establish native build or dependency readiness."
+  }
+  capability saveConfiguration(previous: ConnectionConfiguration, text: Text) returns Nothing {
+    promises "Request conditional persistence for this exact captured previous snapshot. This request is not a completed save. Preserve dirty editor work and refuse if actual saved bytes or write safety no longer match previous. Confirm success with the actual saved configurationChanged snapshot, or return this same previous object to saveFailed."
+  }
+}
+
+component ConnectionController {
+  requires package "expec" for runtime
+  requires package "typescript" for build
+  requires package "node-types" for build
+  requires package "vitest" for test
+
+  construction(feedback: ConnectionFeedback)
+  public configurationChanged, chooseProject, targetChanged, saveFailed, dispose
+
+  capability configurationChanged(snapshot: ConnectionConfiguration) returns Nothing {
+    promises "Capture this exact saved text and write safety for one selected local manifest. Advance currentness before any asynchronous work and withdraw the old connected state while checking. Missing text is unconfigured. Validate existing text with the real ConfigurationReader and registered built-in output profiles; invalid configuration stays invalid with its real diagnostic message and is never rewritten. Use ProjectConnector.connect with this absolute manifest filename. A valid configuration without a project is unconfigured; an unavailable root is unavailable; only an actual connected result establishes connected and verifiedDirectory. Preserve logical target and canonical verified directory separately. Do not scan or capture a project, install packages, generate outputs or parse native project code. Only the latest configuration/target revision may publish."
+  }
+  capability chooseProject(directory: Text) returns Nothing {
+    promises "Choose an absolute native directory for the current selected configuration. Reject invalid existing configuration without rewriting it. If writable is false, preserve the current target, request no save and present the message Save or revert unsaved configuration edits before choosing a project. Verify the proposed directory through the real connector before requesting persistence. A missing or unusable directory remains unavailable and requests no save. Preserve every other existing JSON field; change only project.root. For a missing manifest, propose formatVersion 1, version 0.1.0, build.entries [] and outputs [], with the selected root. Never write the file itself or report the new project connected before actual saved confirmation. Pass an immutable captured previous snapshot to feedback. New configuration or target revisions invalidate older verification and any unsent write request."
+  }
+  capability targetChanged(path: Text) returns Nothing {
+    promises "Recheck the current configured target automatically after relevant logical or canonical root or ancestor events, including deletion and restoration. Ignore unrelated paths and events for a superseded target. Reuse validated current configuration; perform only connector identity/availability checking, not tree capture. Withdraw connected while rechecking and suppress stale completion."
+  }
+  capability saveFailed(previous: ConnectionConfiguration, `message`: Text) returns Nothing {
+    promises "For the exact previous object of the current pending save request, report unavailable with this host failure message; never pretend the requested configuration was saved or connected. Ignore failures from superseded requests."
+  }
+  capability dispose() returns Nothing {
+    promises "End this controller lifetime, invalidate pending asynchronous work and prevent later publication or save requests. Repeated disposal is harmless; the native caller owns watchers and view registrations."
+  }
+}
+
+// These use a fresh real temporary workspace with sibling alpha and beta directories,
+// an expec.json file and the real language ConfigurationReader/ProjectConnector.
+// Setup creates the controller without reading configuration; inspecting supplies the actual saved snapshot.
+// The recording feedback observes published state and requested persistence. Confirming
+// a request conditionally writes its actual text, then supplies the actual saved bytes.
+// Directory/configuration actions perform the real operation and forward its core event.
+// Observations inspect real feedback, request text and files; they never infer success
+// from actions or duplicate connector/validator decisions. Names below identify owned
+// fixture directories; the driver supplies their actual absolute native filenames.
+examples for ConnectionController {
+  fixture alphaConfiguration: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[]},\"outputs\":[],\"project\":{\"root\":\"./alpha\"}}"
+  fixture betaConfiguration: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[]},\"outputs\":[],\"project\":{\"root\":\"./beta\"}}"
+  fixture configuredSettings: Text = "{\"formatVersion\":1,\"version\":\"1.2.3\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"version\":\"1.0.0\",\"phases\":[\"runtime\"]}],\"project\":{\"root\":\"./alpha\"}}"
+
+  setup connectionWorkspace(configuration: Text, writable: Boolean) returns Nothing
+  setup missingConnectionWorkspace(writable: Boolean) returns Nothing
+  action inspectConnection() returns Nothing
+  action chooseProjectDirectory(name: Text) returns Nothing
+  action confirmRequestedConfigurationSave() returns Nothing
+  action rejectRequestedConfigurationSave(`message`: Text) returns Nothing
+  action makeProjectUnavailable(name: Text) returns Nothing
+  action restoreProjectDirectory(name: Text) returns Nothing
+  action replaceConnectionConfiguration(text: Text) returns Nothing
+  observation connectionStatus() returns Text
+  observation configuredProjectName() returns Text
+  observation verifiedProjectName() returns Text
+  observation connectionMessage() returns Text
+  observation requestedConfigurationSaves() returns Number
+  observation actualConfigurationExists() returns Boolean
+  observation requestedProjectName() returns Text
+  observation requestedSettings() returns Text
+  observation connectedPublications() returns Number
+  observation unavailablePublications() returns Number
+  observation connectionPublications() returns Number
+
+  check expectConnection(status: Text, target: Text, verified: Text) {
+    let actualStatus = connectionStatus()
+    let actualTarget = configuredProjectName()
+    let actualVerified = verifiedProjectName()
+    assert actualStatus == status
+    assert actualTarget == target
+    assert actualVerified == verified
+  }
+  check expectSaveRequests(expected: Number) {
+    let actual = requestedConfigurationSaves()
+    assert actual == expected
+  }
+  check expectConnectionMessage(expected: Text) {
+    let actual = connectionMessage()
+    assert actual == expected
+  }
+  check expectConfigurationProblem() {
+    let actualMessage = connectionMessage()
+    assert actualMessage != ""
+    let actualSaves = requestedConfigurationSaves()
+    assert actualSaves == 0
+  }
+  check expectUnwrittenConfiguration() {
+    let exists = actualConfigurationExists()
+    let connected = connectedPublications()
+    assert exists == false
+    assert connected == 0
+  }
+  check expectRequestedProject(expected: Text) {
+    let actual = requestedProjectName()
+    assert actual == expected
+  }
+  check expectPreservedSettings(expected: Text) {
+    let actual = requestedSettings()
+    assert actual == expected
+  }
+  check expectRecoveredConnection() {
+    let unavailable = unavailablePublications()
+    assert unavailable == 1
+    let actualStatus = connectionStatus()
+    let actualTarget = configuredProjectName()
+    let actualVerified = verifiedProjectName()
+    assert actualStatus == "connected"
+    assert actualTarget == "alpha"
+    assert actualVerified == "alpha"
+  }
+  check expectConnectionPublications(expected: Number) {
+    let actual = connectionPublications()
+    assert actual == expected
+  }
+
+  scenario "a missing configuration does not claim a connection" {
+    given missingConnectionWorkspace(true)
+    when inspectConnection()
+    then expectConnection("unconfigured", "", "")
+    then expectSaveRequests(0)
+  }
+  scenario "an existing configured directory has verified availability" {
+    given connectionWorkspace(alphaConfiguration, true)
+    when inspectConnection()
+    then expectConnection("connected", "alpha", "alpha")
+    then expectSaveRequests(0)
+  }
+  scenario "invalid configuration is reported without replacing it during setup" {
+    given connectionWorkspace("{\"project\":", true)
+    when inspectConnection()
+    when chooseProjectDirectory("beta")
+    then expectConnection("invalid", "", "")
+    then expectConfigurationProblem()
+  }
+  scenario "choosing a verified directory requests a save without claiming persistence" {
+    given missingConnectionWorkspace(true)
+    when inspectConnection()
+    when chooseProjectDirectory("alpha")
+    then expectConnection("checking", "alpha", "")
+    then expectSaveRequests(1)
+    then expectRequestedProject("alpha")
+    then expectUnwrittenConfiguration()
+  }
+  scenario "confirming the saved choice connects without changing other settings" {
+    given connectionWorkspace(configuredSettings, true)
+    when inspectConnection()
+    when chooseProjectDirectory("beta")
+    when confirmRequestedConfigurationSave()
+    then expectConnection("connected", "beta", "beta")
+    then expectSaveRequests(1)
+    then expectRequestedProject("beta")
+    then expectPreservedSettings("{\"formatVersion\":1,\"version\":\"1.2.3\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"version\":\"1.0.0\",\"phases\":[\"runtime\"]}]}")
+  }
+  scenario "a failed configuration save never claims the requested connection" {
+    given missingConnectionWorkspace(true)
+    when inspectConnection()
+    when chooseProjectDirectory("alpha")
+    when rejectRequestedConfigurationSave("Permission denied.")
+    then expectConnection("unavailable", "alpha", "")
+    then expectConnectionMessage("Permission denied.")
+    then expectSaveRequests(1)
+    then expectUnwrittenConfiguration()
+  }
+  scenario "a disappearing configured directory becomes unavailable automatically" {
+    given connectionWorkspace(alphaConfiguration, true)
+    when inspectConnection()
+    when makeProjectUnavailable("alpha")
+    then expectConnection("unavailable", "alpha", "")
+    then expectSaveRequests(0)
+  }
+  scenario "restoring the configured directory recovers after its unavailable state" {
+    given connectionWorkspace(alphaConfiguration, true)
+    when inspectConnection()
+    when makeProjectUnavailable("alpha")
+    when restoreProjectDirectory("alpha")
+    then expectRecoveredConnection()
+    then expectSaveRequests(0)
+  }
+  scenario "configuration changes select the new target and ignore old target events" {
+    given connectionWorkspace(alphaConfiguration, true)
+    when inspectConnection()
+    when replaceConnectionConfiguration(betaConfiguration)
+    when makeProjectUnavailable("alpha")
+    then expectConnection("connected", "beta", "beta")
+    then expectConnectionPublications(4)
+    then expectSaveRequests(0)
+  }
+  scenario "choosing another project cannot overwrite unsaved configuration edits" {
+    given connectionWorkspace(alphaConfiguration, false)
+    when inspectConnection()
+    when chooseProjectDirectory("beta")
+    then expectConnection("connected", "alpha", "alpha")
+    then expectConnectionMessage("Save or revert unsaved configuration edits before choosing a project.")
+    then expectSaveRequests(0)
+  }
+}

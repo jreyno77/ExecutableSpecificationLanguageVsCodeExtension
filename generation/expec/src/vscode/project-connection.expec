@@ -1,0 +1,105 @@
+use ConnectionController, ConnectionConfiguration, ConnectionState from "../core/project-connection.expec"
+use VsCodeExtensionContext from "./live-diagnostics.expec"
+
+// Caller assembly selects one explicit local configuration filename. The sidebar
+// never discovers configurations or invents a successful connection from a path.
+component ConnectionSidebar {
+  requires package "vscode-types" for build
+  requires package "node-types" for build
+  requires package "expec" for runtime
+  requires package "vscode-test-electron" for test
+  depends on ConnectionController
+
+  construction(context: VsCodeExtensionContext)
+  public start, present, saveConfiguration, dispose
+
+  capability start(configurationFile: Text) returns Nothing {
+    promises "Register the native .expec Project Connection view and Choose Project command once. Start core ConnectionController for the supplied absolute local manifest filename, feeding actual saved text or absence and whether the document can be written. Display checking until core verifies the connection. Picking a folder sends its absolute fsPath to core; cancel does nothing. Switching filename disposes the previous controller and watches before following the new configuration; obsolete callbacks cannot affect the view or save a file. Settings expec.configurationFile defaults to expec.json relative to the selected workspace folder; a single folder can be selected automatically, multiple folders require a workspace choice. Empty/remote workspaces show an explanation and do not claim a connection. Opening the view or invoking the command activates the extension; opening an expec document still activates existing language support."
+  }
+
+  capability present(state: ConnectionState) returns Nothing {
+    promises "Translate the current core state into native TreeItem labels, description and tooltip; do not validate configuration or decide connection policy. Show the actual target and explanation. Connected means the configured directory has a verified filesystem identity, not that native build prerequisites or generation succeeded. Keep scoped native watches for the selected manifest and current logical/canonical target and their existing ancestors, including when a target is absent. Forward actual relevant configuration and target events to core, including creation, deletion and settings changes, without a manual Refresh action, polling, scanning or recursive project capture. Dispose old watches when the target/configuration changes; changes at an old target cannot restore an obsolete state. Register before reading and recheck once after registration; registration alone does not prove the operating-system watcher is ready. Surface watch failures rather than showing a stale healthy status."
+  }
+
+  capability saveConfiguration(previous: ConnectionConfiguration, text: Text) returns Nothing {
+    promises "Fulfill this exact current core save request using VS Code file/document APIs. Recheck the selected filename, current saved text and dirty-editor state immediately before applying; refuse stale requests or dirty documents without overwriting user edits. Save only the manifest selected by the author, preserve all other settings as supplied by core, and never write connected-project source. Confirm success to core with actual saved text, or report the failure using core.saveFailed with the exact previous snapshot. A requested write or picker result alone never proves success. Missing manifests can be created only by this explicit Choose Project action. Do not create projects, install packages, compile or generate outputs."
+  }
+
+  capability dispose() returns Nothing {
+    promises "Stop core and dispose every owned view, command, event subscription and watcher. Repeated disposal is harmless; pending reads, picks and saves cannot publish or initiate writes after disposal. Cleanup must attempt all owned resources even when one throws."
+  }
+}
+
+// These invoke the installed extension's real command, filesystem/document APIs
+// and registered TreeDataProvider. Observations read actual row values and saved
+// configuration; they do not reconstruct expected state from folders or actions.
+// Each case owns a clean local configuration and project directories; one native
+// host is reused. The driver settles real change events and cleans owned state.
+examples for ConnectionSidebar {
+  fixture configuredShop: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"shop\"},\"build\":{\"entries\":[]},\"outputs\":[]}"
+  fixture configuredLibrary: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"library\"},\"build\":{\"entries\":[]},\"outputs\":[]}"
+
+  setup connectionSidebar(configuration: Text, directories: List<Text>) returns Nothing
+  setup unconfiguredSidebar(directories: List<Text>) returns Nothing
+  action chooseProjectInSidebar(directory: Text) returns Nothing
+  action saveSidebarConfiguration(text: Text) returns Nothing
+  action removeSidebarProject(directory: Text) returns Nothing
+  action restoreSidebarProject(directory: Text) returns Nothing
+  action editConfigurationWithoutSaving(text: Text) returns Nothing
+  observation sidebarConnectionStatus() returns Text
+  observation sidebarProjectName() returns Text
+  observation sidebarConnectionExplanation() returns Text
+  observation sidebarSavedProjectName() returns Text
+  observation sidebarSavedConfiguration() returns Text
+  observation sidebarUnsavedConfiguration() returns Text
+
+  check expectSidebarConnection(status: Text, project: Text) {
+    let actualStatus = sidebarConnectionStatus()
+    let actualProject = sidebarProjectName()
+    let explanation = sidebarConnectionExplanation()
+    assert actualStatus == status
+    assert actualProject == project
+    assert explanation != ""
+  }
+  check expectSidebarSavedProject(project: Text) {
+    let actual = sidebarSavedProjectName()
+    assert actual == project
+  }
+  check expectSidebarConfigurationPreserved(saved: Text, unsaved: Text) {
+    let actualSaved = sidebarSavedConfiguration()
+    let actualUnsaved = sidebarUnsavedConfiguration()
+    assert actualSaved == saved
+    assert actualUnsaved == unsaved
+  }
+
+  scenario "choose an existing project and see its verified directory connection" {
+    given unconfiguredSidebar(["shop"])
+    when chooseProjectInSidebar("shop")
+    then expectSidebarConnection("connected", "shop")
+    then expectSidebarSavedProject("shop")
+  }
+  scenario "an unavailable project replaces the previous connected sidebar status" {
+    given connectionSidebar(configuredShop, ["shop"])
+    when removeSidebarProject("shop")
+    then expectSidebarConnection("unavailable", "shop")
+  }
+  scenario "restoring the project recovers status without a refresh action" {
+    given connectionSidebar(configuredShop, ["shop"])
+    when removeSidebarProject("shop")
+    when restoreSidebarProject("shop")
+    then expectSidebarConnection("connected", "shop")
+  }
+  scenario "a saved configuration follows its new project instead of the old target" {
+    given connectionSidebar(configuredShop, ["shop", "library"])
+    when saveSidebarConfiguration(configuredLibrary)
+    when removeSidebarProject("shop")
+    then expectSidebarConnection("connected", "library")
+  }
+  scenario "choosing a project cannot overwrite an unsaved configuration edit" {
+    given connectionSidebar(configuredShop, ["shop", "library"])
+    when editConfigurationWithoutSaving(configuredLibrary)
+    when chooseProjectInSidebar("library")
+    then expectSidebarConfigurationPreserved(configuredShop, configuredLibrary)
+    then expectSidebarConnection("connected", "shop")
+  }
+}
