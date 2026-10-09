@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const harness = fileURLToPath(new URL('../../resources/vscode/native-host/run.cjs', import.meta.url));
 const temporaryRoot = resolve(tmpdir());
+const diagnosticOutputLimit = 16 * 1024;
 const ownedDirectories = new Set<string>();
 export class NativeCleanupError extends Error {}
 
@@ -14,16 +15,19 @@ export class NativeLauncher {
   readonly closed: Promise<void>;
   private readonly exit: Promise<number | null>;
   private stopping: Promise<void> | undefined;
-  private output = '';
-  private constructor(private readonly child: ChildProcessWithoutNullStreams, private readonly directory: string) {
-    child.stdout.on('data', chunk => { this.output += chunk; });
-    child.stderr.on('data', chunk => { this.output += chunk; });
+  private readonly output: NativeLauncherOutput;
+  private constructor(private readonly child: ChildProcessWithoutNullStreams, private readonly directory: string,
+    private readonly inheritedProfileOverrides: { appData: boolean; portable: boolean },
+    private readonly launchProfileOverrides: { appData: boolean; portable: boolean }, private readonly diagnosticToken?: string) {
+    this.output = new NativeLauncherOutput(diagnosticToken);
+    child.stdout.on('data', chunk => this.output.append(String(chunk), 'stdout'));
+    child.stderr.on('data', chunk => this.output.append(String(chunk), 'stderr'));
     this.exit = new Promise((resolveExit, reject) => {
       child.once('error', reject);
       child.once('close', resolveExit);
     });
     this.closed = this.exit.then(code => {
-      if (code !== 0) throw new Error(`Native VS Code command exited ${code}.\n${this.output}`);
+      if (code !== 0) throw new Error(`Native VS Code command exited ${code}.\n${this.diagnostics().output}`);
     });
     void this.closed.catch(() => undefined);
   }
@@ -32,14 +36,20 @@ export class NativeLauncher {
     const requestPath = join(directory, 'native-request.json');
     await writeFile(requestPath, JSON.stringify(request), { signal });
     signal?.throwIfAborted();
-    const env = { ...process.env };
-    delete env.ELECTRON_RUN_AS_NODE;
-    delete env.VSCODE_IPC_HOOK_CLI;
+    const inherited = { ...process.env };
+    const env = nativeLauncherEnvironment(inherited);
     const child = spawn(process.execPath, [harness, requestPath], {
       env, windowsHide: true, detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'],
     });
     child.stdin.end();
-    return new NativeLauncher(child, directory);
+    return new NativeLauncher(child, directory, nativeProfileOverrides(inherited), nativeProfileOverrides(env),
+      typeof request.token === 'string' ? request.token : undefined);
+  }
+
+  /** Actual owned child evidence only; never expose the authentication token. */
+  diagnostics(): { output: string; inheritedProfileOverrides: { appData: boolean; portable: boolean }; launchProfileOverrides: { appData: boolean; portable: boolean } } {
+    return { output: this.output.read(),
+      inheritedProfileOverrides: { ...this.inheritedProfileOverrides }, launchProfileOverrides: { ...this.launchProfileOverrides } };
   }
 
   async wait(milliseconds = 60_000): Promise<void> {
@@ -109,4 +119,42 @@ export async function removeOwnedDirectory(directory: string): Promise<void> {
   }
   await rm(absolute, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   for (const owned of ownedDirectories) if (owned === absolute || inside(absolute, owned)) ownedDirectories.delete(owned);
+}
+
+/** The actual owned launcher environment; never inherit another VS Code instance. */
+export function nativeLauncherEnvironment(environment: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env = { ...environment };
+  const overrides = new Set(['ELECTRON_RUN_AS_NODE', 'VSCODE_IPC_HOOK_CLI', 'VSCODE_APPDATA', 'VSCODE_PORTABLE']);
+  // Windows environment names ignore case; VS Code profile overrides precede --user-data-dir.
+  for (const key of Object.keys(env)) if (overrides.has(key.toUpperCase())) delete env[key];
+  return env;
+}
+function nativeProfileOverrides(environment: NodeJS.ProcessEnv): { appData: boolean; portable: boolean } {
+  const present = (name: string) => Object.entries(environment).some(([key, value]) => key.toUpperCase() === name && Boolean(value));
+  return { appData: present('VSCODE_APPDATA'), portable: present('VSCODE_PORTABLE') };
+}
+
+/** Redacts each native stream before retention; incomplete token prefixes stay private. */
+export class NativeLauncherOutput {
+  private output = '';
+  private discardedOutput = 0;
+  private readonly pending = { stdout: '', stderr: '' };
+  constructor(private readonly token?: string) {}
+  append(chunk: string, stream: 'stdout' | 'stderr' = 'stdout'): void {
+    let safe = chunk;
+    if (this.token) {
+      safe = (this.pending[stream] + chunk).replaceAll(this.token, '[redacted session token]');
+      let prefixLength = Math.min(this.token.length - 1, safe.length);
+      while (prefixLength > 0 && !this.token.startsWith(safe.slice(-prefixLength))) prefixLength--;
+      this.pending[stream] = prefixLength ? safe.slice(-prefixLength) : '';
+      if (prefixLength) safe = safe.slice(0, -prefixLength);
+    }
+    const output = this.output + safe;
+    this.discardedOutput += Math.max(0, output.length - diagnosticOutputLimit);
+    this.output = output.slice(-diagnosticOutputLimit);
+  }
+  read(): string {
+    const withheld = this.pending.stdout || this.pending.stderr ? '[Possible incomplete session-token prefix withheld.]' : '';
+    return (this.discardedOutput ? '[Native launcher output truncated: ' + this.discardedOutput + ' earlier redacted characters discarded.]\n' : '') + this.output + withheld;
+  }
 }

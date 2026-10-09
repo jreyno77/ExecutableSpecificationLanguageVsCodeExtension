@@ -1,4 +1,4 @@
-import { afterAll } from 'vitest';
+import { afterAll, inject } from 'vitest';
 import type { Browser, Page } from 'playwright';
 
 let browser: Promise<Browser> | undefined;
@@ -6,7 +6,10 @@ afterAll(async () => { await (await browser?.catch(() => undefined))?.close(); }
 
 /** Reuse the immutable browser process; callers own and close their isolated contexts. */
 export function svgBrowser(): Promise<Browser> {
-  return browser ??= import('playwright').then(({ chromium }) => chromium.launch({ headless: true }));
+  return browser ??= import('playwright').then(({ chromium }) => {
+    const endpoint = inject('svgBrowserEndpoint');
+    return endpoint ? chromium.connect(endpoint, { timeout: 10_000 }) : chromium.launch({ headless: true });
+  });
 }
 
 /** Parse actual output as detached XML, without inserting it or executing SVG content. */

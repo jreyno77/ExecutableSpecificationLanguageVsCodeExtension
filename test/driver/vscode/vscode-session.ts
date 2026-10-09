@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createServer, type Server, type Socket } from 'node:net';
-import { lstat, readFile } from 'node:fs/promises';
+import { lstat, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Browser } from 'playwright';
 import { NativeCleanupError, NativeLauncher, ownTemporaryDirectory, removeOwnedDirectory, within } from './native-process.js';
@@ -115,7 +115,16 @@ export class VsCodeSession {
       const browser = await chromium.connectOverCDP(endpoint, { timeout: 5_000 });
       if (this.closing) { await browser.close(); throw new Error('The owned VS Code session is closed.'); }
       return browser;
-    })();
+    })().catch(async error => {
+      const profile = join(this.directory, 'profile');
+      let profileEntries: unknown;
+      try { profileEntries = (await readdir(profile, { withFileTypes: true })).slice(0, 24).map(entry => ({
+        name: entry.name.slice(0, 120), kind: entry.isSymbolicLink() ? 'link' : entry.isDirectory() ? 'directory' : entry.isFile() ? 'file' : 'other',
+      })); } catch (inspectionError) { profileEntries = String(inspectionError).slice(0, 512); }
+      throw new Error('Owned DevTools endpoint acquisition failed: ' + String(error).slice(0, 512) + '\n' + JSON.stringify({
+        profile, profileEntries, launcher: this.launcher?.diagnostics(),
+      }), { cause: error });
+    });
   }
 
   openGenerationEditor(generationId: string, extensionId: string, setup: GenerationEditorSetup): Promise<GenerationEditorObservation> {
