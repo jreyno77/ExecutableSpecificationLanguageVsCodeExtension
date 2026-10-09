@@ -9,8 +9,9 @@ declare global {
 }
 let shared: Promise<Browser> | undefined;
 beforeAll(async () => {
-  if (inject('outputTabs')) {
-    shared = import('playwright').then(({ chromium }) => chromium.launch({ headless: true }));
+  const session = inject('outputTabs');
+  if (session) {
+    shared = import('playwright').then(({ chromium }) => chromium.connect(session.browserEndpoint, { timeout: 10_000 }));
     await shared;
   }
 });
