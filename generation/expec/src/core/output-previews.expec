@@ -73,6 +73,12 @@ component OutputPreviews {
 // their actual renderer behavior. Release/drain all started work, even on assertion
 // failure. Invocation/max-concurrency observations prove bounded scheduling only;
 // current bytes/path/version observations establish the intended visible outcome.
+// previewAuthoring uses pass-through decorators around actual shipped callbacks;
+// armNextOutput arms only their next invocation after established ready feedback.
+// rememberPreviewOutput captures the actual published tab before the transition,
+// including its status/path/media/content; observations never reconstruct it.
+// awaitReadyOutput waits only for that ID in actual current feedback, not for
+// globally settled work while a different output's real callback remains held.
 examples for OutputPreviews {
   fixture emptyPaths: List<Text> = []
   fixture threeOutputs: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"uml\",\"options\":{\"directory\":\"draft/uml\",\"views\":[\"structure\"]}},{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\"}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}"
@@ -85,6 +91,9 @@ examples for OutputPreviews {
   action changePreviewSource(source: SourceDocument, version: Number) returns Nothing
   action changePreviewConfiguration(configuration: Text) returns Nothing
   action settleCurrentPreviews() returns Nothing
+  action awaitReadyOutput(id: Text) returns Nothing
+  action rememberPreviewOutput(id: Text) returns Nothing
+  action armNextOutput(id: Text) returns Nothing
   action savePreviewImport(uri: Text, text: Text) returns Nothing
   action closePreviewSource(uri: Text) returns Nothing
   action disposePreviews() returns Nothing
@@ -99,6 +108,9 @@ examples for OutputPreviews {
   observation previewOutputIds() returns List<Text>
   observation previewOutputLabels() returns List<Text>
   observation previewOutputStatus(id: Text) returns Text
+  observation rememberedPreviewOutputStatus(id: Text) returns Text
+  observation rememberedPreviewDocumentMediaType(id: Text, path: Text) returns Text
+  observation rememberedPreviewDocumentContains(id: Text, path: Text, content: Text) returns Boolean
   observation previewDocumentPaths(id: Text) returns List<Text>
   observation previewDocumentMediaType(id: Text, path: Text) returns Text
   observation previewDocumentContains(id: Text, path: Text, content: Text) returns Boolean
@@ -127,6 +139,14 @@ examples for OutputPreviews {
     let contains = previewDocumentContains(id, path, content)
     assert actualMediaType == mediaType
     assert contains == true
+  }
+  check expectEarlierReadyDocument(id: Text, path: Text, mediaType: Text, content: Text) {
+    let earlierStatus = rememberedPreviewOutputStatus(id)
+    let earlierMediaType = rememberedPreviewDocumentMediaType(id, path)
+    let earlierContains = rememberedPreviewDocumentContains(id, path, content)
+    assert earlierStatus == "ready"
+    assert earlierMediaType == mediaType
+    assert earlierContains == true
   }
   check expectPreviewSvgLabel(id: Text, path: Text, label: Text) {
     let actualMediaType = previewDocumentMediaType(id, path)
@@ -262,6 +282,35 @@ examples for OutputPreviews {
     then expectPreviewStatus("typescript", "blocked")
     then expectPreviewExplanation("typescript", "unresolved-reference")
     then expectNoPreviewDocuments("typescript")
+  }
+
+  scenario "documentation completes while the actual TypeScript callback remains held" {
+    given gatedPreviewAuthoring(textOutputs, "typescript")
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when awaitHeldOutput("typescript")
+    when awaitReadyOutput("markdown")
+    then expectConfiguredOutputs(["typescript", "markdown"], ["TypeScript", "Markdown"])
+    then expectCurrentPreviewSource("file:///workspace/src/library.expec", 1)
+    then expectPreviewStatus("typescript", "pending")
+    then expectNoPreviewDocuments("typescript")
+    then expectBoundedOutputWork("typescript", 1)
+    then expectPreviewStatus("markdown", "ready")
+    then expectPreviewDocument("markdown", "draft/docs/Book.md", "text/markdown", "type Book")
+  }
+
+  scenario "a valid changed render becomes pending after a real ready preview" {
+    given previewAuthoring(typeScriptOnly)
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when settleCurrentPreviews()
+    when rememberPreviewOutput("typescript")
+    when armNextOutput("typescript")
+    when changePreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Number }" }, 2)
+    when awaitHeldOutput("typescript")
+    then expectEarlierReadyDocument("typescript", "draft/types/Book.ts", "text/typescript", "title: string;")
+    then expectCurrentPreviewSource("file:///workspace/src/library.expec", 2)
+    then expectPreviewStatus("typescript", "pending")
+    then expectNoPreviewDocuments("typescript")
+    then expectBoundedOutputWork("typescript", 2)
   }
 
   scenario "a running output presents pending state with no previous documents" {

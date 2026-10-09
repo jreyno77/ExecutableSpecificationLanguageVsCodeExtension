@@ -51,6 +51,6 @@ PR CI selects affected components on Windows and Ubuntu; main runs the full exte
 
 ## Captured language build
 
-`generation/tooling/executable-specification-language-2fb9c5d.tgz` is a normally source-built development capture. It includes the existing foundation plus the reviewed EOF-location, completed-bookkeeping recovery and first-open declaration corrections from language PRs #95, #97 and #98. Its SHA256 is `979534504328e42e8472246b5a8046b153c7467f829808fb0c532627e7b7fb19`; `npm ci` also verifies lockfile integrity. This capture is not an official release; exact-merge package delivery remains a separate gate.
+`generation/tooling/executable-specification-language-36280c0.tgz` is a normally source-built development capture from reviewed language commit `36280c0a7d8380ae592c310569da2edc52c8a7c4`, merged in PR #100 as `3ca467477992f8c4f234b9df76453a780cc5314d`. It includes the existing corrections plus the public authored-output preview operation needed by EXT-05. Full build, scoped output checks, independent review and Windows/Linux PR CI passed. Its SHA256 is `f3af1e588b7460cd8e4390858a1d6defb17595b3a55031104294889b62fd285c`; `npm ci` also verifies lockfile integrity. This capture is not an official release; exact-merge package delivery remains a separate gate.
 
 TypeScript preserves JSX for Vite's React plugin. Automatic-runtime declaration capture remains [language issue60](https://github.com/jreyno77/ExecutableSpecificationLanguage/issues/60); native freshness and writer guards remain enabled.

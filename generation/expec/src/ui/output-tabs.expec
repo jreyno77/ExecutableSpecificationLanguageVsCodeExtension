@@ -52,6 +52,13 @@ examples for OutputTabs {
     ] }
   ]
 
+  fixture revisedDiagrams: List<OutputTab> = [
+    { id: "uml", label: "UML", status: "ready", documents: [
+      { path: "notes.d2", mediaType: "text/vnd.d2", content: "Novel: { title: Number }" },
+      { path: "structure.svg", mediaType: "image/svg+xml", content: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1800\" height=\"1200\" viewBox=\"0 0 1800 1200\"><rect width=\"1800\" height=\"1200\" fill=\"white\"/><text x=\"40\" y=\"60\" font-size=\"20\">Novel</text></svg>" }
+    ] }
+  ]
+
   setup openOutputTabs() returns Nothing
   action presentOutputs(tabs: List<OutputTab>) returns Nothing
   action selectOutput(id: Text) returns Nothing
@@ -174,6 +181,18 @@ examples for OutputTabs {
     then expectOutputContent("# Book")
   }
 
+  scenario "readding a removed output does not resurrect its former selection" {
+    given openOutputTabs()
+    when presentOutputs(previews)
+    when selectOutput("typescript")
+    when presentOutputs([{ id: "markdown", label: "Markdown", status: "ready", documents: [
+      { path: "Book.md", mediaType: "text/markdown", content: "# Book" }
+    ] }])
+    when presentOutputs(previews)
+    then expectSelectedOutput("markdown")
+    then expectOutputContent("# Book")
+  }
+
   scenario "pending feedback withdraws the previous document" {
     given openOutputTabs()
     when presentOutputs(previews)
@@ -219,6 +238,27 @@ examples for OutputTabs {
     when selectOutputDocument("structure.svg")
     then expectSelectedDocument("structure.svg", ["structure.d2", "structure.svg"])
     then expectLoadedDiagram(100, 1800)
+  }
+
+  scenario "retain the selected SVG path across a changed presentation" {
+    given openOutputTabs()
+    when presentOutputs(diagrams)
+    when selectOutputDocument("structure.svg")
+    when presentOutputs(revisedDiagrams)
+    then expectSelectedDocument("structure.svg", ["notes.d2", "structure.svg"])
+    then expectLoadedDiagram(100, 1800)
+  }
+
+  scenario "removing the selected SVG falls back to the first retained document" {
+    given openOutputTabs()
+    when presentOutputs(diagrams)
+    when selectOutputDocument("structure.svg")
+    when presentOutputs(revisedDiagrams)
+    when presentOutputs([{ id: "uml", label: "UML", status: "ready", documents: [
+      { path: "notes.d2", mediaType: "text/vnd.d2", content: "Novel: { title: Number }" }
+    ] }])
+    then expectSelectedDocument("notes.d2", ["notes.d2"])
+    then expectOutputContent("Novel: { title: Number }")
   }
 
   scenario "zoom and scroll a readable wide diagram" {
