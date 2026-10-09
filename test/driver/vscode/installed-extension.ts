@@ -11,6 +11,7 @@ import { NativeDefinitionCase } from './native-definition.js';
 import { ConnectionSidebarCase } from './connection-sidebar.js';
 import { NativePreviewCase } from './native-preview.js';
 import { NativeGenerationCase } from './native-generation.js';
+import { acquireNativeVsix, completeNativeVsix, type NativeVsix } from './native-vsix.js';
 
 const project = fileURLToPath(new URL('../../../', import.meta.url));
 const cachePath = join(tmpdir(), 'expec-vscode-electron-cache');
@@ -29,6 +30,9 @@ export class InstalledExpecEditor {
   private activeSession: VsCodeSession | undefined;
   private disposal: Promise<void> | undefined;
   private cleanupUnconfirmed = false;
+  private archive: NativeVsix | undefined;
+  private evidencePath: string | undefined;
+  private nativeHostConfirmed = false;
   private constructor(
     private readonly directory: string, private readonly workspace: string, private readonly executable: string,
     private readonly extensionId: string, private readonly extensionPath: string,
@@ -40,14 +44,17 @@ export class InstalledExpecEditor {
     const directory = await ownTemporaryDirectory('expec-installed-syntax-');
     try {
       const workspace = await ownTemporaryDirectory('workspace-', directory);
-      const { createVSIX } = await import('@vscode/vsce');
       const manifest = JSON.parse(await readFile(join(project, 'package.json'), 'utf8'));
       const extensionId = `${manifest.publisher}.${manifest.name}`;
       const receiptPath = join(directory, 'installation.json');
-      const packagePath = join(directory, 'expec.vsix');
-      await createVSIX({ cwd: project, packagePath, dependencies: false });
-      console.info('Owned native VSIX:', JSON.stringify({ path: packagePath,
-        sha256: createHash('sha256').update(await readFile(packagePath)).digest('hex'),
+      const archive = await acquireNativeVsix(project, directory, process.env.EXPEC_TEST_VSIX, async packagePath => {
+        const { createVSIX } = await import('@vscode/vsce');
+        await createVSIX({ cwd: project, packagePath, dependencies: false });
+      });
+      const packagePath = archive.path;
+      console.info('Owned native VSIX:', JSON.stringify({ path: packagePath, sourcePath: archive.sourcePath,
+        setup: archive.supplied ? 'provided' : 'local-package', sourceSha256: archive.sourceSha256,
+        copiedSha256: archive.copiedSha256, sha256: archive.copiedSha256,
         entrySha256: createHash('sha256').update(await readFile(join(project, manifest.main))).digest('hex') }));
       await (await NativeLauncher.start(directory, {
         command: 'install', packagePath, version: '1.100.0', cachePath, receiptPath,
@@ -62,7 +69,10 @@ export class InstalledExpecEditor {
         const extensionPath = join(directory, 'extensions', entry.name);
         const installed = JSON.parse(await readFile(join(extensionPath, 'package.json'), 'utf8'));
         if (`${installed.publisher}.${installed.name}` === extensionId && installed.version === manifest.version) {
-          return new InstalledExpecEditor(directory, workspace, executable, extensionId, extensionPath, installed);
+          const editor = new InstalledExpecEditor(directory, workspace, executable, extensionId, extensionPath, installed);
+          editor.archive = archive;
+          editor.evidencePath = process.env.EXPEC_NATIVE_VSIX_EVIDENCE;
+          return editor;
         }
       }
       throw new Error(`The VSIX installer did not install ${extensionId}@${manifest.version}.`);
@@ -138,6 +148,7 @@ export class InstalledExpecEditor {
       if (this.disposal) { await session.dispose(); throw new Error('The installed syntax editor is disposing.'); }
       const path = await session.extensionPath(this.extensionId);
       if (!path || resolve(path) !== resolve(this.extensionPath)) throw new Error('VS Code did not load the VSIX-installed product.');
+      this.nativeHostConfirmed = true;
       return session;
     })();
   }
@@ -202,6 +213,10 @@ export class InstalledExpecEditor {
     if (failures.length) this.cleanupUnconfirmed = true;
     if (this.cleanupUnconfirmed) throw new NativeCleanupError('Native host cleanup is unconfirmed; retained installation ' + this.directory + '.',
       { cause: new AggregateError(failures, 'Actual native cleanup failures.') });
+    if (this.archive) {
+      try { await completeNativeVsix(this.archive, project, this.evidencePath, this.nativeHostConfirmed); }
+      catch (error) { throw new NativeCleanupError('Native VSIX verification or proof failed; retained installation ' + this.directory + '.', { cause: error }); }
+    }
     await removeOwnedDirectory(this.directory);
   }
 }
