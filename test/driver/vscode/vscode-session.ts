@@ -4,6 +4,20 @@ import { join } from 'node:path';
 import { NativeCleanupError, NativeLauncher, ownTemporaryDirectory, removeOwnedDirectory, within } from './native-process.js';
 
 type DocumentObservation = { file: string; text: string; languageId: string };
+type DiagnosticPosition = { readonly line: number; readonly character: number };
+type DiagnosticRange = { readonly start: DiagnosticPosition; readonly end: DiagnosticPosition };
+export type DiagnosticObservation = {
+  readonly uri: string; readonly text: string; readonly version: number; readonly dirty: boolean;
+  readonly savedText: string | null; readonly previousProblemCount: number; readonly closed: boolean;
+  readonly diagnostics: readonly {
+    readonly message: string; readonly severity: number; readonly range: DiagnosticRange;
+    readonly code?: string | number; readonly source?: string;
+    readonly relatedInformation?: readonly { readonly message: string; readonly location: { readonly uri: string; readonly range: DiagnosticRange } }[];
+  }[];
+};
+export type DiagnosticMiddlewareObservation = { cancellationError: boolean; nextCalls: number; runtime: { node: string; vscode: string } };
+
+type Operation = 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose';
 type Pending = { promise: Promise<unknown>; resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> };
 
 /** One owned native host, with only the observations needed by its test consumers. */
@@ -80,6 +94,43 @@ export class VsCodeSession {
     return value;
   }
 
+  async missingDocumentDiagnostics(extensionId: string): Promise<DiagnosticMiddlewareObservation> {
+    const value = await this.request('missingDocumentDiagnostics', { extensionId });
+    if (!value || typeof value !== 'object' || !('cancellationError' in value) || typeof value.cancellationError !== 'boolean'
+      || !('nextCalls' in value) || !Number.isInteger(value.nextCalls) || (value.nextCalls as number) < 0
+      || !('runtime' in value) || !value.runtime || typeof value.runtime !== 'object'
+      || !('node' in value.runtime) || typeof value.runtime.node !== 'string' || !('vscode' in value.runtime) || typeof value.runtime.vscode !== 'string') {
+      const error = new Error('The native host returned an invalid middleware observation.');
+      await this.poison(error); throw error;
+    }
+    return value as DiagnosticMiddlewareObservation;
+  }
+
+  openDiagnosticDocument(documentId: string, extensionId: string, source: { text: string; file?: string; untitled: boolean }): Promise<DiagnosticObservation> {
+    return this.diagnosticRequest('diagnosticOpen', { documentId, extensionId, ...source });
+  }
+  editDiagnosticDocument(documentId: string, texts: readonly string[]): Promise<DiagnosticObservation> {
+    return this.diagnosticRequest('diagnosticEdit', { documentId, texts });
+  }
+  observeDiagnosticDocument(documentId: string): Promise<DiagnosticObservation> {
+    return this.diagnosticRequest('diagnosticObserve', { documentId });
+  }
+  closeDiagnosticDocument(documentId: string): Promise<DiagnosticObservation> {
+    return this.diagnosticRequest('diagnosticClose', { documentId });
+  }
+  async disposeDiagnosticDocument(documentId: string): Promise<void> {
+    const value = await this.request('diagnosticDispose', { documentId });
+    if (value !== null) throw new Error('The native document disposal returned an invalid receipt.');
+  }
+  private async diagnosticRequest(operation: Operation, values: Record<string, unknown>): Promise<DiagnosticObservation> {
+    const value = await this.request(operation, values);
+    if (!isDiagnosticObservation(value)) {
+      const error = new Error('The native host returned an invalid diagnostic observation.');
+      await this.poison(error); throw error;
+    }
+    return value;
+  }
+
   private accept(socket: Socket): void {
     this.sockets.add(socket);
     socket.setEncoding('utf8');
@@ -118,7 +169,7 @@ export class VsCodeSession {
     });
   }
 
-  private request(operation: 'readDocument' | 'extensionPath' | 'shutdown', values: Record<string, unknown>, milliseconds = 60_000): Promise<unknown> {
+  private request(operation: Operation, values: Record<string, unknown>, milliseconds = 60_000): Promise<unknown> {
     if (this.failure || (this.closing && operation !== 'shutdown') || !this.socket?.writable) {
       return Promise.reject(this.failure ?? new Error('The native VS Code session is closed.'));
     }
@@ -186,4 +237,19 @@ export class VsCodeSession {
       this.server.close(error => error ? reject(error) : resolveClose());
     }), 2_000, 'The owned loopback server did not close.');
   }
+}
+function isDiagnosticObservation(value: unknown): value is DiagnosticObservation {
+  if (!value || typeof value !== 'object') return false;
+  const packet = value as Partial<DiagnosticObservation>;
+  return typeof packet.uri === 'string' && typeof packet.text === 'string' && Number.isInteger(packet.version)
+    && typeof packet.dirty === 'boolean' && (packet.savedText === null || typeof packet.savedText === 'string')
+    && Number.isInteger(packet.previousProblemCount) && typeof packet.closed === 'boolean' && Array.isArray(packet.diagnostics)
+    && packet.diagnostics.every(diagnostic => diagnostic && typeof diagnostic === 'object' && typeof diagnostic.message === 'string' && Number.isInteger(diagnostic.severity)
+      && validPosition(diagnostic.range?.start) && validPosition(diagnostic.range?.end));
+}
+function validPosition(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const position = value as { line?: unknown; character?: unknown };
+  return Number.isInteger(position.line) && (position.line as number) >= 0
+    && Number.isInteger(position.character) && (position.character as number) >= 0;
 }

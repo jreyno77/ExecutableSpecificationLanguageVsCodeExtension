@@ -1,0 +1,177 @@
+use SourceDocument from "./workspace.expec"
+
+// The language's existing SyntaxDiagnostic: category, explanation, primaryRange
+// and relatedRanges. Locations count Unicode scalars; no VS Code/LSP types live here.
+opaque type SyntaxProblem
+
+interface DocumentFeedback {
+  public publish, clear
+
+  capability publish(source: SourceDocument, version: Number, problems: List<SyntaxProblem>) returns Nothing {
+    promises "Publish the problems for this exact immutable text snapshot and document version. An empty list replaces previous problems. Preserve the reader's explanations, categories and primary/related locations."
+  }
+
+  capability clear(uri: Text) returns Nothing {
+    promises "Remove all diagnostic feedback for this exact document URI."
+  }
+}
+
+component DocumentAnalysis {
+  requires package "expec" for runtime
+  requires package "typescript" for build
+  requires package "vitest" for test
+
+  construction(feedback: DocumentFeedback)
+  public opened, changed, closed
+
+  capability opened(source: SourceDocument, version: Number) returns Nothing {
+    promises "Start an open document lifetime and check this exact supplied text using one retained LangiumReader. Publish the real reader problems, or an empty list for syntactically accepted source. Treat the URI as identity, including untitled and remote URIs. Do not read files, resolve imports, generate outputs or require a project connection. Versions are nonnegative integers; reject invalid versions with a RangeError before changing state."
+  }
+
+  capability changed(source: SourceDocument, version: Number) returns Nothing {
+    promises "Reject a noninteger or negative version with a RangeError before changing state. For an open document, check and publish only a strictly newer version. Ignore duplicate, older and unopened-document changes. Retain the exact snapshot and version for publication. Check that the same lifetime/version is still current before publishing after any reentrant callback. The native caller excludes callbacks from an earlier document lifetime; URI/version alone cannot distinguish those after reopening. Syntax acceptance makes no semantic validity claim. Reader or publication exceptions must surface rather than masquerade as an empty successful result."
+  }
+
+  capability closed(uri: Text) returns Nothing {
+    promises "End this open lifetime and clear its diagnostics. Ignore later changes until the document is opened again; reopening may start with a lower version. Repeated close is harmless. Other documents remain unchanged."
+  }
+}
+
+// These exercise real DocumentAnalysis and the real language reader with a recording
+// DocumentFeedback. Observations read published packets/clears; they do not parse text.
+// Reader checking is synchronous today; older queued callbacks must still be ignored.
+examples for DocumentAnalysis {
+  fixture broken: SourceDocument = {
+    uri: "file:///workspace/src/library.expec",
+    text: "type Book {\n  title: Text\n"
+  }
+  fixture corrected: SourceDocument = {
+    uri: "file:///workspace/src/library.expec",
+    text: "type Book {\n  title: Text\n}"
+  }
+  fixture other: SourceDocument = {
+    uri: "untitled:Untitled-1",
+    text: "type Draft { value: Unknown }"
+  }
+
+  setup syntaxAnalysis() returns Nothing
+  action openSource(source: SourceDocument, version: Number) returns Nothing
+  action changeSource(source: SourceDocument, version: Number) returns Nothing
+  action closeSource(uri: Text) returns Nothing
+  observation publishedVersion(uri: Text) returns Number
+  observation publicationCount(uri: Text) returns Number
+  observation syntaxProblemCount(uri: Text) returns Number
+  observation syntaxExplanation(uri: Text) returns Text
+  observation syntaxStartLine(uri: Text) returns Number
+  observation syntaxStartColumn(uri: Text) returns Number
+  observation syntaxEndLine(uri: Text) returns Number
+  observation syntaxEndColumn(uri: Text) returns Number
+  observation clearCount(uri: Text) returns Number
+  action tryOpeningSource(source: SourceDocument, version: Number) returns Nothing
+  action tryChangingSource(source: SourceDocument, version: Number) returns Nothing
+  // Try actions invoke the named real method and record whether it throws RangeError.
+  observation invalidVersionRejected() returns Boolean
+
+  check expectSyntaxProblem(uri: Text, version: Number, line: Number, column: Number) {
+    let actualVersion = publishedVersion(uri)
+    let count = syntaxProblemCount(uri)
+    let explanation = syntaxExplanation(uri)
+    let startLine = syntaxStartLine(uri)
+    let startColumn = syntaxStartColumn(uri)
+    let endLine = syntaxEndLine(uri)
+    let endColumn = syntaxEndColumn(uri)
+    assert actualVersion == version
+    assert count == 1
+    assert explanation != ""
+    assert startLine == line
+    assert startColumn == column
+    assert endLine == line
+    assert endColumn == column
+  }
+  check expectNoSyntaxProblems(uri: Text, version: Number) {
+    let actualVersion = publishedVersion(uri)
+    let count = syntaxProblemCount(uri)
+    assert actualVersion == version
+    assert count == 0
+  }
+  check expectPublications(uri: Text, expected: Number) {
+    let actual = publicationCount(uri)
+    assert actual == expected
+  }
+  check expectClears(uri: Text, expected: Number) {
+    let actual = clearCount(uri)
+    assert actual == expected
+  }
+
+  check expectInvalidVersionRejected() {
+    let rejected = invalidVersionRejected()
+    assert rejected == true
+  }
+
+  scenario "locate a missing closing brace at the end of the supplied text" {
+    given syntaxAnalysis()
+    when openSource(broken, 1)
+    then expectSyntaxProblem(broken.uri, 1, 3, 1)
+  }
+  scenario "correcting unsaved text replaces the previous syntax problem" {
+    given syntaxAnalysis()
+    when openSource(broken, 1)
+    when changeSource(corrected, 2)
+    then expectNoSyntaxProblems(corrected.uri, 2)
+    then expectPublications(corrected.uri, 2)
+  }
+  scenario "older and duplicate document versions cannot replace current feedback" {
+    given syntaxAnalysis()
+    when openSource(broken, 1)
+    when changeSource(corrected, 3)
+    when changeSource(broken, 2)
+    when changeSource(broken, 3)
+    then expectNoSyntaxProblems(corrected.uri, 3)
+    then expectPublications(corrected.uri, 2)
+  }
+  scenario "closing clears feedback and ignores later document changes" {
+    given syntaxAnalysis()
+    when openSource(broken, 1)
+    when closeSource(broken.uri)
+    when closeSource(broken.uri)
+    when changeSource(corrected, 2)
+    then expectClears(broken.uri, 1)
+    then expectPublications(broken.uri, 1)
+  }
+  scenario "reopening starts a new document lifetime with its own version" {
+    given syntaxAnalysis()
+    when openSource(broken, 10)
+    when closeSource(broken.uri)
+    when openSource(corrected, 1)
+    then expectNoSyntaxProblems(corrected.uri, 1)
+    then expectPublications(corrected.uri, 2)
+  }
+  scenario "syntax feedback does not claim that an unresolved type is invalid syntax" {
+    given syntaxAnalysis()
+    when openSource(other, 1)
+    then expectNoSyntaxProblems(other.uri, 1)
+  }
+  scenario "closing one document leaves another document's feedback intact" {
+    given syntaxAnalysis()
+    when openSource(broken, 1)
+    when openSource(other, 1)
+    when closeSource(other.uri)
+    then expectSyntaxProblem(broken.uri, 1, 3, 1)
+    then expectClears(broken.uri, 0)
+    then expectClears(other.uri, 1)
+  }
+  scenario "reject negative document versions without publishing" {
+    given syntaxAnalysis()
+    when tryOpeningSource(broken, -1)
+    then expectInvalidVersionRejected()
+    then expectPublications(broken.uri, 0)
+  }
+  scenario "reject fractional versions without changing existing feedback" {
+    given syntaxAnalysis()
+    when openSource(corrected, 1)
+    when tryChangingSource(broken, 1.5)
+    then expectInvalidVersionRejected()
+    then expectNoSyntaxProblems(corrected.uri, 1)
+    then expectPublications(corrected.uri, 1)
+  }
+}

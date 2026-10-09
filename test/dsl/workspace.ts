@@ -148,4 +148,206 @@ readonly syntaxString: string = "component Store {\n  capability save() {\n    p
 readonly syntaxComment: string = "// type Book { title: Text }\nconcept Store {}";
 
 readonly syntaxQuotedName: string = "concept `type // Book` {}";
+
+async syntaxAnalysis(): Promise<void> {
+    return await this.driver.syntaxAnalysis();
+  }
+
+async diagnosticEditor(fileName: string, initialText: string): Promise<void> {
+    return await this.driver.diagnosticEditor(fileName, initialText);
+  }
+
+async openSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.openSource(source, version);
+  }
+
+async changeSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.changeSource(source, version);
+  }
+
+async closeSource(uri: string): Promise<void> {
+    return await this.driver.closeSource(uri);
+  }
+
+async tryOpeningSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.tryOpeningSource(source, version);
+  }
+
+async tryChangingSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.tryChangingSource(source, version);
+  }
+
+async editWithoutSaving(text: string): Promise<void> {
+    return await this.driver.editWithoutSaving(text);
+  }
+
+async editQuickly(first: string, latest: string): Promise<void> {
+    return await this.driver.editQuickly(first, latest);
+  }
+
+async closeEditedDocument(): Promise<void> {
+    return await this.driver.closeEditedDocument();
+  }
+
+async publishedVersion(uri: string): Promise<number> {
+    return await this.driver.publishedVersion(uri);
+  }
+
+async publicationCount(uri: string): Promise<number> {
+    return await this.driver.publicationCount(uri);
+  }
+
+async syntaxProblemCount(uri: string): Promise<number> {
+    return await this.driver.syntaxProblemCount(uri);
+  }
+
+async syntaxExplanation(uri: string): Promise<string> {
+    return await this.driver.syntaxExplanation(uri);
+  }
+
+async syntaxStartLine(uri: string): Promise<number> {
+    return await this.driver.syntaxStartLine(uri);
+  }
+
+async syntaxStartColumn(uri: string): Promise<number> {
+    return await this.driver.syntaxStartColumn(uri);
+  }
+
+async syntaxEndLine(uri: string): Promise<number> {
+    return await this.driver.syntaxEndLine(uri);
+  }
+
+async syntaxEndColumn(uri: string): Promise<number> {
+    return await this.driver.syntaxEndColumn(uri);
+  }
+
+async clearCount(uri: string): Promise<number> {
+    return await this.driver.clearCount(uri);
+  }
+
+async invalidVersionRejected(): Promise<boolean> {
+    return await this.driver.invalidVersionRejected();
+  }
+
+async previouslyVisibleProblemCount(): Promise<number> {
+    return await this.driver.previouslyVisibleProblemCount();
+  }
+
+async editorProblemCount(): Promise<number> {
+    return await this.driver.editorProblemCount();
+  }
+
+async editorProblemMessage(): Promise<string> {
+    return await this.driver.editorProblemMessage();
+  }
+
+async editorProblemIsError(): Promise<boolean> {
+    return await this.driver.editorProblemIsError();
+  }
+
+async editorProblemStartLine(): Promise<number> {
+    return await this.driver.editorProblemStartLine();
+  }
+
+async editorProblemStartColumn(): Promise<number> {
+    return await this.driver.editorProblemStartColumn();
+  }
+
+async editorProblemEndLine(): Promise<number> {
+    return await this.driver.editorProblemEndLine();
+  }
+
+async editorProblemEndColumn(): Promise<number> {
+    return await this.driver.editorProblemEndColumn();
+  }
+
+async savedDocumentText(): Promise<string> {
+    return await this.driver.savedDocumentText();
+  }
+
+async openDocumentText(): Promise<string> {
+    return await this.driver.openDocumentText();
+  }
+
+async openDocumentIsDirty(): Promise<boolean> {
+    return await this.driver.openDocumentIsDirty();
+  }
+
+async expectSyntaxProblem(uri: string, version: number, line: number, column: number): Promise<void> {
+    const actualVersion = await this.driver.publishedVersion(uri);
+    const count = await this.driver.syntaxProblemCount(uri);
+    const explanation = await this.driver.syntaxExplanation(uri);
+    const startLine = await this.driver.syntaxStartLine(uri);
+    const startColumn = await this.driver.syntaxStartColumn(uri);
+    const endLine = await this.driver.syntaxEndLine(uri);
+    const endColumn = await this.driver.syntaxEndColumn(uri);
+    expectData(actualVersion, version);
+    expectData(count, 1);
+    expect(!comparisonEqual(explanation, "")).toBe(true);
+    expectData(startLine, line);
+    expectData(startColumn, column);
+    expectData(endLine, line);
+    expectData(endColumn, column);
+  }
+
+async expectNoSyntaxProblems(uri: string, version: number): Promise<void> {
+    const actualVersion = await this.driver.publishedVersion(uri);
+    const count = await this.driver.syntaxProblemCount(uri);
+    expectData(actualVersion, version);
+    expectData(count, 0);
+  }
+
+async expectPublications(uri: string, expected: number): Promise<void> {
+    const actual = await this.driver.publicationCount(uri);
+    expectData(actual, expected);
+  }
+
+async expectClears(uri: string, expected: number): Promise<void> {
+    const actual = await this.driver.clearCount(uri);
+    expectData(actual, expected);
+  }
+
+async expectInvalidVersionRejected(): Promise<void> {
+    const rejected = await this.driver.invalidVersionRejected();
+    expectData(rejected, true);
+  }
+
+async expectEditorSyntaxProblem(line: number, column: number, endLine: number, endColumn: number): Promise<void> {
+    const count = await this.driver.editorProblemCount();
+    const explanation = await this.driver.editorProblemMessage();
+    const isError = await this.driver.editorProblemIsError();
+    const actualLine = await this.driver.editorProblemStartLine();
+    const actualColumn = await this.driver.editorProblemStartColumn();
+    const actualEndLine = await this.driver.editorProblemEndLine();
+    const actualEndColumn = await this.driver.editorProblemEndColumn();
+    expectData(count, 1);
+    expect(!comparisonEqual(explanation, "")).toBe(true);
+    expectData(isError, true);
+    expectData(actualLine, line);
+    expectData(actualColumn, column);
+    expectData(actualEndLine, endLine);
+    expectData(actualEndColumn, endColumn);
+  }
+
+async expectResolvedEditorProblem(): Promise<void> {
+    const previous = await this.driver.previouslyVisibleProblemCount();
+    expectData(previous, 1);
+    const actual = await this.driver.editorProblemCount();
+    expectData(actual, 0);
+  }
+
+async expectUnsavedText(current: string, saved: string): Promise<void> {
+    const actualCurrent = await this.driver.openDocumentText();
+    const actualSaved = await this.driver.savedDocumentText();
+    const dirty = await this.driver.openDocumentIsDirty();
+    expectData(actualCurrent, current);
+    expectData(actualSaved, saved);
+    expectData(dirty, true);
+  }
+
+readonly broken: SourceDocument = { ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book {\n  title: Text\n" };
+
+readonly corrected: SourceDocument = { ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book {\n  title: Text\n}" };
+
+readonly other: SourceDocument = { ["uri"]: "untitled:Untitled-1", ["text"]: "type Draft { value: Unknown }" };
 }

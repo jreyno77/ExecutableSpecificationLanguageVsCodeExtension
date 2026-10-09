@@ -1,3 +1,6 @@
+import type { DiagnosticDocument } from './vscode/diagnostic-document.js';
+import type { DiagnosticObservation } from './vscode/vscode-session.js';
+import { DocumentAnalysisRecording } from './document-analysis.js';
 import { InstalledExpecEditor } from './vscode/installed-extension.js';
 import { ExpecSyntax } from './vscode/syntax-reader.js';
 import type { TextDocument } from 'vscode';
@@ -8,6 +11,9 @@ import { OutputTabsBrowser } from './output-tabs-browser.js';
 import { OutputTab } from "../../src/core/OutputTab.js";
 import { SourceDocument } from "../../src/core/SourceDocument.js";
 export class WorkspaceDriver {
+  private diagnosticDocument!: DiagnosticDocument;
+  private diagnosticObservation!: DiagnosticObservation;
+  private analysisRecording!: DocumentAnalysisRecording;
   private syntax!: ExpecSyntax;
   private installedEditor!: InstalledExpecEditor;
   private syntaxLanguage = "";
@@ -117,4 +123,136 @@ async editorLanguageId(): Promise<string> {
 async syntaxScopeAt(line: number, column: number): Promise<string> {
     return this.syntax.scopeAt(line, column);
   }
-}
+
+async syntaxAnalysis(): Promise<void> {
+    this.analysisRecording = new DocumentAnalysisRecording();
+  }
+
+async diagnosticEditor(fileName: string, initialText: string): Promise<void> {
+    this.installedEditor = await InstalledExpecEditor.prepare();
+    this.diagnosticDocument = await this.installedEditor.diagnosticDocument(fileName, initialText);
+    this.diagnosticObservation = await this.diagnosticDocument.observation();
+  }
+
+async openSource(source: SourceDocument, version: number): Promise<void> {
+    this.analysisRecording.opened(source, version);
+  }
+
+async changeSource(source: SourceDocument, version: number): Promise<void> {
+    this.analysisRecording.changed(source, version);
+  }
+
+async closeSource(uri: string): Promise<void> {
+    this.analysisRecording.closed(uri);
+  }
+
+async tryOpeningSource(source: SourceDocument, version: number): Promise<void> {
+    this.analysisRecording.tryOpened(source, version);
+  }
+
+async tryChangingSource(source: SourceDocument, version: number): Promise<void> {
+    this.analysisRecording.tryChanged(source, version);
+  }
+
+async editWithoutSaving(text: string): Promise<void> {
+    this.diagnosticObservation = await this.diagnosticDocument.edit(text);
+  }
+
+async editQuickly(first: string, latest: string): Promise<void> {
+    this.diagnosticObservation = await this.diagnosticDocument.editQuickly(first, latest);
+  }
+
+async closeEditedDocument(): Promise<void> {
+    this.diagnosticObservation = await this.diagnosticDocument.close();
+  }
+
+async publishedVersion(uri: string): Promise<number> {
+    return this.analysisRecording.latest(uri).version;
+  }
+
+async publicationCount(uri: string): Promise<number> {
+    return this.analysisRecording.publicationCount(uri);
+  }
+
+async syntaxProblemCount(uri: string): Promise<number> {
+    return this.analysisRecording.latest(uri).problems.length;
+  }
+
+async syntaxExplanation(uri: string): Promise<string> {
+    return this.analysisRecording.problem(uri).explanation;
+  }
+
+async syntaxStartLine(uri: string): Promise<number> {
+    return this.analysisRecording.problem(uri).primaryRange.start.line;
+  }
+
+async syntaxStartColumn(uri: string): Promise<number> {
+    return this.analysisRecording.problem(uri).primaryRange.start.column;
+  }
+
+async syntaxEndLine(uri: string): Promise<number> {
+    return this.analysisRecording.problem(uri).primaryRange.end.line;
+  }
+
+async syntaxEndColumn(uri: string): Promise<number> {
+    return this.analysisRecording.problem(uri).primaryRange.end.column;
+  }
+
+async clearCount(uri: string): Promise<number> {
+    return this.analysisRecording.clearCount(uri);
+  }
+
+async invalidVersionRejected(): Promise<boolean> {
+    return this.analysisRecording.invalidVersionRejected();
+  }
+
+async previouslyVisibleProblemCount(): Promise<number> {
+    return this.diagnosticObservation.previousProblemCount;
+  }
+
+async editorProblemCount(): Promise<number> {
+    return this.diagnosticObservation.diagnostics.length;
+  }
+
+async editorProblemMessage(): Promise<string> {
+    return this.nativeProblem().message;
+  }
+
+async editorProblemIsError(): Promise<boolean> {
+    return this.nativeProblem().severity === 0;
+  }
+
+async editorProblemStartLine(): Promise<number> {
+    return this.nativeProblem().range.start.line + 1;
+  }
+
+async editorProblemStartColumn(): Promise<number> {
+    return this.nativeProblem().range.start.character + 1;
+  }
+
+async editorProblemEndLine(): Promise<number> {
+    return this.nativeProblem().range.end.line + 1;
+  }
+
+async editorProblemEndColumn(): Promise<number> {
+    return this.nativeProblem().range.end.character + 1;
+  }
+
+async savedDocumentText(): Promise<string> {
+    const saved = this.diagnosticObservation.savedText;
+    if (saved === null) throw new Error('An untitled document has no saved file.');
+    return saved;
+  }
+
+async openDocumentText(): Promise<string> {
+    return this.diagnosticObservation.text;
+  }
+
+async openDocumentIsDirty(): Promise<boolean> {
+    return this.diagnosticObservation.dirty;
+  }
+  private nativeProblem(): DiagnosticObservation['diagnostics'][number] {
+    const problem = this.diagnosticObservation.diagnostics[0];
+    if (!problem) throw new Error('The native editor has no syntax problem.');
+    return problem;
+  }}

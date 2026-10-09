@@ -1,10 +1,11 @@
-import { afterAll } from 'vitest';
+import { afterAll, onTestFinished } from 'vitest';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NativeCleanupError, NativeLauncher, inside, ownTemporaryDirectory, removeOwnedDirectory, within } from './native-process.js';
-import { VsCodeSession } from './vscode-session.js';
+import { VsCodeSession, type DiagnosticMiddlewareObservation } from './vscode-session.js';
+import { DiagnosticDocument } from './diagnostic-document.js';
 
 const project = fileURLToPath(new URL('../../../', import.meta.url));
 const cachePath = join(tmpdir(), 'expec-vscode-electron-cache');
@@ -14,6 +15,7 @@ afterAll(async () => { await (await installation?.catch(() => undefined))?.dispo
 /** Once for this native suite file; adding isolated files requires project-level ownership. */
 export class InstalledExpecEditor {
   private readonly activeOpens = new Set<Promise<string>>();
+  private readonly diagnosticDocuments = new Set<DiagnosticDocument>();
   private session: Promise<VsCodeSession> | undefined;
   private activeSession: VsCodeSession | undefined;
   private disposal: Promise<void> | undefined;
@@ -77,6 +79,24 @@ export class InstalledExpecEditor {
     return operation;
   }
 
+  async missingDocumentDiagnostics(): Promise<DiagnosticMiddlewareObservation> {
+    if (this.disposal) throw new Error('The installed syntax editor is disposing.');
+    return (await this.nativeSession()).missingDocumentDiagnostics(this.extensionId);
+  }
+
+  async diagnosticDocument(fileName: string, initialText: string): Promise<DiagnosticDocument> {
+    if (this.disposal) throw new Error('The installed syntax editor is disposing.');
+    const document = new DiagnosticDocument(() => this.nativeSession(), this.extensionId, fileName, initialText);
+    this.diagnosticDocuments.add(document);
+    onTestFinished(async () => {
+      await document.dispose(); this.diagnosticDocuments.delete(document);
+    }, 40_000);
+    try { await document.open(); return document; }
+    catch (error) {
+      await document.dispose(); this.diagnosticDocuments.delete(document); throw error;
+    }
+  }
+
   private async nativeSession(): Promise<VsCodeSession> {
     return this.session ??= (async () => {
       const session = this.activeSession = await VsCodeSession.start(this.executable, join(this.directory, 'extensions'));
@@ -111,10 +131,15 @@ export class InstalledExpecEditor {
   dispose(): Promise<void> { return this.disposal ??= this.finishDisposal(); }
   private async finishDisposal(): Promise<void> {
     await within(Promise.allSettled([...this.activeOpens]), 70_000, 'Active native observations did not settle before disposal.');
-    try { await this.activeSession?.dispose(); }
-    catch (error) { if (error instanceof NativeCleanupError) this.cleanupUnconfirmed = true; throw error; }
+    try {
+      try {
+        const documents = await Promise.allSettled([...this.diagnosticDocuments].map(document => document.dispose()));
+        const failed = documents.find(result => result.status === 'rejected');
+        if (failed?.status === 'rejected') throw failed.reason;
+      } finally { await this.activeSession?.dispose(); }
+    } catch (error) { if (error instanceof NativeCleanupError) this.cleanupUnconfirmed = true; throw error; }
     finally {
-      if (this.cleanupUnconfirmed) throw new Error(`Native host cleanup is unconfirmed; retained installation ${this.directory}.`);
+      if (this.cleanupUnconfirmed) throw new Error('Native host cleanup is unconfirmed; retained installation ' + this.directory + '.');
       await removeOwnedDirectory(this.directory);
     }
   }

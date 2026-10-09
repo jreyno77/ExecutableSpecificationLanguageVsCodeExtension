@@ -1,0 +1,155 @@
+use DocumentAnalysis, SyntaxProblem from "../core/document-analysis.expec"
+use SourceDocument from "../core/workspace.expec"
+
+// Native types are confined to the VS Code/LSP boundary.
+opaque type LanguageServerConnection
+opaque type VsCodeExtensionContext
+opaque type NativeLanguageClient
+
+component LanguageServerAdapter {
+  requires package "language-server" for runtime
+  requires package "language-server-document" for runtime
+  requires package "expec" for runtime
+  requires package "typescript" for build
+  depends on DocumentAnalysis
+
+  construction(connection: LanguageServerConnection)
+  public start, publish, clear, dispose
+
+  capability start() returns Nothing {
+    promises "Register native LSP initialization and document events once, using TextDocuments to reconstruct incremental text. Feed actual open/change/close snapshots and versions to core DocumentAnalysis. Opening must check exactly once despite TextDocuments also emitting a content-change event. Core owns checking and version/lifetime policy; this adapter owns protocol registration and translation. Register standard LSP document diagnostic pull with no cross-file/workspace diagnostics yet, and negotiate UTF-16 positions."
+  }
+  capability publish(source: SourceDocument, version: Number, problems: List<SyntaxProblem>) returns Nothing {
+    promises "Retain the real error diagnostics for this exact source URI, text and version as the current native pull-response cache. Convert Unicode scalar ranges, including related ranges, to zero-based UTF-16 using the supplied snapshot; preserve explanation and category. An empty list replaces the cached problems and yields an empty full diagnostic report when the native client requests it. Never guess a location, reparse source, generate files or read disk."
+  }
+  capability clear(uri: Text) returns Nothing {
+    promises "Remove the closed document from the pull-response cache. Native document diagnostic pull owns editor close cleanup; never resurrect a cached response from an earlier lifetime."
+  }
+  capability dispose() returns Nothing {
+    promises "Remove owned subscriptions, end tracked document lifetimes and prevent further diagnostic publication. Repeated disposal is harmless. Leave connection/process shutdown to the native server entry point."
+  }
+}
+
+component EditorLanguageSupport {
+  requires package "language-client" for runtime
+  requires package "vscode-types" for build
+  requires package "typescript" for build
+  requires package "vite" for build
+  requires package "vitest" for test
+  requires package "vscode-test-electron" for test
+  depends on LanguageServerAdapter
+
+  construction(context: VsCodeExtensionContext, client: NativeLanguageClient)
+  public start, dispose
+
+  capability start() returns Nothing {
+    promises "Request startup of the supplied native LanguageClient once. The native entry point owns its construction, packaged TypeScript server, expec selector (file and untitled), and single awaited stop on deactivation. Return that native client through the standard VS Code activation export for callers of its native feature APIs. Register owned resources with this extension context. Use native document diagnostic pull on edits. In the public provideDiagnostics middleware capture native document identity/version before awaiting next, then cancel an obsolete/closed result instead of returning empty success. The SDK owns scheduling, cancellation and diagnostic collections. Never replace newer feedback or reopen diagnostics for a closed document; do not rely on push version fields. Keep startup failures observable and keep core policy out of this host adapter."
+  }
+  capability dispose() returns Nothing {
+    promises "Invalidate adapter-owned callbacks and remove owned registrations once. The native entry point owns the injected client and awaits its one stop promise on deactivation; this operation neither stops that client twice nor promises synchronous process termination."
+  }
+}
+
+// Real installed VSIX and language server. The driver edits actual native documents,
+// observes native diagnostics/events, and closes owned documents/listeners per case.
+// Keep one reusable host; use a fresh test-owned workspace and document URI per case.
+// Each edit waits, within a deadline, for actual native pull completion/application for
+// that captured document identity/version, through the exported native client feature API
+// and real editor diagnostic events. A changed editor.version or an already empty
+// collection is not completion evidence. editQuickly submits both edits before waiting.
+// Closing starts from established feedback and observes actual editor tab closure plus
+// native diagnostic collection cleanup. Discard unsaved edits through the standard editor
+// command. Do not manually clear diagnostics, send a fake protocol close, or delete the
+// file to force closure. VS Code may retain a saved-file TextDocument in its buffer cache
+// after the editor tab closes; buffer eviction/isClosed/LSP DidClose is not this UI boundary.
+// Actual LSP close events still end the core lifetime when native buffer disposal occurs.
+// Each case closes its owned tab and removes its listeners/files; native buffer cache
+// ownership belongs to VS Code and ends with the shared host, rather than a test invention.
+// The untitled setup supplies initial text, not a saved disk file.
+// These are proposed acceptance steps, not existing executable results.
+examples for EditorLanguageSupport {
+  setup diagnosticEditor(fileName: Text, initialText: Text) returns Nothing
+  action editWithoutSaving(text: Text) returns Nothing
+  action editQuickly(first: Text, latest: Text) returns Nothing
+  action closeEditedDocument() returns Nothing
+  observation previouslyVisibleProblemCount() returns Number
+  observation editorProblemCount() returns Number
+  observation editorProblemMessage() returns Text
+  observation editorProblemIsError() returns Boolean
+  observation editorProblemStartLine() returns Number
+  observation editorProblemStartColumn() returns Number
+  observation editorProblemEndLine() returns Number
+  observation editorProblemEndColumn() returns Number
+  observation savedDocumentText() returns Text
+  observation openDocumentText() returns Text
+  observation openDocumentIsDirty() returns Boolean
+
+  // Display lines/columns are one-based UTF-16, as shown by the editor.
+  check expectEditorSyntaxProblem(line: Number, column: Number, endLine: Number, endColumn: Number) {
+    let count = editorProblemCount()
+    let explanation = editorProblemMessage()
+    let isError = editorProblemIsError()
+    let actualLine = editorProblemStartLine()
+    let actualColumn = editorProblemStartColumn()
+    let actualEndLine = editorProblemEndLine()
+    let actualEndColumn = editorProblemEndColumn()
+    assert count == 1
+    assert explanation != ""
+    assert isError == true
+    assert actualLine == line
+    assert actualColumn == column
+    assert actualEndLine == endLine
+    assert actualEndColumn == endColumn
+  }
+  check expectResolvedEditorProblem() {
+    let previous = previouslyVisibleProblemCount()
+    assert previous == 1
+    let actual = editorProblemCount()
+    assert actual == 0
+  }
+  check expectUnsavedText(current: Text, saved: Text) {
+    let actualCurrent = openDocumentText()
+    let actualSaved = savedDocumentText()
+    let dirty = openDocumentIsDirty()
+    assert actualCurrent == current
+    assert actualSaved == saved
+    assert dirty == true
+  }
+
+  scenario "show a missing brace from unsaved text without changing the saved file" {
+    given diagnosticEditor("library.expec", "type Book {\n  title: Text\n}")
+    when editWithoutSaving("type Book {\n  title: Text\n")
+    then expectEditorSyntaxProblem(3, 1, 3, 1)
+    then expectUnsavedText("type Book {\n  title: Text\n", "type Book {\n  title: Text\n}")
+  }
+  scenario "fixing an unsaved syntax error clears its diagnostic" {
+    given diagnosticEditor("library.expec", "type Book {\n  title: Text\n}")
+    when editWithoutSaving("type Book {\n  title: Text\n")
+    when editWithoutSaving("type Book {\n  title: Text\n  copies: Number\n}")
+    then expectResolvedEditorProblem()
+    then expectUnsavedText("type Book {\n  title: Text\n  copies: Number\n}", "type Book {\n  title: Text\n}")
+  }
+  scenario "rapid edits keep diagnostics for the latest text" {
+    given diagnosticEditor("library.expec", "type Book { title: Text }")
+    when editWithoutSaving("type Book {")
+    when editQuickly("type Book { title: @ }", "type Book { title: Text\n  copies: Number }")
+    then expectResolvedEditorProblem()
+    then expectUnsavedText("type Book { title: Text\n  copies: Number }", "type Book { title: Text }")
+  }
+  scenario "locate errors after an astral character using editor columns" {
+    given diagnosticEditor("unicode.expec", "type `📚` { title: Text }")
+    when editWithoutSaving("type `📚` { title: Text @ }")
+    then expectEditorSyntaxProblem(1, 25, 1, 26)
+  }
+  scenario "closing a document clears its owned diagnostics" {
+    given diagnosticEditor("library.expec", "type Book { title: Text }")
+    when editWithoutSaving("type Book {")
+    when closeEditedDocument()
+    then expectResolvedEditorProblem()
+  }
+  scenario "untitled expec documents receive syntax feedback without a project connection" {
+    given diagnosticEditor("untitled:Draft.expec", "type Draft { title: Text }")
+    when editWithoutSaving("type Draft {")
+    then expectEditorSyntaxProblem(1, 13, 1, 13)
+  }
+}

@@ -1,43 +1,51 @@
 # .expec for VS Code
 
-Extension structure specified in `.expec`, with TypeScript and UML generated into the connected project. Core owns application behavior; UI and VS Code adapt presentation and host events into core.
+Install the extension to get `.expec` language recognition, theme-compatible highlighting and syntax feedback while you type. Diagnostics use the current unsaved text and clear when you fix the problem or close its editor. File and untitled documents are supported.
 
-## Setup
-
-Use Node 24.19+ (24.x) and npm 11.20+ (11.x).
+Build with Node 24.19+ (24.x) and npm 11.20+ (11.x):
 
 ```sh
 npm ci
 npm run spec:check
 npm run build
-npx playwright install chromium
-npm test
+npm run package:vsix
 ```
 
-`generation/expec/src/` is the authored specification. Its folder layout maps to `src/core`, `src/ui`, and `src/vscode`. Scenarios in those same sources produce `test/acceptance`, `test/dsl`, and `test/driver`. Diagrams are generated in `generation/uml`.
+Use VS Code's **Extensions: Install from VSIX** command with `dist/expec-vscode-extension.vsix`. Open a `.expec` file containing:
 
-The first components implement preview routing, opt-in generation on save, editor-event forwarding and React tabs for supplied outputs. Eleven generated scenarios exercise these contracts; focused UI tests cover mounting and disposal. Core/editor tests run in-process. UI tests use real Chromium, sharing browser setup while isolating each test in its own context. The installable VSIX provides native `.expec` language recognition and theme-compatible highlighting from the language's grammar. Six additional generated scenarios verify the real installed extension and its TextMate scopes. Language-server diagnostics and activation are subsequent work.
+```expec
+concept Library {
+}
+```
 
-## Work from the specification
+Remove its closing brace without saving to see the syntax diagnostic; restore it to clear the problem. See the [language reference](https://github.com/jreyno77/ExecutableSpecificationLanguage/wiki) for authoring syntax and examples.
 
-`npm run generate` updates TypeScript, tests and UML in the originating connected checkout. The current language CLI cannot yet reconnect a fresh clone to existing generated files ([language issue #61](https://github.com/jreyno77/ExecutableSpecificationLanguage/issues/61)): its ignored `.expec/` state belongs to the original project location. A fresh checkout can check, build and test the committed outputs using the commands above. The captured tool includes the optional Electron capture repair. EXT-08 initial generation emitted all six highlighting scenarios and preserved the prior implementation. A later preservation run kept all 19 checked public files byte-identical but stopped at a final freshness/recovery check; its pending intent is retained and that run is not a successful complete regeneration. Do not copy private connection state, remove existing output, or edit managed files to bypass that limitation.
+## Develop from the specification
 
-The acceptance output explicitly retains its established `source` parameter-name mappings for the two editor notifications. The TypeScript adapter uses `document: TextDocument`; the configured acceptance names are deliberate mappings, not a replay of an earlier rename.
+Core owns application behavior; `src/vscode` and `src/ui` adapt native host events and presentation into core. Authored contracts and scenarios live in `generation/expec/src/`, whose folder layout maps to the connected project's `src/`. Scenarios generate acceptance tests, DSL and driver seams under `test/`; diagrams go to `generation/uml`.
 
-1. **Specifying:** edit and review `.expec` contracts and examples.
-2. **Generating:** run the generator, inspect its outputs and verify them.
-3. **Implementing:** fill only the handwritten areas the generator preserves.
+1. **Specifying:** edit and independently review the `.expec` APIs and literal examples.
+2. **Generating:** run `npm run generate`, inspect outputs and verify preservation.
+3. **Implementing:** observe behavioral failure, then fill preserved handwritten bodies and private helpers.
 
-During implementation, do not edit `.expec`, generated declarations, imports, signatures, assertions or diagrams. Bodies, unassociated private state/helpers and separate handwritten imports are preserved implementation areas. If a managed part or dependency must change, record the finding on the task, return to Specifying, review, and regenerate before continuing implementation. Package requirements belong in the owning `.expec` components and `generation/expec/expec.json`; keep `package.json` and its lockfile aligned. Preserve the captured language archive dependency described below.
+During implementation, authored `.expec`, managed declarations/imports/signatures, generated assertions and diagrams are read-only. A required contract or dependency change returns the task to Specifying with its learning recorded, followed by review and regeneration. Package requirements belong to the owning `.expec` components and `generation/expec/expec.json`; align `package.json` and its lockfile.
 
-Build an installable package with `npm run package:vsix` after `npm run build`, then use VS Code's **Extensions: Install from VSIX** command with `dist/expec-vscode-extension.vsix`. CI retains the VSIX from each platform.
+Generation works in the originating connected checkout. A fresh clone can check, build and test committed outputs; reconnecting it for regeneration remains [language issue61](https://github.com/jreyno77/ExecutableSpecificationLanguage/issues/61). Private connection state belongs to its original location.
 
-PR CI tests affected components on Windows and Ubuntu; main runs the complete extension suite. Browser installation is needed only for UI tests. On Linux CI, Playwright also installs its required system libraries, and the native VS Code tests run under Xvfb. The native syntax suite shares one VSIX installation and one owned VS Code host; each example uses a fresh document URI and token stack. The SDK download cache is keyed by its pinned version and platform. Extra isolated native test files will need project-level session ownership.
+## Test
 
-## Development language build
+```sh
+npx playwright install chromium
+npm test
+npm run test:collect
+```
 
-For this bootstrap, `generation/tooling/executable-specification-language-a69ceca.tgz` pins a normally source-built development generator at [a69ceca](https://github.com/jreyno77/ExecutableSpecificationLanguage/commit/a69ceca4382cb91ff28174ceb6c3ed73a5a6eae2). It combines [PR #68](https://github.com/jreyno77/ExecutableSpecificationLanguage/pull/68)'s captured analysis, [PR #85](https://github.com/jreyno77/ExecutableSpecificationLanguage/pull/85)'s initial package confirmation, merged [PR #91](https://github.com/jreyno77/ExecutableSpecificationLanguage/pull/91)'s initial source/project confirmation, merged [PR #88](https://github.com/jreyno77/ExecutableSpecificationLanguage/pull/88)'s existing-grammar highlighting asset, and merged [PR #92](https://github.com/jreyno77/ExecutableSpecificationLanguage/pull/92)'s actual Node builtin declaration selection. Source-folder mirroring and relocation already exist on language main. Later freshness and writer checks remain strict. The normal source build and pack pass; the archive includes the exported syntax asset. Current Windows/Linux CI passed for PRs #88, #91 and #92; their exact-merge releases remain unverified. This captured composition is not an official release; replace it with a verified release dependency when available.
+Core checks run in-process. React/browser checks share Chromium and isolate mutable contexts. Installed-editor checks share one VSIX installation and owned VS Code host, with fresh document URIs and owned listeners/files per case. Runtime collection lists imported suites without executing their tests.
 
-SHA-512 integrity: `sha512-YLdLm0O5hcqtQQl17RV96t55AXtWKZ2GGxiSAGEAww1w+Ynyf1Z5d5W1diR5MkuvGJXT3N0W918OaZ6RRc164g==`.
+PR CI selects affected components on Windows and Ubuntu; main runs the full extension suite. Linux CI installs browser libraries and runs native editor checks under Xvfb. CI retains platform VSIX artifacts.
 
-TypeScript preserves JSX for the Vite React plugin to transform. The captured language tool currently rejects a relative directory import in React automatic-runtime declarations ([language issue #60](https://github.com/jreyno77/ExecutableSpecificationLanguage/issues/60)); no native-input or writer check is disabled.
+## Captured language build
+
+`generation/tooling/executable-specification-language-2fb9c5d.tgz` is a normally source-built development capture. It includes the existing foundation plus the reviewed EOF-location, completed-bookkeeping recovery and first-open declaration corrections from language PRs #95, #97 and #98. Its SHA256 is `979534504328e42e8472246b5a8046b153c7467f829808fb0c532627e7b7fb19`; `npm ci` also verifies lockfile integrity. This capture is not an official release; exact-merge package delivery remains a separate gate.
+
+TypeScript preserves JSX for Vite's React plugin. Automatic-runtime declaration capture remains [language issue60](https://github.com/jreyno77/ExecutableSpecificationLanguage/issues/60); native freshness and writer guards remain enabled.
