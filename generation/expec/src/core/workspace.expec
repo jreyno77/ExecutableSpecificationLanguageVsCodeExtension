@@ -19,8 +19,10 @@ type OutputTab {
   // Temporary additive migration only: retire this scalar after handwritten consumers
   // move to documents, by returning to Specifying and regenerating before readiness.
   content: Text?
-  status: Text
-  documents: List<OutputDocument>
+  // Temporary optional fields permit existing owned fixtures to regenerate.
+  // Every live preview supplies both; make them required before PR readiness.
+  status: Text?
+  documents: List<OutputDocument>?
   `message`: Text?
 }
 
