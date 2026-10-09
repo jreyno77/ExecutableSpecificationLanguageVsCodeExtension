@@ -37,7 +37,7 @@ component ConnectionController {
     promises "Capture this exact saved text and write safety for one selected local manifest. Advance currentness before any asynchronous work and withdraw the old connected state while checking. Missing text is unconfigured. Validate existing text with the real ConfigurationReader and registered built-in output profiles; invalid configuration stays invalid with its real diagnostic message and is never rewritten. Use ProjectConnector.connect with this absolute manifest filename. A valid configuration without a project is unconfigured; an unavailable root is unavailable; only an actual connected result establishes connected and verifiedDirectory. Preserve logical target and canonical verified directory separately. Do not scan or capture a project, install packages, generate outputs or parse native project code. Only the latest configuration/target revision may publish."
   }
   capability chooseProject(directory: Text) returns Nothing {
-    promises "Choose an absolute native directory for the current selected configuration. Reject invalid existing configuration without rewriting it. If writable is false, preserve the current target, request no save and present the message Save or revert unsaved configuration edits before choosing a project. Verify the proposed directory through the real connector before requesting persistence. A missing or unusable directory remains unavailable and requests no save. Preserve every other existing JSON field; change only project.root. For a missing manifest, propose formatVersion 1, version 0.1.0, build.entries [] and outputs [], with the selected root. Never write the file itself or report the new project connected before actual saved confirmation. Pass an immutable captured previous snapshot to feedback. New configuration or target revisions invalidate older verification and any unsent write request."
+    promises "Choose an absolute native directory for the current selected configuration. Reject invalid existing configuration without rewriting it. If writable is false, preserve the current target, request no save and present the message Save or revert unsaved configuration edits before choosing a project. Verify the proposed directory through the real connector before requesting persistence. A missing or unusable directory remains unavailable and requests no save. Preserve every other existing JSON field; change only project.root. For a missing manifest, propose formatVersion 1, version 0.1.0, build.entries [src/main.expec] and outputs []. This is this extension's explicit initial metadata setting, not a language default; connection does not check whether that source file exists, and authors must configure their actual build entry before compilation, with the selected root. Never write the file itself or report the new project connected before actual saved confirmation. Pass an immutable captured previous snapshot to feedback. New configuration or target revisions invalidate older verification and any unsent write request."
   }
   capability targetChanged(path: Text) returns Nothing {
     promises "Recheck the current configured target automatically after relevant logical or canonical root or ancestor events, including deletion and restoration. Ignore unrelated paths and events for a superseded target. Reuse validated current configuration; perform only connector identity/availability checking, not tree capture. Withdraw connected while rechecking and suppress stale completion."
@@ -60,8 +60,8 @@ component ConnectionController {
 // from actions or duplicate connector/validator decisions. Names below identify owned
 // fixture directories; the driver supplies their actual absolute native filenames.
 examples for ConnectionController {
-  fixture alphaConfiguration: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[]},\"outputs\":[],\"project\":{\"root\":\"./alpha\"}}"
-  fixture betaConfiguration: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[]},\"outputs\":[],\"project\":{\"root\":\"./beta\"}}"
+  fixture alphaConfiguration: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[],\"project\":{\"root\":\"./alpha\"}}"
+  fixture betaConfiguration: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[],\"project\":{\"root\":\"./beta\"}}"
   fixture configuredSettings: Text = "{\"formatVersion\":1,\"version\":\"1.2.3\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"version\":\"1.0.0\",\"phases\":[\"runtime\"]}],\"project\":{\"root\":\"./alpha\"}}"
 
   setup connectionWorkspace(configuration: Text, writable: Boolean) returns Nothing
@@ -154,6 +154,14 @@ examples for ConnectionController {
     when chooseProjectDirectory("beta")
     then expectConnection("invalid", "", "")
     then expectConfigurationProblem()
+  }
+  scenario "choosing a missing directory cannot save or claim a connection" {
+    given missingConnectionWorkspace(true)
+    when inspectConnection()
+    when chooseProjectDirectory("missing")
+    then expectConnection("unavailable", "missing", "")
+    then expectSaveRequests(0)
+    then expectUnwrittenConfiguration()
   }
   scenario "choosing a verified directory requests a save without claiming persistence" {
     given missingConnectionWorkspace(true)

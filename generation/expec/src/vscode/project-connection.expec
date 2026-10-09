@@ -36,11 +36,12 @@ component ConnectionSidebar {
 // Each case owns a clean local configuration and project directories; one native
 // host is reused. The driver settles real change events and cleans owned state.
 examples for ConnectionSidebar {
-  fixture configuredShop: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"shop\"},\"build\":{\"entries\":[]},\"outputs\":[]}"
-  fixture configuredLibrary: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"library\"},\"build\":{\"entries\":[]},\"outputs\":[]}"
+  fixture configuredShop: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"shop\"},\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[]}"
+  fixture configuredLibrary: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"library\"},\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[]}"
 
   setup connectionSidebar(configuration: Text, directories: List<Text>) returns Nothing
   setup unconfiguredSidebar(directories: List<Text>) returns Nothing
+  action observeSidebar() returns Nothing
   action chooseProjectInSidebar(directory: Text) returns Nothing
   action saveSidebarConfiguration(text: Text) returns Nothing
   action removeSidebarProject(directory: Text) returns Nothing
@@ -78,6 +79,19 @@ examples for ConnectionSidebar {
     then expectSidebarConnection("connected", "shop")
     then expectSidebarSavedProject("shop")
   }
+  scenario "a configured but initially missing project is shown as unavailable" {
+    given connectionSidebar(configuredShop, [])
+    when observeSidebar()
+    then expectSidebarConnection("unavailable", "shop")
+    then expectSidebarSavedProject("shop")
+  }
+  scenario "creating an initially missing project updates its status automatically" {
+    given connectionSidebar(configuredShop, [])
+    when observeSidebar()
+    when restoreSidebarProject("shop")
+    then expectSidebarConnection("connected", "shop")
+    then expectSidebarSavedProject("shop")
+  }
   scenario "an unavailable project replaces the previous connected sidebar status" {
     given connectionSidebar(configuredShop, ["shop"])
     when removeSidebarProject("shop")
@@ -103,3 +117,20 @@ examples for ConnectionSidebar {
     then expectSidebarConnection("connected", "shop")
   }
 }
+
+// Proposed bounded native-component expectation; this recording host supplies real
+// temporary manifest bytes through its VS Code filesystem boundary. It records any
+// attempted write and published TreeDataProvider rows. It does not emulate the core
+// connection decision or launch another editor host. The component implementation
+// must satisfy this example in addition to the installed-editor scenarios above.
+// it('an old save request cannot overwrite newer saved configuration', async () => {
+//   const host = await savedConnectionHost(configuredShop, ['shop', 'library']);
+//   const previous = host.captureSavedConfiguration();
+//   await host.replaceSavedConfiguration(configuredLibrary);
+//   await host.awaitConnection('connected', 'library');
+//   host.sidebar.saveConfiguration(previous, configuredShop);
+//   await host.settleRequestedSave();
+//   expect(await host.savedConfiguration()).toBe(configuredLibrary);
+//   expect(host.configurationWrites()).toEqual([]);
+//   expect(host.connectionRow()).toMatchObject({ status: 'connected', target: 'library' });
+// });
