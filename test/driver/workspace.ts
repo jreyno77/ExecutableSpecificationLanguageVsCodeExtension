@@ -357,4 +357,140 @@ async entryVersionUnchanged(): Promise<boolean> {
     if (origin.kind !== 'source') throw new Error('The semantic problem has no source range.');
     return origin.range;
   }
+
+async connectionWorkspace(configuration: string, writable: boolean): Promise<void> {
+    throw new Error("Not implemented: workspace.connectionWorkspace");
+  }
+
+async missingConnectionWorkspace(writable: boolean): Promise<void> {
+    throw new Error("Not implemented: workspace.missingConnectionWorkspace");
+  }
+
+async connectionSidebar(configuration: string, directories: Array<string>): Promise<void> {
+    throw new Error("Not implemented: workspace.connectionSidebar");
+  }
+
+async unconfiguredSidebar(directories: Array<string>): Promise<void> {
+    throw new Error("Not implemented: workspace.unconfiguredSidebar");
+  }
+
+async inspectConnection(): Promise<void> {
+    throw new Error("Not implemented: workspace.inspectConnection");
+  }
+
+async chooseProjectDirectory(name: string): Promise<void> {
+    throw new Error("Not implemented: workspace.chooseProjectDirectory");
+  }
+
+async confirmRequestedConfigurationSave(): Promise<void> {
+    throw new Error("Not implemented: workspace.confirmRequestedConfigurationSave");
+  }
+
+async rejectRequestedConfigurationSave(message: string): Promise<void> {
+    throw new Error("Not implemented: workspace.rejectRequestedConfigurationSave");
+  }
+
+async makeProjectUnavailable(name: string): Promise<void> {
+    throw new Error("Not implemented: workspace.makeProjectUnavailable");
+  }
+
+async restoreProjectDirectory(name: string): Promise<void> {
+    throw new Error("Not implemented: workspace.restoreProjectDirectory");
+  }
+
+async replaceConnectionConfiguration(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.replaceConnectionConfiguration");
+  }
+
+async observeSidebar(): Promise<void> {
+    throw new Error("Not implemented: workspace.observeSidebar");
+  }
+
+async chooseProjectInSidebar(directory: string): Promise<void> {
+    throw new Error("Not implemented: workspace.chooseProjectInSidebar");
+  }
+
+async saveSidebarConfiguration(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.saveSidebarConfiguration");
+  }
+
+async removeSidebarProject(directory: string): Promise<void> {
+    throw new Error("Not implemented: workspace.removeSidebarProject");
+  }
+
+async restoreSidebarProject(directory: string): Promise<void> {
+    throw new Error("Not implemented: workspace.restoreSidebarProject");
+  }
+
+async editConfigurationWithoutSaving(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.editConfigurationWithoutSaving");
+  }
+
+async connectionStatus(): Promise<string> {
+    throw new Error("Not implemented: workspace.connectionStatus");
+  }
+
+async configuredProjectName(): Promise<string> {
+    throw new Error("Not implemented: workspace.configuredProjectName");
+  }
+
+async verifiedProjectName(): Promise<string> {
+    throw new Error("Not implemented: workspace.verifiedProjectName");
+  }
+
+async connectionMessage(): Promise<string> {
+    throw new Error("Not implemented: workspace.connectionMessage");
+  }
+
+async requestedConfigurationSaves(): Promise<number> {
+    throw new Error("Not implemented: workspace.requestedConfigurationSaves");
+  }
+
+async actualConfigurationExists(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.actualConfigurationExists");
+  }
+
+async requestedProjectName(): Promise<string> {
+    throw new Error("Not implemented: workspace.requestedProjectName");
+  }
+
+async requestedSettings(): Promise<string> {
+    throw new Error("Not implemented: workspace.requestedSettings");
+  }
+
+async connectedPublications(): Promise<number> {
+    throw new Error("Not implemented: workspace.connectedPublications");
+  }
+
+async unavailablePublications(): Promise<number> {
+    throw new Error("Not implemented: workspace.unavailablePublications");
+  }
+
+async connectionPublications(): Promise<number> {
+    throw new Error("Not implemented: workspace.connectionPublications");
+  }
+
+async sidebarConnectionStatus(): Promise<string> {
+    throw new Error("Not implemented: workspace.sidebarConnectionStatus");
+  }
+
+async sidebarProjectName(): Promise<string> {
+    throw new Error("Not implemented: workspace.sidebarProjectName");
+  }
+
+async sidebarConnectionExplanation(): Promise<string> {
+    throw new Error("Not implemented: workspace.sidebarConnectionExplanation");
+  }
+
+async sidebarSavedProjectName(): Promise<string> {
+    throw new Error("Not implemented: workspace.sidebarSavedProjectName");
+  }
+
+async sidebarSavedConfiguration(): Promise<string> {
+    throw new Error("Not implemented: workspace.sidebarSavedConfiguration");
+  }
+
+async sidebarUnsavedConfiguration(): Promise<string> {
+    throw new Error("Not implemented: workspace.sidebarUnsavedConfiguration");
+  }
 }
