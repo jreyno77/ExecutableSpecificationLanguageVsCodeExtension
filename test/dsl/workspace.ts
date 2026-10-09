@@ -350,4 +350,135 @@ readonly broken: SourceDocument = { ["uri"]: "file:///workspace/src/library.expe
 readonly corrected: SourceDocument = { ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book {\n  title: Text\n}" };
 
 readonly other: SourceDocument = { ["uri"]: "untitled:Untitled-1", ["text"]: "type Draft { value: Unknown }" };
+
+async semanticAnalysis(): Promise<void> {
+    return await this.driver.semanticAnalysis();
+  }
+
+async importedEditor(entryText: string, dependencyText: string): Promise<void> {
+    return await this.driver.importedEditor(entryText, dependencyText);
+  }
+
+async missingImportedEditor(entryText: string): Promise<void> {
+    return await this.driver.missingImportedEditor(entryText);
+  }
+
+async saveSemanticSource(source: SourceDocument): Promise<void> {
+    return await this.driver.saveSemanticSource(source);
+  }
+
+async removeSemanticSource(uri: string): Promise<void> {
+    return await this.driver.removeSemanticSource(uri);
+  }
+
+async openSemanticSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.openSemanticSource(source, version);
+  }
+
+async changeSemanticSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.changeSemanticSource(source, version);
+  }
+
+async closeSemanticSource(uri: string): Promise<void> {
+    return await this.driver.closeSemanticSource(uri);
+  }
+
+async saveImportedText(text: string): Promise<void> {
+    return await this.driver.saveImportedText(text);
+  }
+
+async deleteImportedFile(): Promise<void> {
+    return await this.driver.deleteImportedFile();
+  }
+
+async semanticProblemCode(uri: string): Promise<string> {
+    return await this.driver.semanticProblemCode(uri);
+  }
+
+async semanticProblemCount(uri: string): Promise<number> {
+    return await this.driver.semanticProblemCount(uri);
+  }
+
+async semanticStartLine(uri: string): Promise<number> {
+    return await this.driver.semanticStartLine(uri);
+  }
+
+async semanticStartColumn(uri: string): Promise<number> {
+    return await this.driver.semanticStartColumn(uri);
+  }
+
+async semanticEndColumn(uri: string): Promise<number> {
+    return await this.driver.semanticEndColumn(uri);
+  }
+
+async hasCheckedSpecification(uri: string): Promise<boolean> {
+    return await this.driver.hasCheckedSpecification(uri);
+  }
+
+async semanticDeferredCount(uri: string): Promise<number> {
+    return await this.driver.semanticDeferredCount(uri);
+  }
+
+async semanticPublicationCount(uri: string): Promise<number> {
+    return await this.driver.semanticPublicationCount(uri);
+  }
+
+async semanticPublishedVersion(uri: string): Promise<number> {
+    return await this.driver.semanticPublishedVersion(uri);
+  }
+
+async editorProblemCode(): Promise<string> {
+    return await this.driver.editorProblemCode();
+  }
+
+async entryVersionUnchanged(): Promise<boolean> {
+    return await this.driver.entryVersionUnchanged();
+  }
+
+async expectSemanticProblem(uri: string, code: string, line: number, column: number, endColumn: number): Promise<void> {
+    const actualCode = await this.driver.semanticProblemCode(uri);
+    const count = await this.driver.semanticProblemCount(uri);
+    const actualLine = await this.driver.semanticStartLine(uri);
+    const actualColumn = await this.driver.semanticStartColumn(uri);
+    const actualEnd = await this.driver.semanticEndColumn(uri);
+    const checked = await this.driver.hasCheckedSpecification(uri);
+    expectData(actualCode, code);
+    expectData(count, 1);
+    expectData(actualLine, line);
+    expectData(actualColumn, column);
+    expectData(actualEnd, endColumn);
+    expectData(checked, false);
+  }
+
+async expectCheckedSource(uri: string): Promise<void> {
+    const checked = await this.driver.hasCheckedSpecification(uri);
+    const problems = await this.driver.semanticProblemCount(uri);
+    const deferred = await this.driver.semanticDeferredCount(uri);
+    expectData(checked, true);
+    expectData(problems, 0);
+    expectData(deferred, 0);
+  }
+
+async expectSemanticPublications(uri: string, count: number, version: number): Promise<void> {
+    const actualCount = await this.driver.semanticPublicationCount(uri);
+    const actualVersion = await this.driver.semanticPublishedVersion(uri);
+    expectData(actualCount, count);
+    expectData(actualVersion, version);
+  }
+
+async expectEditorSemanticCode(code: string): Promise<void> {
+    const actualCode = await this.driver.editorProblemCode();
+    expectData(actualCode, code);
+  }
+
+async expectUnchangedEntryVersion(): Promise<void> {
+    const unchanged = await this.driver.entryVersionUnchanged();
+    expectData(unchanged, true);
+  }
+
+readonly basket: SourceDocument = { ["uri"]: "file:///workspace/src/basket.expec", ["text"]: "use Book from \"./book.expec\"\ntype Basket { book: Book }" };
+
+readonly book: SourceDocument = { ["uri"]: "file:///workspace/src/book.expec", ["text"]: "type Book { title: Text }" };
+
+readonly renamedBook: SourceDocument = { ["uri"]: "file:///workspace/src/book.expec", ["text"]: "type Magazine { title: Text }" };
 }

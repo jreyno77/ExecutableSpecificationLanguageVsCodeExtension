@@ -21,7 +21,7 @@ export class InstalledExpecEditor {
   private disposal: Promise<void> | undefined;
   private cleanupUnconfirmed = false;
   private constructor(
-    private readonly directory: string, private readonly executable: string,
+    private readonly directory: string, private readonly workspace: string, private readonly executable: string,
     private readonly extensionId: string, private readonly extensionPath: string,
     private readonly manifest: { contributes?: { grammars?: { language: string; scopeName: string; path: string }[] } },
   ) {}
@@ -30,6 +30,7 @@ export class InstalledExpecEditor {
   private static async install(): Promise<InstalledExpecEditor> {
     const directory = await ownTemporaryDirectory('expec-installed-syntax-');
     try {
+      const workspace = await ownTemporaryDirectory('workspace-', directory);
       const { createVSIX } = await import('@vscode/vsce');
       const manifest = JSON.parse(await readFile(join(project, 'package.json'), 'utf8'));
       const extensionId = `${manifest.publisher}.${manifest.name}`;
@@ -49,7 +50,7 @@ export class InstalledExpecEditor {
         const extensionPath = join(directory, 'extensions', entry.name);
         const installed = JSON.parse(await readFile(join(extensionPath, 'package.json'), 'utf8'));
         if (`${installed.publisher}.${installed.name}` === extensionId && installed.version === manifest.version) {
-          return new InstalledExpecEditor(directory, executable, extensionId, extensionPath, installed);
+          return new InstalledExpecEditor(directory, workspace, executable, extensionId, extensionPath, installed);
         }
       }
       throw new Error(`The VSIX installer did not install ${extensionId}@${manifest.version}.`);
@@ -84,9 +85,9 @@ export class InstalledExpecEditor {
     return (await this.nativeSession()).missingDocumentDiagnostics(this.extensionId);
   }
 
-  async diagnosticDocument(fileName: string, initialText: string): Promise<DiagnosticDocument> {
+  async diagnosticDocument(fileName: string, initialText: string, dependencyText?: string | null): Promise<DiagnosticDocument> {
     if (this.disposal) throw new Error('The installed syntax editor is disposing.');
-    const document = new DiagnosticDocument(() => this.nativeSession(), this.extensionId, fileName, initialText);
+    const document = new DiagnosticDocument(() => this.nativeSession(), this.extensionId, fileName, initialText, dependencyText, this.workspace);
     this.diagnosticDocuments.add(document);
     onTestFinished(async () => {
       await document.dispose(); this.diagnosticDocuments.delete(document);
@@ -99,7 +100,7 @@ export class InstalledExpecEditor {
 
   private async nativeSession(): Promise<VsCodeSession> {
     return this.session ??= (async () => {
-      const session = this.activeSession = await VsCodeSession.start(this.executable, join(this.directory, 'extensions'));
+      const session = this.activeSession = await VsCodeSession.start(this.executable, join(this.directory, 'extensions'), this.workspace);
       if (this.disposal) { await session.dispose(); throw new Error('The installed syntax editor is disposing.'); }
       const path = await session.extensionPath(this.extensionId);
       if (!path || resolve(path) !== resolve(this.extensionPath)) throw new Error('VS Code did not load the VSIX-installed product.');
@@ -109,7 +110,7 @@ export class InstalledExpecEditor {
 
   private async openDocument(fileName: string, text: string): Promise<string> {
     if (basename(fileName) !== fileName || fileName === '.' || fileName === '..') throw new Error('Open a single test-owned file name.');
-    const directory = await ownTemporaryDirectory('expec-syntax-document-');
+    const directory = await ownTemporaryDirectory('expec-syntax-document-', this.workspace);
     let cleanupUnconfirmed = false;
     try {
       const file = join(directory, fileName);

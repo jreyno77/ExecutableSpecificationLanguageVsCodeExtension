@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const harness = fileURLToPath(new URL('../../resources/vscode/native-host/run.cjs', import.meta.url));
@@ -92,9 +92,12 @@ export function inside(parent: string, child: string): boolean {
   return path !== '' && !isAbsolute(path) && path !== '..' && !path.startsWith('..' + (process.platform === 'win32' ? '\\' : '/'));
 }
 
-export async function ownTemporaryDirectory(prefix: string): Promise<string> {
-  const directory = resolve(await mkdtemp(join(temporaryRoot, prefix)));
-  if (!inside(temporaryRoot, directory)) throw new Error('Native test directory is outside its temporary root.');
+export async function ownTemporaryDirectory(prefix: string, parent = temporaryRoot): Promise<string> {
+  const base = resolve(parent);
+  if (base !== temporaryRoot && !ownedDirectories.has(base)) throw new Error('Native child directory requires an owned parent.');
+  if (!prefix || basename(prefix) !== prefix || prefix === '.' || prefix === '..') throw new Error('Native directory prefix must be a single name.');
+  const directory = resolve(await mkdtemp(join(base, prefix)));
+  if (!inside(base, directory)) throw new Error('Native test directory is outside its owned parent.');
   ownedDirectories.add(directory);
   return directory;
 }
@@ -105,5 +108,5 @@ export async function removeOwnedDirectory(directory: string): Promise<void> {
     throw new Error('Refusing to remove a directory not owned by this native test.');
   }
   await rm(absolute, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-  ownedDirectories.delete(absolute);
+  for (const owned of ownedDirectories) if (owned === absolute || inside(absolute, owned)) ownedDirectories.delete(owned);
 }

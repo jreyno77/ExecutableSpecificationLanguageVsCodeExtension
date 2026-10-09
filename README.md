@@ -1,6 +1,6 @@
 # .expec for VS Code
 
-Install the extension to get `.expec` language recognition, theme-compatible highlighting and syntax feedback while you type. Diagnostics use the current unsaved text and clear when you fix the problem or close its editor. File and untitled documents are supported.
+Install the extension to get `.expec` language recognition, theme-compatible highlighting and syntax and semantic feedback while you type. Diagnostics use the current unsaved text and clear when you fix the problem or close its editor. File and untitled documents are supported.
 
 Build with Node 24.19+ (24.x) and npm 11.20+ (11.x):
 
@@ -18,7 +18,9 @@ concept Library {
 }
 ```
 
-Remove its closing brace without saving to see the syntax diagnostic; restore it to clear the problem. See the [language reference](https://github.com/jreyno77/ExecutableSpecificationLanguage/wiki) for authoring syntax and examples.
+Remove its closing brace without saving to see the syntax diagnostic; restore it to clear the problem.
+
+An unknown type such as `type Basket { book: Boook }` receives a located semantic diagnostic. Fixing it to `Text` clears the problem. Source imports resolve relative to their owning file; unsaved imported text takes precedence, and saved imports update dependent diagnostics through VS Code’s native file watching. Unavailable modules and packages remain explicit findings. See the [language reference](https://github.com/jreyno77/ExecutableSpecificationLanguage/wiki) for authoring syntax and examples.
 
 ## Develop from the specification
 

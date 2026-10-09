@@ -255,4 +255,106 @@ async openDocumentIsDirty(): Promise<boolean> {
     const problem = this.diagnosticObservation.diagnostics[0];
     if (!problem) throw new Error('The native editor has no syntax problem.');
     return problem;
-  }}
+  }
+async semanticAnalysis(): Promise<void> {
+    this.analysisRecording = new DocumentAnalysisRecording();
+  }
+
+async importedEditor(entryText: string, dependencyText: string): Promise<void> {
+    await this.openImportedEditor(entryText, dependencyText);
+  }
+
+async missingImportedEditor(entryText: string): Promise<void> {
+    await this.openImportedEditor(entryText, null);
+  }
+
+async saveSemanticSource(source: SourceDocument): Promise<void> {
+    this.analysisRecording.saved(source);
+  }
+
+async removeSemanticSource(uri: string): Promise<void> {
+    this.analysisRecording.removed(uri);
+  }
+
+async openSemanticSource(source: SourceDocument, version: number): Promise<void> {
+    this.analysisRecording.opened(source, version);
+  }
+
+async changeSemanticSource(source: SourceDocument, version: number): Promise<void> {
+    this.analysisRecording.changed(source, version);
+  }
+
+async closeSemanticSource(uri: string): Promise<void> {
+    this.analysisRecording.closed(uri);
+  }
+
+async saveImportedText(text: string): Promise<void> {
+    this.diagnosticObservation = await this.diagnosticDocument.changeDependency(text);
+  }
+
+async deleteImportedFile(): Promise<void> {
+    this.diagnosticObservation = await this.diagnosticDocument.changeDependency(null);
+  }
+
+async semanticProblemCode(uri: string): Promise<string> {
+    return this.analysisRecording.semanticProblem(uri).code;
+  }
+
+async semanticProblemCount(uri: string): Promise<number> {
+    return this.checkedCompilation(uri).problems.length;
+  }
+
+async semanticStartLine(uri: string): Promise<number> {
+    return this.semanticRange(uri).start.line;
+  }
+
+async semanticStartColumn(uri: string): Promise<number> {
+    return this.semanticRange(uri).start.column;
+  }
+
+async semanticEndColumn(uri: string): Promise<number> {
+    return this.semanticRange(uri).end.column;
+  }
+
+async hasCheckedSpecification(uri: string): Promise<boolean> {
+    return this.analysisRecording.compilation(uri)?.value !== undefined;
+  }
+
+async semanticDeferredCount(uri: string): Promise<number> {
+    return this.checkedCompilation(uri).deferred.length;
+  }
+
+async semanticPublicationCount(uri: string): Promise<number> {
+    return this.analysisRecording.publicationCount(uri);
+  }
+
+async semanticPublishedVersion(uri: string): Promise<number> {
+    return this.analysisRecording.latest(uri).version;
+  }
+
+async editorProblemCode(): Promise<string> {
+    const code = this.nativeProblem().code;
+    if (typeof code !== "string") throw new Error("The native diagnostic has no textual problem code.");
+    return code;
+  }
+
+async entryVersionUnchanged(): Promise<boolean> {
+    return this.diagnosticObservation.version === this.diagnosticObservation.initialVersion;
+  }
+
+  private async openImportedEditor(entryText: string, dependencyText: string | null): Promise<void> {
+    this.installedEditor = await InstalledExpecEditor.prepare();
+    this.diagnosticDocument = await this.installedEditor.diagnosticDocument('basket.expec', entryText, dependencyText);
+    this.diagnosticObservation = await this.diagnosticDocument.observation();
+  }
+  private checkedCompilation(uri: string) {
+    const compilation = this.analysisRecording.compilation(uri);
+    if (!compilation) throw new Error('No compiler report was published for ' + uri);
+    return compilation;
+  }
+  private semanticRange(uri: string) {
+    const origin = this.analysisRecording.semanticProblem(uri).at;
+    if (origin.kind !== 'source') throw new Error('The semantic problem has no source range.');
+    return origin.range;
+  }
+}
