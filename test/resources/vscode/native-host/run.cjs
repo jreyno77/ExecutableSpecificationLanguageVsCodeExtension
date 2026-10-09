@@ -6,6 +6,8 @@ exports.run = async function run() {
   const vscode = require('vscode');
   const { openDiagnosticDocument } = require('./diagnostic-document.cjs');
   const diagnosticDocuments = new Map();
+  const { openConnectionSidebar } = require('./connection-sidebar.cjs');
+  const connectionSidebars = new Map();
   const request = JSON.parse(await fs.readFile(process.env.EXPEC_NATIVE_REQUEST, 'utf8'));
   const socket = net.createConnection({ host: '127.0.0.1', port: request.port });
   await new Promise((resolveRun, rejectRun) => {
@@ -62,9 +64,30 @@ exports.run = async function run() {
               await document.dispose(); diagnosticDocuments.delete(frame.documentId); value = null;
             } else throw new Error('Invalid native document operation.');
           }
+        } else if (frame.operation === 'sidebarOpen' && typeof frame.sidebarId === 'string' && typeof frame.extensionId === 'string'
+          && typeof frame.file === 'string' && typeof frame.directory === 'string' && typeof frame.resetFile === 'string') {
+          if (connectionSidebars.has(frame.sidebarId)) throw new Error('The owned native sidebar case already exists.');
+          const sidebar = await openConnectionSidebar(vscode, frame.extensionId, frame);
+          connectionSidebars.set(frame.sidebarId, sidebar);
+          value = await sidebar.observation();
+        } else if (['sidebarObserve', 'sidebarAction', 'sidebarDispose'].includes(frame.operation) && typeof frame.sidebarId === 'string') {
+          const sidebar = connectionSidebars.get(frame.sidebarId);
+          if (frame.operation === 'sidebarDispose' && !sidebar) value = null;
+          else {
+            if (!sidebar) throw new Error('The owned native sidebar case is unavailable.');
+            if (frame.operation === 'sidebarObserve') value = await sidebar.observation();
+            else if (frame.operation === 'sidebarAction' && ['choose', 'save', 'remove', 'restore', 'edit'].includes(frame.kind)
+              && (['choose', 'remove', 'restore'].includes(frame.kind) ? typeof frame.name === 'string' : typeof frame.text === 'string')) {
+              value = await sidebar.action(frame.kind, frame.name, frame.text);
+            } else if (frame.operation === 'sidebarDispose') {
+              await sidebar.dispose(); connectionSidebars.delete(frame.sidebarId); value = null;
+            } else throw new Error('Invalid native sidebar operation.');
+          }
         } else if (frame.operation === 'shutdown') {
           for (const document of diagnosticDocuments.values()) await document.dispose();
           diagnosticDocuments.clear();
+          for (const sidebar of connectionSidebars.values()) await sidebar.dispose();
+          connectionSidebars.clear();
           value = null; shuttingDown = true;
         } else throw new Error('Unsupported native observation.');
         await send({ kind: 'response', id: frame.id, value });

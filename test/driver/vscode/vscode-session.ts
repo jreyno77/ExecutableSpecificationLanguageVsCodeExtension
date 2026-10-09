@@ -17,7 +17,9 @@ export type DiagnosticObservation = {
 };
 export type DiagnosticMiddlewareObservation = { cancellationError: boolean; nextCalls: number; runtime: { node: string; vscode: string } };
 
-type Operation = 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
+export type SidebarObservation = { readonly status: string; readonly project: string; readonly explanation: string; readonly saved?: string; readonly unsaved?: string };
+
+type Operation = 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
 type Pending = { promise: Promise<unknown>; resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> };
 
 /** One owned native host, with only the observations needed by its test consumers. */
@@ -132,6 +134,28 @@ export class VsCodeSession {
       await this.poison(error); throw error;
     }
     return value;
+  }
+
+  openConnectionSidebar(sidebarId: string, extensionId: string, setup: { file: string; directory: string; resetFile: string }): Promise<SidebarObservation> {
+    return this.sidebarRequest('sidebarOpen', { sidebarId, extensionId, ...setup });
+  }
+  observeConnectionSidebar(sidebarId: string): Promise<SidebarObservation> { return this.sidebarRequest('sidebarObserve', { sidebarId }); }
+  changeConnectionSidebar(sidebarId: string, kind: 'choose' | 'save' | 'remove' | 'restore' | 'edit', name?: string, text?: string): Promise<SidebarObservation> {
+    return this.sidebarRequest('sidebarAction', { sidebarId, kind, name, text });
+  }
+  async disposeConnectionSidebar(sidebarId: string): Promise<void> {
+    const value = await this.request('sidebarDispose', { sidebarId });
+    if (value !== null) throw new Error('The native sidebar disposal returned an invalid receipt.');
+  }
+  private async sidebarRequest(operation: Operation, values: Record<string, unknown>): Promise<SidebarObservation> {
+    const value = await this.request(operation, values);
+    if (!value || typeof value !== 'object' || !('status' in value) || typeof value.status !== 'string'
+      || !('project' in value) || typeof value.project !== 'string' || !('explanation' in value) || typeof value.explanation !== 'string'
+      || ('saved' in value && typeof value.saved !== 'string') || ('unsaved' in value && typeof value.unsaved !== 'string')) {
+      const error = new Error('The native host returned an invalid sidebar observation.');
+      await this.poison(error); throw error;
+    }
+    return value as SidebarObservation;
   }
 
   private accept(socket: Socket): void {

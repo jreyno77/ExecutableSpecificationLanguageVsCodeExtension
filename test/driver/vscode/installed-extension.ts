@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { NativeCleanupError, NativeLauncher, inside, ownTemporaryDirectory, removeOwnedDirectory, within } from './native-process.js';
 import { VsCodeSession, type DiagnosticMiddlewareObservation } from './vscode-session.js';
 import { DiagnosticDocument } from './diagnostic-document.js';
+import { ConnectionSidebarCase } from './connection-sidebar.js';
 
 const project = fileURLToPath(new URL('../../../', import.meta.url));
 const cachePath = join(tmpdir(), 'expec-vscode-electron-cache');
@@ -16,6 +17,7 @@ afterAll(async () => { await (await installation?.catch(() => undefined))?.dispo
 export class InstalledExpecEditor {
   private readonly activeOpens = new Set<Promise<string>>();
   private readonly diagnosticDocuments = new Set<DiagnosticDocument>();
+  private readonly connectionSidebars = new Set<ConnectionSidebarCase>();
   private session: Promise<VsCodeSession> | undefined;
   private activeSession: VsCodeSession | undefined;
   private disposal: Promise<void> | undefined;
@@ -98,6 +100,15 @@ export class InstalledExpecEditor {
     }
   }
 
+  async connectionSidebar(configuration: string | undefined, directories: readonly string[]): Promise<ConnectionSidebarCase> {
+    if (this.disposal) throw new Error('The installed syntax editor is disposing.');
+    const sidebar = new ConnectionSidebarCase(() => this.nativeSession(), this.extensionId, configuration, directories, this.workspace);
+    this.connectionSidebars.add(sidebar);
+    onTestFinished(async () => { await sidebar.dispose(); this.connectionSidebars.delete(sidebar); }, 40_000);
+    try { await sidebar.open(); return sidebar; }
+    catch (error) { await sidebar.dispose(); this.connectionSidebars.delete(sidebar); throw error; }
+  }
+
   private async nativeSession(): Promise<VsCodeSession> {
     return this.session ??= (async () => {
       const session = this.activeSession = await VsCodeSession.start(this.executable, join(this.directory, 'extensions'), this.workspace);
@@ -134,7 +145,7 @@ export class InstalledExpecEditor {
     await within(Promise.allSettled([...this.activeOpens]), 70_000, 'Active native observations did not settle before disposal.');
     try {
       try {
-        const documents = await Promise.allSettled([...this.diagnosticDocuments].map(document => document.dispose()));
+        const documents = await Promise.allSettled([...this.diagnosticDocuments].map(document => document.dispose()).concat([...this.connectionSidebars].map(sidebar => sidebar.dispose())));
         const failed = documents.find(result => result.status === 'rejected');
         if (failed?.status === 'rejected') throw failed.reason;
       } finally { await this.activeSession?.dispose(); }

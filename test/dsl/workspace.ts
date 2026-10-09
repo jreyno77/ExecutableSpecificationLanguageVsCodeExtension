@@ -481,4 +481,230 @@ readonly basket: SourceDocument = { ["uri"]: "file:///workspace/src/basket.expec
 readonly book: SourceDocument = { ["uri"]: "file:///workspace/src/book.expec", ["text"]: "type Book { title: Text }" };
 
 readonly renamedBook: SourceDocument = { ["uri"]: "file:///workspace/src/book.expec", ["text"]: "type Magazine { title: Text }" };
+
+async connectionWorkspace(configuration: string, writable: boolean): Promise<void> {
+    return await this.driver.connectionWorkspace(configuration, writable);
+  }
+
+async missingConnectionWorkspace(writable: boolean): Promise<void> {
+    return await this.driver.missingConnectionWorkspace(writable);
+  }
+
+async connectionSidebar(configuration: string, directories: Array<string>): Promise<void> {
+    return await this.driver.connectionSidebar(configuration, directories);
+  }
+
+async unconfiguredSidebar(directories: Array<string>): Promise<void> {
+    return await this.driver.unconfiguredSidebar(directories);
+  }
+
+async inspectConnection(): Promise<void> {
+    return await this.driver.inspectConnection();
+  }
+
+async chooseProjectDirectory(name: string): Promise<void> {
+    return await this.driver.chooseProjectDirectory(name);
+  }
+
+async confirmRequestedConfigurationSave(): Promise<void> {
+    return await this.driver.confirmRequestedConfigurationSave();
+  }
+
+async rejectRequestedConfigurationSave(message: string): Promise<void> {
+    return await this.driver.rejectRequestedConfigurationSave(message);
+  }
+
+async makeProjectUnavailable(name: string): Promise<void> {
+    return await this.driver.makeProjectUnavailable(name);
+  }
+
+async restoreProjectDirectory(name: string): Promise<void> {
+    return await this.driver.restoreProjectDirectory(name);
+  }
+
+async replaceConnectionConfiguration(text: string): Promise<void> {
+    return await this.driver.replaceConnectionConfiguration(text);
+  }
+
+async observeSidebar(): Promise<void> {
+    return await this.driver.observeSidebar();
+  }
+
+async chooseProjectInSidebar(directory: string): Promise<void> {
+    return await this.driver.chooseProjectInSidebar(directory);
+  }
+
+async saveSidebarConfiguration(text: string): Promise<void> {
+    return await this.driver.saveSidebarConfiguration(text);
+  }
+
+async removeSidebarProject(directory: string): Promise<void> {
+    return await this.driver.removeSidebarProject(directory);
+  }
+
+async restoreSidebarProject(directory: string): Promise<void> {
+    return await this.driver.restoreSidebarProject(directory);
+  }
+
+async editConfigurationWithoutSaving(text: string): Promise<void> {
+    return await this.driver.editConfigurationWithoutSaving(text);
+  }
+
+async connectionStatus(): Promise<string> {
+    return await this.driver.connectionStatus();
+  }
+
+async configuredProjectName(): Promise<string> {
+    return await this.driver.configuredProjectName();
+  }
+
+async verifiedProjectName(): Promise<string> {
+    return await this.driver.verifiedProjectName();
+  }
+
+async connectionMessage(): Promise<string> {
+    return await this.driver.connectionMessage();
+  }
+
+async requestedConfigurationSaves(): Promise<number> {
+    return await this.driver.requestedConfigurationSaves();
+  }
+
+async actualConfigurationExists(): Promise<boolean> {
+    return await this.driver.actualConfigurationExists();
+  }
+
+async requestedProjectName(): Promise<string> {
+    return await this.driver.requestedProjectName();
+  }
+
+async requestedSettings(): Promise<string> {
+    return await this.driver.requestedSettings();
+  }
+
+async connectedPublications(): Promise<number> {
+    return await this.driver.connectedPublications();
+  }
+
+async unavailablePublications(): Promise<number> {
+    return await this.driver.unavailablePublications();
+  }
+
+async connectionPublications(): Promise<number> {
+    return await this.driver.connectionPublications();
+  }
+
+async sidebarConnectionStatus(): Promise<string> {
+    return await this.driver.sidebarConnectionStatus();
+  }
+
+async sidebarProjectName(): Promise<string> {
+    return await this.driver.sidebarProjectName();
+  }
+
+async sidebarConnectionExplanation(): Promise<string> {
+    return await this.driver.sidebarConnectionExplanation();
+  }
+
+async sidebarSavedProjectName(): Promise<string> {
+    return await this.driver.sidebarSavedProjectName();
+  }
+
+async sidebarSavedConfiguration(): Promise<string> {
+    return await this.driver.sidebarSavedConfiguration();
+  }
+
+async sidebarUnsavedConfiguration(): Promise<string> {
+    return await this.driver.sidebarUnsavedConfiguration();
+  }
+
+async expectConnection(status: string, target: string, verified: string): Promise<void> {
+    const actualStatus = await this.driver.connectionStatus();
+    const actualTarget = await this.driver.configuredProjectName();
+    const actualVerified = await this.driver.verifiedProjectName();
+    expectData(actualStatus, status);
+    expectData(actualTarget, target);
+    expectData(actualVerified, verified);
+  }
+
+async expectSaveRequests(expected: number): Promise<void> {
+    const actual = await this.driver.requestedConfigurationSaves();
+    expectData(actual, expected);
+  }
+
+async expectConnectionMessage(expected: string): Promise<void> {
+    const actual = await this.driver.connectionMessage();
+    expectData(actual, expected);
+  }
+
+async expectConfigurationProblem(): Promise<void> {
+    const actualMessage = await this.driver.connectionMessage();
+    expect(!comparisonEqual(actualMessage, "")).toBe(true);
+    const actualSaves = await this.driver.requestedConfigurationSaves();
+    expectData(actualSaves, 0);
+  }
+
+async expectUnwrittenConfiguration(): Promise<void> {
+    const exists = await this.driver.actualConfigurationExists();
+    const connected = await this.driver.connectedPublications();
+    expectData(exists, false);
+    expectData(connected, 0);
+  }
+
+async expectRequestedProject(expected: string): Promise<void> {
+    const actual = await this.driver.requestedProjectName();
+    expectData(actual, expected);
+  }
+
+async expectPreservedSettings(expected: string): Promise<void> {
+    const actual = await this.driver.requestedSettings();
+    expectData(actual, expected);
+  }
+
+async expectRecoveredConnection(): Promise<void> {
+    const unavailable = await this.driver.unavailablePublications();
+    expectData(unavailable, 1);
+    const actualStatus = await this.driver.connectionStatus();
+    const actualTarget = await this.driver.configuredProjectName();
+    const actualVerified = await this.driver.verifiedProjectName();
+    expectData(actualStatus, "connected");
+    expectData(actualTarget, "alpha");
+    expectData(actualVerified, "alpha");
+  }
+
+async expectConnectionPublications(expected: number): Promise<void> {
+    const actual = await this.driver.connectionPublications();
+    expectData(actual, expected);
+  }
+
+async expectSidebarConnection(status: string, project: string): Promise<void> {
+    const actualStatus = await this.driver.sidebarConnectionStatus();
+    const actualProject = await this.driver.sidebarProjectName();
+    const explanation = await this.driver.sidebarConnectionExplanation();
+    expectData(actualStatus, status);
+    expectData(actualProject, project);
+    expect(!comparisonEqual(explanation, "")).toBe(true);
+  }
+
+async expectSidebarSavedProject(project: string): Promise<void> {
+    const actual = await this.driver.sidebarSavedProjectName();
+    expectData(actual, project);
+  }
+
+async expectSidebarConfigurationPreserved(saved: string, unsaved: string): Promise<void> {
+    const actualSaved = await this.driver.sidebarSavedConfiguration();
+    const actualUnsaved = await this.driver.sidebarUnsavedConfiguration();
+    expectData(actualSaved, saved);
+    expectData(actualUnsaved, unsaved);
+  }
+
+readonly alphaConfiguration: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[],\"project\":{\"root\":\"./alpha\"}}";
+
+readonly betaConfiguration: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[],\"project\":{\"root\":\"./beta\"}}";
+
+readonly configuredSettings: string = "{\"formatVersion\":1,\"version\":\"1.2.3\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"version\":\"1.0.0\",\"phases\":[\"runtime\"]}],\"project\":{\"root\":\"./alpha\"}}";
+
+readonly configuredShop: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"shop\"},\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[]}";
+
+readonly configuredLibrary: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"library\"},\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[]}";
 }

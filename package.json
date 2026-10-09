@@ -77,7 +77,43 @@
         "scopeName": "source.expec",
         "path": "./src/vscode/syntax/expec.tmLanguage.json"
       }
-    ]
+    ],
+    "commands": [
+      {
+        "command": "expec.chooseProject",
+        "title": "Choose Project",
+        "category": ".expec",
+        "icon": "$(plug)"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "expec.connection",
+          "name": ".expec Project Connection"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "expec.chooseProject",
+          "when": "view == expec.connection",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": ".expec",
+      "properties": {
+        "expec.configurationFile": {
+          "type": "string",
+          "default": "expec.json",
+          "scope": "resource",
+          "description": "Configuration file for the selected workspace. Relative paths resolve from its folder. The connection view reports directory availability; build and generation readiness are checked separately."
+        }
+      }
+    }
   },
   "main": "./dist/native/extension.cjs",
   "activationEvents": [

@@ -1,3 +1,7 @@
+import type { ConnectionSidebarCase } from './vscode/connection-sidebar.js';
+import { basename } from 'node:path';
+import { stat } from 'node:fs/promises';
+import { ConnectionRecording } from './connection-recording.js';
 import type { DiagnosticDocument } from './vscode/diagnostic-document.js';
 import type { DiagnosticObservation } from './vscode/vscode-session.js';
 import { DocumentAnalysisRecording } from './document-analysis.js';
@@ -11,6 +15,8 @@ import { OutputTabsBrowser } from './output-tabs-browser.js';
 import { OutputTab } from "../../src/core/OutputTab.js";
 import { SourceDocument } from "../../src/core/SourceDocument.js";
 export class WorkspaceDriver {
+  private sidebarCase!: ConnectionSidebarCase;
+  private connectionRecording!: ConnectionRecording;
   private diagnosticDocument!: DiagnosticDocument;
   private diagnosticObservation!: DiagnosticObservation;
   private analysisRecording!: DocumentAnalysisRecording;
@@ -356,5 +362,149 @@ async entryVersionUnchanged(): Promise<boolean> {
     const origin = this.analysisRecording.semanticProblem(uri).at;
     if (origin.kind !== 'source') throw new Error('The semantic problem has no source range.');
     return origin.range;
+  }
+
+async connectionWorkspace(configuration: string, writable: boolean): Promise<void> {
+    this.connectionRecording = await ConnectionRecording.open(configuration, writable);
+  }
+
+async missingConnectionWorkspace(writable: boolean): Promise<void> {
+    this.connectionRecording = await ConnectionRecording.open(undefined, writable);
+  }
+
+async connectionSidebar(configuration: string, directories: Array<string>): Promise<void> {
+    this.installedEditor = await InstalledExpecEditor.prepare();
+    this.sidebarCase = await this.installedEditor.connectionSidebar(configuration, directories);
+  }
+
+async unconfiguredSidebar(directories: Array<string>): Promise<void> {
+    this.installedEditor = await InstalledExpecEditor.prepare();
+    this.sidebarCase = await this.installedEditor.connectionSidebar(undefined, directories);
+  }
+
+async inspectConnection(): Promise<void> {
+    await this.connectionRecording.inspect();
+  }
+
+async chooseProjectDirectory(name: string): Promise<void> {
+    await this.connectionRecording.choose(name);
+  }
+
+async confirmRequestedConfigurationSave(): Promise<void> {
+    await this.connectionRecording.confirmSave();
+  }
+
+async rejectRequestedConfigurationSave(message: string): Promise<void> {
+    await this.connectionRecording.rejectSave(message);
+  }
+
+async makeProjectUnavailable(name: string): Promise<void> {
+    await this.connectionRecording.remove(name);
+  }
+
+async restoreProjectDirectory(name: string): Promise<void> {
+    await this.connectionRecording.restore(name);
+  }
+
+async replaceConnectionConfiguration(text: string): Promise<void> {
+    await this.connectionRecording.replace(text);
+  }
+
+async observeSidebar(): Promise<void> {
+    await this.sidebarCase.observe();
+  }
+
+async chooseProjectInSidebar(directory: string): Promise<void> {
+    await this.sidebarCase.choose(directory);
+  }
+
+async saveSidebarConfiguration(text: string): Promise<void> {
+    await this.sidebarCase.save(text);
+  }
+
+async removeSidebarProject(directory: string): Promise<void> {
+    await this.sidebarCase.remove(directory);
+  }
+
+async restoreSidebarProject(directory: string): Promise<void> {
+    await this.sidebarCase.restore(directory);
+  }
+
+async editConfigurationWithoutSaving(text: string): Promise<void> {
+    await this.sidebarCase.edit(text);
+  }
+
+async connectionStatus(): Promise<string> {
+    return this.connectionRecording.latest.status;
+  }
+
+async configuredProjectName(): Promise<string> {
+    return basename(this.connectionRecording.latest.target ?? "");
+  }
+
+async verifiedProjectName(): Promise<string> {
+    return basename(this.connectionRecording.latest.verifiedDirectory ?? "");
+  }
+
+async connectionMessage(): Promise<string> {
+    return this.connectionRecording.latest.message;
+  }
+
+async requestedConfigurationSaves(): Promise<number> {
+    return this.connectionRecording.saves.length;
+  }
+
+async actualConfigurationExists(): Promise<boolean> {
+    try { await stat(this.connectionRecording.file); return true; } catch (error) { if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return false; throw error; }
+  }
+
+async requestedProjectName(): Promise<string> {
+    const request = this.connectionRecording.saves.at(-1); if (!request) throw new Error("No configuration save was requested."); return basename(JSON.parse(request.text).project.root);
+  }
+
+async requestedSettings(): Promise<string> {
+    const request = this.connectionRecording.saves.at(-1); if (!request) throw new Error("No configuration save was requested."); const { project, ...settings } = JSON.parse(request.text); return JSON.stringify(settings);
+  }
+
+async connectedPublications(): Promise<number> {
+    return this.connectionRecording.states.filter(state => state.status === "connected").length;
+  }
+
+async unavailablePublications(): Promise<number> {
+    return this.connectionRecording.states.filter(state => state.status === "unavailable").length;
+  }
+
+async connectionPublications(): Promise<number> {
+    return this.connectionRecording.states.length;
+  }
+
+async sidebarConnectionStatus(): Promise<string> {
+    return this.sidebarCase.last.status;
+  }
+
+async sidebarProjectName(): Promise<string> {
+    return this.sidebarCase.last.project;
+  }
+
+async sidebarConnectionExplanation(): Promise<string> {
+    return this.sidebarCase.last.explanation;
+  }
+
+async sidebarSavedProjectName(): Promise<string> {
+    const saved = this.sidebarCase.last.saved;
+    if (saved === undefined) throw new Error('The native sidebar has no saved configuration.');
+    return basename(JSON.parse(saved).project.root);
+  }
+
+async sidebarSavedConfiguration(): Promise<string> {
+    const saved = this.sidebarCase.last.saved;
+    if (saved === undefined) throw new Error('The native sidebar has no saved configuration.');
+    return saved;
+  }
+
+async sidebarUnsavedConfiguration(): Promise<string> {
+    const unsaved = this.sidebarCase.last.unsaved;
+    if (unsaved === undefined) throw new Error('The native sidebar has no unsaved configuration.');
+    return unsaved;
   }
 }

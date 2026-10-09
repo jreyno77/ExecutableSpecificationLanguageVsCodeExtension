@@ -11,7 +11,9 @@
       "src/vscode/editor-adapter.expec",
       "src/vscode/language-support.expec",
       "src/core/document-analysis.expec",
-      "src/vscode/live-diagnostics.expec"
+      "src/vscode/live-diagnostics.expec",
+      "src/core/project-connection.expec",
+      "src/vscode/project-connection.expec"
     ]
   },
   "outputs": [
@@ -23,7 +25,9 @@
         "configFile": "tsconfig.json",
         "imports": [
           {
-            "declaration": ["VsCodeDocument"],
+            "declaration": [
+              "VsCodeDocument"
+            ],
             "name": "TextDocument",
             "from": "vscode"
           },
@@ -79,11 +83,19 @@
         "configFile": "tsconfig.json",
         "names": [
           {
-            "declaration": ["EditorAdapter", "documentChanged", "document"],
+            "declaration": [
+              "EditorAdapter",
+              "documentChanged",
+              "document"
+            ],
             "name": "source"
           },
           {
-            "declaration": ["EditorAdapter", "documentSaved", "document"],
+            "declaration": [
+              "EditorAdapter",
+              "documentSaved",
+              "document"
+            ],
             "name": "source"
           }
         ]
