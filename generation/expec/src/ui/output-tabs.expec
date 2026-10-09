@@ -33,7 +33,7 @@ component OutputTabs {
 // Core examples use actual registered renderers. SVG image load/natural/displayed
 // dimensions prove browser rendering here; zoom/scroll observations read actual UI.
 examples for OutputTabs {
-  fixture emptyPaths: List<Text> = []
+  fixture emptyDocumentPaths: List<Text> = []
   fixture previews: List<OutputTab> = [
     { id: "uml", label: "UML", status: "ready", documents: [
       { path: "structure.d2", mediaType: "text/vnd.d2", content: "Book: { title: Text }" }
@@ -103,7 +103,7 @@ examples for OutputTabs {
     let documents = selectedDocumentPaths()
     assert actualStatus == status
     assert actualExplanation == explanation
-    assert documents == emptyPaths
+    assert documents == emptyDocumentPaths
   }
   check expectSelectedDocument(path: Text, paths: List<Text>) {
     let actual = selectedDocumentPath()
