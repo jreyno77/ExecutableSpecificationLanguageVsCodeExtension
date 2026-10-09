@@ -10,7 +10,8 @@
     "build": "npm run typecheck && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:collect": "vitest list"
+    "test:collect": "vitest list",
+    "package:vsix": "vsce package --no-dependencies --out dist/expec-vscode-extension.vsix"
   },
   "devDependencies": {
     "@types/node": "24.13.6",
@@ -18,19 +19,60 @@
     "@types/react-dom": "19.3.0",
     "@types/vscode": "1.100.0",
     "@vitejs/plugin-react": "6.1.2",
-    "executable-specification-language": "file:generation/tooling/executable-specification-language-167dc68.tgz",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "4.0.0",
+    "executable-specification-language": "file:generation/tooling/executable-specification-language-a69ceca.tgz",
     "playwright": "1.63.0",
     "typescript": "5.9.3",
     "vite": "8.3.3",
-    "vitest": "5.0.2"
+    "vitest": "5.0.2",
+    "vscode-oniguruma": "2.0.1",
+    "vscode-textmate": "9.3.2"
   },
   "engines": {
     "node": ">=24.19.0 <25",
-    "npm": ">=11.20.0 <12"
+    "npm": ">=11.20.0 <12",
+    "vscode": "^1.100.0"
   },
   "packageManager": "npm@11.20.0",
   "dependencies": {
     "react": "19.3.0",
     "react-dom": "19.3.0"
+  },
+  "displayName": ".expec",
+  "description": "Read executable specifications in VS Code.",
+  "publisher": "jreyno77",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jreyno77/ExecutableSpecificationLanguageVsCodeExtension.git"
+  },
+  "license": "UNLICENSED",
+  "categories": [
+    "Programming Languages"
+  ],
+  "files": [
+    "README.md",
+    "src/vscode/syntax/expec.tmLanguage.json"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "expec",
+        "aliases": [
+          ".expec",
+          "expec"
+        ],
+        "extensions": [
+          ".expec"
+        ]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "expec",
+        "scopeName": "source.expec",
+        "path": "./src/vscode/syntax/expec.tmLanguage.json"
+      }
+    ]
   }
 }

@@ -8,7 +8,8 @@
     "entries": [
       "src/core/workspace.expec",
       "src/ui/output-tabs.expec",
-      "src/vscode/editor-adapter.expec"
+      "src/vscode/editor-adapter.expec",
+      "src/vscode/language-support.expec"
     ]
   },
   "outputs": [
@@ -151,6 +152,38 @@
       "version": "0.1.0",
       "phases": [
         "build"
+      ]
+    },
+    {
+      "alias": "vsce",
+      "name": "npm:@vscode/vsce",
+      "version": "4.0.0",
+      "phases": [
+        "build"
+      ]
+    },
+    {
+      "alias": "vscode-textmate",
+      "name": "npm:vscode-textmate",
+      "version": "9.3.2",
+      "phases": [
+        "test"
+      ]
+    },
+    {
+      "alias": "vscode-oniguruma",
+      "name": "npm:vscode-oniguruma",
+      "version": "2.0.1",
+      "phases": [
+        "test"
+      ]
+    },
+    {
+      "alias": "vscode-test-electron",
+      "name": "npm:@vscode/test-electron",
+      "version": "3.1.0",
+      "phases": [
+        "test"
       ]
     }
   ]

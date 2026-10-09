@@ -51,7 +51,7 @@ jobs:
               if (/\.md$/.test(file) || file.startsWith('generation/uml/')) continue;
               if (/^(src\/core\/|generation\/expec\/src\/core\/|test\/(?:unit\/)?core\/|test\/acceptance\/WorkspaceCore(?:\.|\/))/.test(file)) {
                 selected.add('core'); selected.add('editor'); selected.add('ui');
-              } else if (/^(src\/vscode\/|generation\/expec\/src\/vscode\/|test\/(?:unit\/)?vscode\/|test\/acceptance\/EditorAdapter(?:\.|\/))/.test(file)) {
+              } else if (/^(src\/vscode\/|generation\/expec\/src\/vscode\/|test\/(?:unit\/|driver\/|resources\/)?vscode\/|test\/acceptance\/(?:EditorAdapter(?:\.|\/)|workspace\.test\.ts))/.test(file)) {
                 selected.add('editor');
               } else if (/^(src\/ui\/|generation\/expec\/src\/ui\/|test\/(?:unit\/)?ui\/|test\/acceptance\/OutputTabs(?:\.|\/)|test\/resources\/)/.test(file)) {
                 selected.add('ui');
@@ -63,7 +63,7 @@ jobs:
           }
           const filters = {
             core: ['test/acceptance/WorkspaceCore', 'test/unit/core/', 'test/core/'],
-            editor: ['test/acceptance/EditorAdapter', 'test/unit/vscode/', 'test/vscode/'],
+            editor: ['test/acceptance/EditorAdapter', 'test/acceptance/workspace.test.ts', 'test/unit/vscode/', 'test/vscode/'],
             ui: ['test/acceptance/OutputTabs', 'test/unit/ui/', 'test/ui/'],
           };
           const tests = all || selected.size > 0;
@@ -78,6 +78,13 @@ jobs:
         run: npm run spec:check
       - name: Build
         run: npm run build
+      - name: Package the extension
+        run: npm run package:vsix
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: expec-vsix-${{ matrix.os }}
+          path: dist/expec-vscode-extension.vsix
+          if-no-files-found: error
       - name: Install Chromium for UI tests
         if: steps.scope.outputs.ui == 'true'
         run: npx --no-install playwright install --with-deps chromium
@@ -85,4 +92,9 @@ jobs:
         if: steps.scope.outputs.tests == 'true'
         env:
           TEST_FILTERS: ${{ steps.scope.outputs.filters }}
-        run: npm test -- $TEST_FILTERS
+        run: |
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            xvfb-run -a npm test -- $TEST_FILTERS
+          else
+            npm test -- $TEST_FILTERS
+          fi

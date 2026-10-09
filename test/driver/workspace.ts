@@ -1,3 +1,5 @@
+import { InstalledExpecEditor } from './vscode/installed-extension.js';
+import { ExpecSyntax } from './vscode/syntax-reader.js';
 import type { TextDocument } from 'vscode';
 import { WorkspaceCore } from '../../src/core/WorkspaceCore.js';
 import { EditorAdapter } from '../../src/vscode/EditorAdapter.js';
@@ -6,6 +8,9 @@ import { OutputTabsBrowser } from './output-tabs-browser.js';
 import { OutputTab } from "../../src/core/OutputTab.js";
 import { SourceDocument } from "../../src/core/SourceDocument.js";
 export class WorkspaceDriver {
+  private syntax!: ExpecSyntax;
+  private installedEditor!: InstalledExpecEditor;
+  private syntaxLanguage = "";
   private core!: WorkspaceCore;
   private editor!: EditorAdapter;
   private readonly documents = new Map<string, { content: { text: string }; document: TextDocument }>();
@@ -87,5 +92,29 @@ async disposeOutputTabs(): Promise<void> {
 
 async outputHostExists(): Promise<boolean> {
     return this.ui.hostExists();
+  }
+
+async preparedExpecEditor(): Promise<void> {
+    this.installedEditor = await InstalledExpecEditor.prepare();
+  }
+
+async preparedExpecGrammar(): Promise<void> {
+    this.syntax = await ExpecSyntax.prepare();
+  }
+
+async openSyntaxFile(fileName: string, text: string): Promise<void> {
+    this.syntaxLanguage = await this.installedEditor.open(fileName, text);
+  }
+
+async tokenizeSyntax(text: string): Promise<void> {
+    this.syntax.tokenize(text);
+  }
+
+async editorLanguageId(): Promise<string> {
+    return this.syntaxLanguage;
+  }
+
+async syntaxScopeAt(line: number, column: number): Promise<string> {
+    return this.syntax.scopeAt(line, column);
   }
 }
