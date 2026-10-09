@@ -4,6 +4,8 @@ const net = require('node:net');
 // A distinct test extension runs observations; the product remains installed from its VSIX.
 exports.run = async function run() {
   const vscode = require('vscode');
+  const { openDiagnosticDocument } = require('./diagnostic-document.cjs');
+  const diagnosticDocuments = new Map();
   const request = JSON.parse(await fs.readFile(process.env.EXPEC_NATIVE_REQUEST, 'utf8'));
   const socket = net.createConnection({ host: '127.0.0.1', port: request.port });
   await new Promise((resolveRun, rejectRun) => {
@@ -23,7 +25,45 @@ exports.run = async function run() {
 
         } else if (frame.operation === 'extensionPath' && typeof frame.extensionId === 'string') {
           value = vscode.extensions.getExtension(frame.extensionId)?.extensionPath ?? null;
+        } else if (frame.operation === 'missingDocumentDiagnostics' && typeof frame.extensionId === 'string') {
+          const client = await vscode.extensions.getExtension(frame.extensionId)?.activate();
+          const provide = client?.clientOptions.middleware?.provideDiagnostics;
+          if (typeof provide !== 'function') throw new Error('The installed product has no diagnostic middleware.');
+          const uri = vscode.Uri.parse('untitled:missing-native-document-' + frame.id + '.expec');
+          if (vscode.workspace.textDocuments.some(document => document.uri.toString() === uri.toString())) {
+            throw new Error('The missing diagnostic document unexpectedly exists.');
+          }
+          const cancellation = new vscode.CancellationTokenSource();
+          let nextCalls = 0;
+          const runtime = { node: process.versions.node, vscode: vscode.version };
+          try {
+            await provide(uri, undefined, cancellation.token, async () => { nextCalls++; return { kind: 'full', items: [] }; });
+            value = { cancellationError: false, nextCalls, runtime };
+          } catch (error) { value = { cancellationError: error instanceof vscode.CancellationError, nextCalls, runtime }; }
+          finally { cancellation.dispose(); }
+        } else if (frame.operation === 'diagnosticOpen' && typeof frame.documentId === 'string' && typeof frame.extensionId === 'string'
+          && typeof frame.text === 'string' && (frame.untitled === true || typeof frame.file === 'string')) {
+          if (diagnosticDocuments.has(frame.documentId)) throw new Error('The owned native document already exists.');
+          const document = await openDiagnosticDocument(vscode, frame.extensionId, frame);
+          diagnosticDocuments.set(frame.documentId, document);
+          value = await document.observation();
+        } else if (['diagnosticEdit', 'diagnosticObserve', 'diagnosticClose', 'diagnosticDispose'].includes(frame.operation)
+          && typeof frame.documentId === 'string') {
+          const document = diagnosticDocuments.get(frame.documentId);
+          if (frame.operation === 'diagnosticDispose' && !document) value = null;
+          else {
+            if (!document) throw new Error('The owned native document is unavailable.');
+            if (frame.operation === 'diagnosticEdit' && Array.isArray(frame.texts) && frame.texts.length > 0
+              && frame.texts.every(text => typeof text === 'string')) value = await document.edit(frame.texts);
+            else if (frame.operation === 'diagnosticObserve') value = await document.observation();
+            else if (frame.operation === 'diagnosticClose') value = await document.close();
+            else if (frame.operation === 'diagnosticDispose') {
+              await document.dispose(); diagnosticDocuments.delete(frame.documentId); value = null;
+            } else throw new Error('Invalid native document operation.');
+          }
         } else if (frame.operation === 'shutdown') {
+          for (const document of diagnosticDocuments.values()) await document.dispose();
+          diagnosticDocuments.clear();
           value = null; shuttingDown = true;
         } else throw new Error('Unsupported native observation.');
         await send({ kind: 'response', id: frame.id, value });
