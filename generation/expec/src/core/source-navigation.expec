@@ -1,0 +1,231 @@
+use SourceDocument from "./workspace.expec"
+use DocumentReport from "./document-analysis.expec"
+
+// Plain core reply. Offsets are zero-based Unicode scalars, end exclusive, in
+// this exact captured target text. The selected range is the authored name token.
+type SourceDefinition {
+  source: SourceDocument
+  startOffset: Number
+  endOffset: Number
+}
+
+component SourceNavigation {
+  requires package "expec" for runtime
+  requires package "typescript" for build
+  requires package "vitest" for test
+
+  construction()
+  public published, closed, definition, dispose
+
+  capability published(source: SourceDocument, version: Number, report: DocumentReport) returns Nothing {
+    promises "Receive only current immutable DocumentAnalysis publications from the same live analysis, including replacement reports at the same editor version after dependency changes. Capture the supplied source/version and exact report.sources; prepare a lookup from the current public Inspection once per publication. This Inspection holds the existing SourceComposer's resolution facts and is not a checked Specification or a claim of whole-compilation success. Bound references remain usable when independent semantic problems or deferred requirements exist elsewhere. Rejected entry syntax has no Inspection and withdraws old targets. Never parse, resolve, compile, discover files or read saved text here; no previous accepted model substitutes for the current publication. Invalid noninteger or negative versions throw RangeError before changing state."
+  }
+  capability closed(uri: Text) returns Nothing {
+    promises "Forget this document's report and lookup when DocumentAnalysis ends its lifetime. Repeated close is harmless. A later current publication after reopening starts a new lifetime and may have a lower version. Other documents remain usable."
+  }
+  capability definition(uri: Text, version: Number, offset: Number) returns SourceDefinition? {
+    promises "Ask the retained current report for this exact URI/version and zero-based Unicode-scalar cursor offset. Reject negative or noninteger versions/offsets with RangeError. Without a current matching report, after close/disposal, outside its captured text or without current Inspection, return absence. Navigate only a source reference's final identifier segment whose half-open name range contains the cursor and whose public resolution is bound. Qualified prefixes have no independent SDK binding and return absence. Read the actual bound target through that same Inspection and require its source nameOrigin and exact captured target text; return that authored name range and text, without guessing from spelling or declaration order. Unresolved, ambiguous, deferred, builtin/external, unnamed or uncaptured targets, declaration names, comments and punctuation return absence. A query performs no parsing, resolution, compilation, acquisition or project scan; reuse the prepared lookup. This operation never writes, generates or changes editor selection."
+  }
+  capability dispose() returns Nothing {
+    promises "End this navigation lifetime, clear retained reports/lookups and ignore later publications. All queries return absence; repeated disposal is harmless."
+  }
+}
+
+// Assemble real DocumentAnalysis, in-memory saved sources and real SourceNavigation.
+// Feedback forwards the actual publication/clear to navigation and records it.
+// Line/column actions below are one-based Unicode-scalar input positions converted
+// in the driver against the actual current source; no driver parser or resolver.
+// Each request records its actual reply. One-based request numbers below select
+// those replies after all actions; an absent record is a driver error, not no target.
+// Target observations read actual replies and captured text, not fixture names.
+// Reader/compiler/read counts use the actual assembled API calls, before and after
+// requests; these counts prove no repeated analysis, not a wall-time claim.
+examples for SourceNavigation {
+  fixture navigationLocal: SourceDocument = {
+    uri: "file:///workspace/catalog.expec",
+    text: "type Book { title: Text }\ntype Basket { book: Book }"
+  }
+  fixture navigationEntry: SourceDocument = {
+    uri: "file:///workspace/basket.expec",
+    text: "use Book from \"./book.expec\"\ntype Basket { book: Book }"
+  }
+  fixture navigationBook: SourceDocument = {
+    uri: "file:///workspace/book.expec",
+    text: "type Book { title: Text }"
+  }
+  fixture navigationUnicodeBook: SourceDocument = {
+    uri: "file:///workspace/book.expec",
+    text: "type Marker { label: Text = \"📚\" }\n\ntype Book { title: Text }"
+  }
+
+  setup sourceNavigation() returns Nothing
+  action saveNavigationSource(source: SourceDocument) returns Nothing
+  action openNavigationSource(source: SourceDocument, version: Number) returns Nothing
+  action changeNavigationSource(source: SourceDocument, version: Number) returns Nothing
+  action closeNavigationSource(uri: Text) returns Nothing
+  action disposeNavigation() returns Nothing
+  action requestSourceDefinition(uri: Text, version: Number, line: Number, column: Number) returns Nothing
+  action rememberNavigationWork() returns Nothing
+  observation hasSourceDefinition(request: Number) returns Boolean
+  observation sourceDefinitionUri(request: Number) returns Text
+  observation sourceDefinitionText(request: Number) returns Text
+  observation sourceDefinitionName(request: Number) returns Text
+  observation sourceDefinitionStartLine(request: Number) returns Number
+  observation sourceDefinitionStartColumn(request: Number) returns Number
+  observation sourceDefinitionEndLine(request: Number) returns Number
+  observation sourceDefinitionEndColumn(request: Number) returns Number
+  observation navigationWorkUnchanged() returns Boolean
+  observation navigationHasProblem(uri: Text, code: Text) returns Boolean
+
+  check expectSourceDefinition(request: Number, uri: Text, text: Text, name: Text, line: Number, column: Number, endColumn: Number) {
+    let present = hasSourceDefinition(request)
+    let actualUri = sourceDefinitionUri(request)
+    let actualText = sourceDefinitionText(request)
+    let actualName = sourceDefinitionName(request)
+    let startLine = sourceDefinitionStartLine(request)
+    let startColumn = sourceDefinitionStartColumn(request)
+    let endLine = sourceDefinitionEndLine(request)
+    let actualEnd = sourceDefinitionEndColumn(request)
+    assert present == true
+    assert actualUri == uri
+    assert actualText == text
+    assert actualName == name
+    assert startLine == line
+    assert startColumn == column
+    assert endLine == line
+    assert actualEnd == endColumn
+  }
+  check expectNoSourceDefinition(request: Number) {
+    let present = hasSourceDefinition(request)
+    assert present == false
+  }
+  check expectNoNavigationAnalysis() {
+    let unchanged = navigationWorkUnchanged()
+    assert unchanged == true
+  }
+  check expectNavigationProblem(uri: Text, code: Text) {
+    let present = navigationHasProblem(uri, code)
+    assert present == true
+  }
+
+  scenario "a local type reference selects its actual authored name" {
+    given sourceNavigation()
+    when openNavigationSource(navigationLocal, 1)
+    when requestSourceDefinition(navigationLocal.uri, 1, 2, 21)
+    then expectSourceDefinition(1, navigationLocal.uri, navigationLocal.text, "Book", 1, 6, 10)
+  }
+  scenario "quoted Unicode names retain their exact scalar name range" {
+    given sourceNavigation()
+    when openNavigationSource({ uri: navigationLocal.uri, text: "type `📚Book` { title: Text }\ntype Basket { book: `📚Book` }" }, 1)
+    when requestSourceDefinition(navigationLocal.uri, 1, 2, 23)
+    then expectSourceDefinition(1, navigationLocal.uri, "type `📚Book` { title: Text }\ntype Basket { book: `📚Book` }", "`📚Book`", 1, 6, 13)
+  }
+  scenario "an imported reference selects the captured imported declaration" {
+    given sourceNavigation()
+    when saveNavigationSource(navigationBook)
+    when openNavigationSource(navigationEntry, 1)
+    when requestSourceDefinition(navigationEntry.uri, 1, 2, 21)
+    then expectSourceDefinition(1, navigationBook.uri, navigationBook.text, "Book", 1, 6, 10)
+  }
+  scenario "an unsaved imported edit supplies the current target after Unicode" {
+    given sourceNavigation()
+    when saveNavigationSource(navigationBook)
+    when openNavigationSource(navigationEntry, 1)
+    when openNavigationSource(navigationUnicodeBook, 2)
+    when requestSourceDefinition(navigationEntry.uri, 1, 2, 21)
+    then expectSourceDefinition(1, navigationBook.uri, navigationUnicodeBook.text, "Book", 3, 6, 10)
+  }
+  scenario "a bound reference remains navigable with an independent semantic error" {
+    given sourceNavigation()
+    when openNavigationSource({ uri: navigationLocal.uri, text: "type Book { title: Text }\ntype Basket { book: Book\n  missing: Unknown }" }, 1)
+    when requestSourceDefinition(navigationLocal.uri, 1, 2, 21)
+    then expectNavigationProblem(navigationLocal.uri, "unresolved-reference")
+    then expectSourceDefinition(1, navigationLocal.uri, "type Book { title: Text }\ntype Basket { book: Book\n  missing: Unknown }", "Book", 1, 6, 10)
+  }
+  scenario "an unresolved reference has no invented definition" {
+    given sourceNavigation()
+    when openNavigationSource({ uri: navigationLocal.uri, text: "type Basket { book: Missing }" }, 1)
+    when requestSourceDefinition(navigationLocal.uri, 1, 1, 21)
+    then expectNavigationProblem(navigationLocal.uri, "unresolved-reference")
+    then expectNoSourceDefinition(1)
+  }
+  scenario "ambiguous imported names do not choose the first declaration" {
+    given sourceNavigation()
+    when saveNavigationSource({ uri: "file:///workspace/shopping.expec", text: "type Cart {}" })
+    when saveNavigationSource({ uri: "file:///workspace/shipping.expec", text: "type Cart {}" })
+    when openNavigationSource({ uri: navigationEntry.uri, text: "use Cart from \"./shopping.expec\"\nuse Cart from \"./shipping.expec\"\nfunction save(cart: Cart)" }, 1)
+    when requestSourceDefinition(navigationEntry.uri, 1, 3, 21)
+    then expectNavigationProblem(navigationEntry.uri, "ambiguous-reference")
+    then expectNoSourceDefinition(1)
+  }
+  scenario "a malformed edit withdraws the previous definition" {
+    given sourceNavigation()
+    when openNavigationSource(navigationLocal, 1)
+    when requestSourceDefinition(navigationLocal.uri, 1, 2, 21)
+    when changeNavigationSource({ uri: navigationLocal.uri, text: "type Book { title: Text }\ntype Basket { book: Book " }, 2)
+    when requestSourceDefinition(navigationLocal.uri, 2, 2, 21)
+    when requestSourceDefinition(navigationLocal.uri, 1, 2, 21)
+    then expectSourceDefinition(1, navigationLocal.uri, navigationLocal.text, "Book", 1, 6, 10)
+    then expectNoSourceDefinition(2)
+    then expectNoSourceDefinition(3)
+  }
+  scenario "an older requested version cannot navigate with newer text" {
+    given sourceNavigation()
+    when openNavigationSource(navigationLocal, 1)
+    when changeNavigationSource({ uri: navigationLocal.uri, text: "type Magazine { title: Text }\ntype Basket { book: Magazine }" }, 2)
+    when requestSourceDefinition(navigationLocal.uri, 1, 2, 21)
+    when requestSourceDefinition(navigationLocal.uri, 2, 2, 21)
+    then expectNoSourceDefinition(1)
+    then expectSourceDefinition(2, navigationLocal.uri, "type Magazine { title: Text }\ntype Basket { book: Magazine }", "Magazine", 1, 6, 14)
+  }
+  scenario "closing and reopening replaces the old report lifetime" {
+    given sourceNavigation()
+    when openNavigationSource(navigationLocal, 10)
+    when closeNavigationSource(navigationLocal.uri)
+    when requestSourceDefinition(navigationLocal.uri, 10, 2, 21)
+    when openNavigationSource(navigationLocal, 1)
+    when requestSourceDefinition(navigationLocal.uri, 1, 2, 21)
+    then expectNoSourceDefinition(1)
+    then expectSourceDefinition(2, navigationLocal.uri, navigationLocal.text, "Book", 1, 6, 10)
+  }
+  scenario "definition requests do not repeat parsing compilation or source acquisition" {
+    given sourceNavigation()
+    when saveNavigationSource(navigationBook)
+    when openNavigationSource(navigationEntry, 1)
+    when rememberNavigationWork()
+    when requestSourceDefinition(navigationEntry.uri, 1, 2, 21)
+    when requestSourceDefinition(navigationEntry.uri, 1, 2, 22)
+    then expectSourceDefinition(1, navigationBook.uri, navigationBook.text, "Book", 1, 6, 10)
+    then expectSourceDefinition(2, navigationBook.uri, navigationBook.text, "Book", 1, 6, 10)
+    then expectNoNavigationAnalysis()
+  }
+  scenario "only the final segment of a qualified source reference has a definition" {
+    given sourceNavigation()
+    when openNavigationSource({ uri: navigationLocal.uri, text: "component Store { public save\ncapability save() returns Nothing }\nexamples for Store.save {}" }, 1)
+    when requestSourceDefinition(navigationLocal.uri, 1, 3, 20)
+    when requestSourceDefinition(navigationLocal.uri, 1, 3, 14)
+    then expectSourceDefinition(1, navigationLocal.uri, "component Store { public save\ncapability save() returns Nothing }\nexamples for Store.save {}", "save", 2, 12, 16)
+    then expectNoSourceDefinition(2)
+  }
+  scenario "a cursor on punctuation has no fabricated target" {
+    given sourceNavigation()
+    when openNavigationSource(navigationLocal, 1)
+    when requestSourceDefinition(navigationLocal.uri, 1, 2, 19)
+    then expectNoSourceDefinition(1)
+  }
+  scenario "a built-in type has no fabricated source declaration" {
+    given sourceNavigation()
+    when openNavigationSource(navigationLocal, 1)
+    when requestSourceDefinition(navigationLocal.uri, 1, 2, 21)
+    when requestSourceDefinition(navigationLocal.uri, 1, 1, 20)
+    then expectSourceDefinition(1, navigationLocal.uri, navigationLocal.text, "Book", 1, 6, 10)
+    then expectNoSourceDefinition(2)
+  }
+  scenario "disposing withdraws all retained targets" {
+    given sourceNavigation()
+    when openNavigationSource(navigationLocal, 1)
+    when disposeNavigation()
+    when requestSourceDefinition(navigationLocal.uri, 1, 2, 21)
+    then expectNoSourceDefinition(1)
+  }
+}

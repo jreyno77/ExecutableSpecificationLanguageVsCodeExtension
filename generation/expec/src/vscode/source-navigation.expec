@@ -1,0 +1,226 @@
+use SourceNavigation from "../core/source-navigation.expec"
+
+// Existing standard LSP values, confined to this adapter. Explicit public package
+// bindings live in the generation manifest; there is no custom transport model.
+opaque type DefinitionTextDocument
+opaque type DefinitionPosition
+opaque type DefinitionLocation
+
+component SourceDefinitionAdapter {
+  requires package "language-server" for runtime
+  requires package "language-server-document" for runtime
+  requires package "typescript" for build
+  requires package "vitest" for test
+  requires package "vscode-test-electron" for test
+  depends on SourceNavigation
+
+  construction(navigation: SourceNavigation)
+  public definition
+
+  capability definition(document: DefinitionTextDocument, position: DefinitionPosition) returns DefinitionLocation? {
+    promises "Translate a standard LSP UTF-16 position using this exact current TextDocument text into a zero-based Unicode-scalar offset, and ask core SourceNavigation.definition once with its exact URI/version. Reject noninteger, negative or out-of-line positions with absence; do not clamp them or split a surrogate pair into a guessed scalar. Translate the returned authored name range back to standard UTF-16 Location using the reply's exact captured target text and URI. Absence stays absence. This adapter owns only coordinate/protocol conversion; it never parses, resolves, compiles, chooses a declaration, reads files, saves or generates. The shared LanguageServerAdapter owns its one registration and current document lifecycle; no second DocumentAnalysis is constructed."
+  }
+}
+
+// Actual installed VSIX/native language server, reusing the existing owned host.
+// Setup and edit actions await actual current native analysis/pull completion for
+// their captured editor identity/version. An imported edit also awaits a new entry
+// analysis resultId even at the unchanged entry version. Empty diagnostics or a
+// completed definition query alone are not evidence of that new report. Each case
+// owns entry.expec/book.expec (or its two ambiguous imports), editor tabs
+// and listeners. Setup supplies saved bytes; edits change real buffers without save.
+// goToNativeDefinition first reactivates the owned entry at its authored cursor,
+// then requests the actual registered provider for completion and
+// then invokes the standard Go to Definition command, never manual showTextDocument
+// with a copied expected destination. Positive observations inspect returned native
+// locations plus the actual active target URI/cursor; file observations compare
+// exact native URIs against the corresponding owned file, not basename alone. Range name/text is read from
+// the real target document at the returned range. No server model crosses transport.
+// Line/column values here are one-based UTF-16 editor positions. No-result cases
+// await a real provider completion and observe zero locations and unchanged source
+// focus. Compare the complete owned tree's paths/kinds/bytes after the action; edits
+// and navigation leave all saved files unchanged. Cleanup discards owned dirty tabs,
+// removes owned listeners/files and preserves errors if native cleanup is uncertain.
+// These are proposed literal acceptance examples, not execution evidence.
+examples for SourceDefinitionAdapter {
+  fixture nativeDefinitionLocal: Text = "type Book { title: Text }\ntype Basket { book: Book }"
+  fixture nativeDefinitionEntry: Text = "use Book from \"./book.expec\"\ntype Basket { book: Book }"
+  fixture nativeDefinitionBook: Text = "type Book { title: Text }"
+  fixture nativeDefinitionUnicodeEntry: Text = "use Book from \"./book.expec\"\ntype Marker { label: Text = \"📚\" }\ntype Basket { book: Book }"
+  fixture nativeDefinitionUnicodeBook: Text = "type Marker { label: Text = \"📚\" }\n\ntype Book { title: Text }"
+
+  setup localDefinitionEditor(entry: Text) returns Nothing
+  setup importedDefinitionEditor(entry: Text, imported: Text) returns Nothing
+  setup ambiguousDefinitionEditor(entry: Text, first: Text, second: Text) returns Nothing
+  action editDefinitionEntry(text: Text) returns Nothing
+  action editDefinitionImport(text: Text) returns Nothing
+  action goToNativeDefinition(line: Number, column: Number) returns Nothing
+  observation nativeDefinitionCount() returns Number
+  observation nativeDefinitionFileName() returns Text
+  observation nativeDefinitionUsesOwnedFile(fileName: Text) returns Boolean
+  observation nativeDefinitionName() returns Text
+  observation nativeDefinitionStartLine() returns Number
+  observation nativeDefinitionStartColumn() returns Number
+  observation nativeDefinitionEndLine() returns Number
+  observation nativeDefinitionEndColumn() returns Number
+  observation activeDefinitionFileName() returns Text
+  observation activeDefinitionUsesOwnedFile(fileName: Text) returns Boolean
+  observation activeDefinitionLine() returns Number
+  observation activeDefinitionColumn() returns Number
+  observation definitionEntryIsDirty() returns Boolean
+  observation definitionImportIsDirty() returns Boolean
+  observation definitionFilesUnchanged() returns Boolean
+  observation definitionEditorHasProblem(code: Text) returns Boolean
+
+  check expectNativeSourceDefinition(fileName: Text, name: Text, line: Number, column: Number, endColumn: Number) {
+    let count = nativeDefinitionCount()
+    let file = nativeDefinitionFileName()
+    let ownedTarget = nativeDefinitionUsesOwnedFile(fileName)
+    let actualName = nativeDefinitionName()
+    let startLine = nativeDefinitionStartLine()
+    let startColumn = nativeDefinitionStartColumn()
+    let endLine = nativeDefinitionEndLine()
+    let actualEnd = nativeDefinitionEndColumn()
+    let activeFile = activeDefinitionFileName()
+    let ownedActive = activeDefinitionUsesOwnedFile(fileName)
+    let activeLine = activeDefinitionLine()
+    let activeColumn = activeDefinitionColumn()
+    assert count == 1
+    assert file == fileName
+    assert ownedTarget == true
+    assert actualName == name
+    assert startLine == line
+    assert startColumn == column
+    assert endLine == line
+    assert actualEnd == endColumn
+    assert activeFile == fileName
+    assert ownedActive == true
+    assert activeLine == line
+    assert activeColumn == column
+  }
+  check expectNoNativeSourceDefinition() {
+    let count = nativeDefinitionCount()
+    let activeFile = activeDefinitionFileName()
+    let ownedActive = activeDefinitionUsesOwnedFile("entry.expec")
+    assert count == 0
+    assert activeFile == "entry.expec"
+    assert ownedActive == true
+  }
+  check expectDefinitionFilesUnchanged() {
+    let unchanged = definitionFilesUnchanged()
+    assert unchanged == true
+  }
+  check expectDefinitionBuffersDirty() {
+    let entryDirty = definitionEntryIsDirty()
+    let importDirty = definitionImportIsDirty()
+    assert entryDirty == true
+    assert importDirty == true
+  }
+  check expectDefinitionEditorProblem(code: Text) {
+    let present = definitionEditorHasProblem(code)
+    assert present == true
+  }
+
+  scenario "Go to Definition selects the actual local declaration" {
+    given localDefinitionEditor(nativeDefinitionLocal)
+    when goToNativeDefinition(2, 21)
+    then expectNativeSourceDefinition("entry.expec", "Book", 1, 6, 10)
+    then expectDefinitionFilesUnchanged()
+  }
+  scenario "Go to Definition preserves UTF-16 columns around an astral name" {
+    given localDefinitionEditor("type `📚Book` { title: Text }\ntype Basket { book: `📚Book` }")
+    when goToNativeDefinition(2, 24)
+    then expectNativeSourceDefinition("entry.expec", "`📚Book`", 1, 6, 14)
+    then expectDefinitionFilesUnchanged()
+  }
+  scenario "Go to Definition uses unsaved imported text and exact Unicode ranges" {
+    given importedDefinitionEditor(nativeDefinitionEntry, nativeDefinitionBook)
+    when editDefinitionEntry(nativeDefinitionUnicodeEntry)
+    when editDefinitionImport(nativeDefinitionUnicodeBook)
+    when goToNativeDefinition(3, 21)
+    then expectNativeSourceDefinition("book.expec", "Book", 3, 6, 10)
+    then expectDefinitionBuffersDirty()
+    then expectDefinitionFilesUnchanged()
+  }
+  scenario "a bound definition remains available beside an unrelated editor error" {
+    given localDefinitionEditor("type Book { title: Text }\ntype Basket { book: Book\n  missing: Unknown }")
+    when goToNativeDefinition(2, 21)
+    then expectDefinitionEditorProblem("unresolved-reference")
+    then expectNativeSourceDefinition("entry.expec", "Book", 1, 6, 10)
+    then expectDefinitionFilesUnchanged()
+  }
+  scenario "an unresolved reference does not move to an invented declaration" {
+    given localDefinitionEditor("type Basket { book: Missing }")
+    when goToNativeDefinition(1, 21)
+    then expectDefinitionEditorProblem("unresolved-reference")
+    then expectNoNativeSourceDefinition()
+    then expectDefinitionFilesUnchanged()
+  }
+  scenario "an ambiguous imported reference does not pick one source" {
+    given ambiguousDefinitionEditor("use Cart from \"./shopping.expec\"\nuse Cart from \"./shipping.expec\"\nfunction save(cart: Cart)", "type Cart {}", "type Cart {}")
+    when goToNativeDefinition(3, 21)
+    then expectDefinitionEditorProblem("ambiguous-reference")
+    then expectNoNativeSourceDefinition()
+    then expectDefinitionFilesUnchanged()
+  }
+  // These small adapter-caller controls need no VS Code process. Use actual
+  // LSP TextDocument, real DocumentAnalysis/SourceNavigation and this adapter.
+  // Pass the literal Position directly; the driver must not normalize/clamp it.
+  // Record each actual reply; request numbers are one-based. Missing records fail.
+  setup definitionConversion(text: Text) returns Nothing
+  action requestConvertedDefinition(line: Number, character: Number) returns Nothing
+  observation hasConvertedDefinition(request: Number) returns Boolean
+  observation convertedDefinitionName(request: Number) returns Text
+  observation convertedDefinitionStartLine(request: Number) returns Number
+  observation convertedDefinitionStartCharacter(request: Number) returns Number
+  observation convertedDefinitionEndLine(request: Number) returns Number
+  observation convertedDefinitionEndCharacter(request: Number) returns Number
+
+  check expectConvertedDefinition(request: Number, name: Text, line: Number, character: Number, endCharacter: Number) {
+    let present = hasConvertedDefinition(request)
+    let actualName = convertedDefinitionName(request)
+    let startLine = convertedDefinitionStartLine(request)
+    let startCharacter = convertedDefinitionStartCharacter(request)
+    let endLine = convertedDefinitionEndLine(request)
+    let actualEnd = convertedDefinitionEndCharacter(request)
+    assert present == true
+    assert actualName == name
+    assert startLine == line
+    assert startCharacter == character
+    assert endLine == line
+    assert actualEnd == endCharacter
+  }
+  check expectNoConvertedDefinition(request: Number) {
+    let present = hasConvertedDefinition(request)
+    assert present == false
+  }
+
+  scenario "a negative LSP position does not clamp into a valid reference" {
+    given definitionConversion("type `📚Book` { title: Text }\ntype Basket { book: `📚Book` }")
+    when requestConvertedDefinition(1, 23)
+    when requestConvertedDefinition(-1, 23)
+    then expectConvertedDefinition(1, "`📚Book`", 0, 5, 13)
+    then expectNoConvertedDefinition(2)
+  }
+  scenario "an out-of-line LSP position does not clamp into a valid reference" {
+    given definitionConversion("type `📚Book` { title: Text }\ntype Basket { book: `📚Book` }")
+    when requestConvertedDefinition(1, 23)
+    when requestConvertedDefinition(1, 999)
+    then expectConvertedDefinition(1, "`📚Book`", 0, 5, 13)
+    then expectNoConvertedDefinition(2)
+  }
+  scenario "a position inside a surrogate pair has no guessed scalar target" {
+    given definitionConversion("type `📚Book` { title: Text }\ntype Basket { book: `📚Book` }")
+    when requestConvertedDefinition(1, 23)
+    when requestConvertedDefinition(1, 22)
+    then expectConvertedDefinition(1, "`📚Book`", 0, 5, 13)
+    then expectNoConvertedDefinition(2)
+  }
+  scenario "a fractional LSP position has no invented location" {
+    given definitionConversion("type `📚Book` { title: Text }\ntype Basket { book: `📚Book` }")
+    when requestConvertedDefinition(1, 23)
+    when requestConvertedDefinition(1, 23.5)
+    then expectConvertedDefinition(1, "`📚Book`", 0, 5, 13)
+    then expectNoConvertedDefinition(2)
+  }
+}

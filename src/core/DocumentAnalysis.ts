@@ -1,4 +1,4 @@
-import { Compiler, LangiumModel, SourceComposer, type ModuleModel, type ReadResult } from 'executable-specification-language';
+import { Compiler, LangiumModel, QueryInspection, SourceComposer, type ModuleModel, type ReadResult } from 'executable-specification-language';
 import type { DocumentReport } from './DocumentReport.js';
 
 type OpenDocument = { source: SourceDocument; version: number; revision: number; dependencies: Set<string>; pending?: Set<string> };
@@ -159,12 +159,15 @@ export class DocumentAnalysis {
             visit(entry);
             current();
             const models = [...captures.values()].flatMap(parsed => parsed.model ? [parsed.model] : []);
-            const compilation = entry.model ? this.compiler.compile({ resolution:
-                this.composer.compose(entry.model, { modules: models.slice(1), packages: [] }) }) : undefined;
+            const resolution = entry.model
+                ? this.composer.compose(entry.model, { modules: models.slice(1), packages: [] }) : undefined;
+            const compilation = resolution ? this.compiler.compile({ resolution }) : undefined;
+            const inspection = resolution ? new QueryInspection(resolution.model) : undefined;
             current();
             const report: DocumentReport = {
                 syntax: [...captures.values()].flatMap(parsed => parsed.result.status === 'rejected' ? [...parsed.result.diagnostics] : []),
                 ...(compilation === undefined ? {} : { compilation }),
+                ...(inspection === undefined ? {} : { inspection }),
                 sources: [...captures.values()].map(parsed => parsed.source), dependencies: [...dependencies],
             };
             Object.freeze(report.syntax);

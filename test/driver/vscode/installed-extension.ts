@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { NativeCleanupError, NativeLauncher, inside, ownTemporaryDirectory, removeOwnedDirectory, within } from './native-process.js';
 import { VsCodeSession, type DiagnosticMiddlewareObservation } from './vscode-session.js';
 import { DiagnosticDocument } from './diagnostic-document.js';
+import { NativeDefinitionCase } from './native-definition.js';
 import { ConnectionSidebarCase } from './connection-sidebar.js';
 import { NativePreviewCase } from './native-preview.js';
 import { NativeGenerationCase } from './native-generation.js';
@@ -20,6 +21,7 @@ afterAll(async () => { await (await installation?.catch(() => undefined))?.dispo
 export class InstalledExpecEditor {
   private readonly activeOpens = new Set<Promise<string>>();
   private readonly diagnosticDocuments = new Set<DiagnosticDocument>();
+  private readonly sourceDefinitions = new Set<NativeDefinitionCase>();
   private readonly connectionSidebars = new Set<ConnectionSidebarCase>();
   private readonly previewEditors = new Set<NativePreviewCase>();
   private readonly generationEditors = new Set<NativeGenerationCase>();
@@ -93,6 +95,19 @@ export class InstalledExpecEditor {
   async missingDocumentDiagnostics(): Promise<DiagnosticMiddlewareObservation> {
     if (this.disposal) throw new Error('The installed syntax editor is disposing.');
     return (await this.nativeSession()).missingDocumentDiagnostics(this.extensionId);
+  }
+
+  async definitionEditor(sources: Readonly<Record<string, string>>): Promise<NativeDefinitionCase> {
+    if (this.disposal) throw new Error('The installed definition editor is disposing.');
+    const definition = new NativeDefinitionCase(() => this.nativeSession(), this.extensionId, sources, this.workspace);
+    this.sourceDefinitions.add(definition);
+    onTestFinished(async () => { await definition.dispose(); this.sourceDefinitions.delete(definition); }, 40_000);
+    try { await definition.open(); return definition; }
+    catch (error) {
+      try { await definition.dispose(); }
+      catch (cleanup) { throw new AggregateError([error, cleanup], 'Native definition setup and cleanup failed.', { cause: error }); }
+      this.sourceDefinitions.delete(definition); throw error;
+    }
   }
 
   async diagnosticDocument(fileName: string, initialText: string, dependencyText?: string | null): Promise<DiagnosticDocument> {
@@ -181,7 +196,7 @@ export class InstalledExpecEditor {
       for (const result of opened) if (result.status === 'rejected') failures.push(result.reason);
     } catch (error) { failures.push(error); }
     const disposed = await Promise.allSettled([...this.diagnosticDocuments].map(document => document.dispose())
-      .concat([...this.connectionSidebars].map(sidebar => sidebar.dispose()), [...this.previewEditors].map(editor => editor.dispose()), [...this.generationEditors].map(editor => editor.dispose())));
+      .concat([...this.sourceDefinitions].map(definition => definition.dispose()), [...this.connectionSidebars].map(sidebar => sidebar.dispose()), [...this.previewEditors].map(editor => editor.dispose()), [...this.generationEditors].map(editor => editor.dispose())));
     for (const result of disposed) if (result.status === 'rejected') failures.push(result.reason);
     try { await this.activeSession?.dispose(); } catch (error) { failures.push(error); }
     if (failures.length) this.cleanupUnconfirmed = true;

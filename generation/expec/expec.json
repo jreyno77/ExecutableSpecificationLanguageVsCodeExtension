@@ -17,7 +17,9 @@
       "src/core/output-previews.expec",
       "src/vscode/output-previews.expec",
       "src/core/generation-on-save.expec",
-      "src/vscode/generation-on-save.expec"
+      "src/vscode/generation-on-save.expec",
+      "src/core/source-navigation.expec",
+      "src/vscode/source-navigation.expec"
     ]
   },
   "outputs": [
@@ -76,6 +78,34 @@
             ],
             "from": "executable-specification-language",
             "name": "OutputRegistration"
+          },
+          {
+            "declaration": [
+              "SourceInspection"
+            ],
+            "from": "executable-specification-language",
+            "name": "Inspection"
+          },
+          {
+            "declaration": [
+              "DefinitionTextDocument"
+            ],
+            "from": "vscode-languageserver-textdocument",
+            "name": "TextDocument"
+          },
+          {
+            "declaration": [
+              "DefinitionPosition"
+            ],
+            "from": "vscode-languageserver",
+            "name": "Position"
+          },
+          {
+            "declaration": [
+              "DefinitionLocation"
+            ],
+            "from": "vscode-languageserver",
+            "name": "Location"
           }
         ]
       }

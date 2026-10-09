@@ -1,3 +1,6 @@
+import { SourceDefinitionConversion } from './source-definition-conversion.js';
+import type { NativeDefinitionCase } from './vscode/native-definition.js';
+import { SourceNavigationRecording } from './source-navigation.js';
 import { GenerationOnSaveRecording } from './generation-on-save.js';
 import type { NativeGenerationCase } from './vscode/native-generation.js';
 import type { ConnectionSidebarCase } from './vscode/connection-sidebar.js';
@@ -19,6 +22,9 @@ import { SourceDocument } from "../../src/core/SourceDocument.js";
 import { OutputPreviewsRecording } from './output-previews.js';
 import type { NativePreviewCase } from './vscode/native-preview.js';
 export class WorkspaceDriver {
+  private definitionConversionRecording!: SourceDefinitionConversion;
+    private nativeDefinition!: NativeDefinitionCase;
+  private navigationRecording!: SourceNavigationRecording;
   private sidebarCase!: ConnectionSidebarCase;
   private connectionRecording!: ConnectionRecording;
   private diagnosticDocument!: DiagnosticDocument;
@@ -1011,5 +1017,197 @@ async nativeGenerationDirtyTextIncludes(text: string): Promise<boolean> {
 
 async nativeGenerationLaunchExplanationIncludes(text: string): Promise<boolean> {
     return await this.nativeGeneration.launchExplanationIncludes(text);
+  }
+
+async sourceNavigation(): Promise<void> {
+    this.navigationRecording = SourceNavigationRecording.create();
+  }
+
+async localDefinitionEditor(entry: string): Promise<void> {
+        this.nativeDefinition = await (await InstalledExpecEditor.prepare()).definitionEditor({ 'entry.expec': entry });
+    }
+
+async importedDefinitionEditor(entry: string, imported: string): Promise<void> {
+        this.nativeDefinition = await (await InstalledExpecEditor.prepare()).definitionEditor({ 'entry.expec': entry, 'book.expec': imported });
+    }
+
+async ambiguousDefinitionEditor(entry: string, first: string, second: string): Promise<void> {
+        this.nativeDefinition = await (await InstalledExpecEditor.prepare()).definitionEditor({ 'entry.expec': entry, 'shopping.expec': first, 'shipping.expec': second });
+    }
+
+async definitionConversion(text: string): Promise<void> {
+    this.definitionConversionRecording = new SourceDefinitionConversion(text);
+  }
+
+async saveNavigationSource(source: SourceDocument): Promise<void> {
+    this.navigationRecording.savedSource(source);
+  }
+
+async openNavigationSource(source: SourceDocument, version: number): Promise<void> {
+    this.navigationRecording.opened(source, version);
+  }
+
+async changeNavigationSource(source: SourceDocument, version: number): Promise<void> {
+    this.navigationRecording.changed(source, version);
+  }
+
+async closeNavigationSource(uri: string): Promise<void> {
+    this.navigationRecording.closed(uri);
+  }
+
+async disposeNavigation(): Promise<void> {
+    this.navigationRecording.disposed();
+  }
+
+async requestSourceDefinition(uri: string, version: number, line: number, column: number): Promise<void> {
+    this.navigationRecording.request(uri, version, line, column);
+  }
+
+async rememberNavigationWork(): Promise<void> {
+    this.navigationRecording.rememberWork();
+  }
+
+async editDefinitionEntry(text: string): Promise<void> {
+        await this.nativeDefinition.editEntry(text);
+    }
+
+async editDefinitionImport(text: string): Promise<void> {
+        await this.nativeDefinition.editImport(text);
+    }
+
+async goToNativeDefinition(line: number, column: number): Promise<void> {
+        await this.nativeDefinition.goTo(line, column);
+    }
+
+async requestConvertedDefinition(line: number, character: number): Promise<void> {
+    this.definitionConversionRecording.request(line, character);
+  }
+
+async hasSourceDefinition(request: number): Promise<boolean> {
+    return this.navigationRecording.reply(request) !== undefined;
+  }
+
+async sourceDefinitionUri(request: number): Promise<string> {
+    return this.navigationRecording.definition(request).source.uri;
+  }
+
+async sourceDefinitionText(request: number): Promise<string> {
+    return this.navigationRecording.definition(request).source.text;
+  }
+
+async sourceDefinitionName(request: number): Promise<string> {
+    return this.navigationRecording.name(request);
+  }
+
+async sourceDefinitionStartLine(request: number): Promise<number> {
+    return this.navigationRecording.start(request).line;
+  }
+
+async sourceDefinitionStartColumn(request: number): Promise<number> {
+    return this.navigationRecording.start(request).column;
+  }
+
+async sourceDefinitionEndLine(request: number): Promise<number> {
+    return this.navigationRecording.end(request).line;
+  }
+
+async sourceDefinitionEndColumn(request: number): Promise<number> {
+    return this.navigationRecording.end(request).column;
+  }
+
+async navigationWorkUnchanged(): Promise<boolean> {
+    return this.navigationRecording.workUnchanged();
+  }
+
+async navigationHasProblem(uri: string, code: string): Promise<boolean> {
+    return this.navigationRecording.hasProblem(uri, code);
+  }
+
+async nativeDefinitionCount(): Promise<number> {
+        return this.nativeDefinition.observation().locations.length;
+    }
+
+async nativeDefinitionFileName(): Promise<string> {
+        return this.nativeDefinition.locationFileName();
+    }
+
+async nativeDefinitionUsesOwnedFile(fileName: string): Promise<boolean> {
+        return this.nativeDefinition.locationUsesOwnedFile(fileName);
+    }
+
+async nativeDefinitionName(): Promise<string> {
+        return this.nativeDefinition.observation().locations[0]?.name ?? '';
+    }
+
+async nativeDefinitionStartLine(): Promise<number> {
+        const location = this.nativeDefinition.observation().locations[0]; return location ? location.range.start.line + 1 : -1;
+    }
+
+async nativeDefinitionStartColumn(): Promise<number> {
+        const location = this.nativeDefinition.observation().locations[0]; return location ? location.range.start.character + 1 : -1;
+    }
+
+async nativeDefinitionEndLine(): Promise<number> {
+        const location = this.nativeDefinition.observation().locations[0]; return location ? location.range.end.line + 1 : -1;
+    }
+
+async nativeDefinitionEndColumn(): Promise<number> {
+        const location = this.nativeDefinition.observation().locations[0]; return location ? location.range.end.character + 1 : -1;
+    }
+
+async activeDefinitionFileName(): Promise<string> {
+        return this.nativeDefinition.activeFileName();
+    }
+
+async activeDefinitionUsesOwnedFile(fileName: string): Promise<boolean> {
+        return this.nativeDefinition.activeUsesOwnedFile(fileName);
+    }
+
+async activeDefinitionLine(): Promise<number> {
+        return this.nativeDefinition.observation().active.line + 1;
+    }
+
+async activeDefinitionColumn(): Promise<number> {
+        return this.nativeDefinition.observation().active.character + 1;
+    }
+
+async definitionEntryIsDirty(): Promise<boolean> {
+        return this.nativeDefinition.observation().entryDirty;
+    }
+
+async definitionImportIsDirty(): Promise<boolean> {
+        return this.nativeDefinition.observation().importDirty;
+    }
+
+async definitionFilesUnchanged(): Promise<boolean> {
+        return await this.nativeDefinition.filesUnchanged();
+    }
+
+async definitionEditorHasProblem(code: string): Promise<boolean> {
+        return this.nativeDefinition.observation().problemCodes.includes(code);
+    }
+
+async hasConvertedDefinition(request: number): Promise<boolean> {
+    return this.definitionConversionRecording.reply(request) !== undefined;
+  }
+
+async convertedDefinitionName(request: number): Promise<string> {
+    return this.definitionConversionRecording.name(request);
+  }
+
+async convertedDefinitionStartLine(request: number): Promise<number> {
+    return this.definitionConversionRecording.location(request).range.start.line;
+  }
+
+async convertedDefinitionStartCharacter(request: number): Promise<number> {
+    return this.definitionConversionRecording.location(request).range.start.character;
+  }
+
+async convertedDefinitionEndLine(request: number): Promise<number> {
+    return this.definitionConversionRecording.location(request).range.end.line;
+  }
+
+async convertedDefinitionEndCharacter(request: number): Promise<number> {
+    return this.definitionConversionRecording.location(request).range.end.character;
   }
 }

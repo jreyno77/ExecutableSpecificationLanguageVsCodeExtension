@@ -6,6 +6,8 @@ exports.run = async function run() {
   const vscode = require('vscode');
   const { openDiagnosticDocument } = require('./diagnostic-document.cjs');
   const diagnosticDocuments = new Map();
+  const { openSourceDefinition } = require('./source-definition.cjs');
+  const sourceDefinitions = new Map();
   const { openConnectionSidebar } = require('./connection-sidebar.cjs');
   const connectionSidebars = new Map();
   const { openPreviewEditor } = require('./preview-editor.cjs');
@@ -47,6 +49,26 @@ exports.run = async function run() {
             value = { cancellationError: false, nextCalls, runtime };
           } catch (error) { value = { cancellationError: error instanceof vscode.CancellationError, nextCalls, runtime }; }
           finally { cancellation.dispose(); }
+        } else if (frame.operation === 'definitionOpen' && typeof frame.definitionId === 'string' && typeof frame.extensionId === 'string'
+          && frame.files && typeof frame.files === 'object' && typeof frame.files['entry.expec'] === 'string'
+          && Object.values(frame.files).every(file => typeof file === 'string')) {
+          if (sourceDefinitions.has(frame.definitionId)) throw new Error('The owned definition case already exists.');
+          const definition = await openSourceDefinition(vscode, frame.extensionId, frame.files);
+          sourceDefinitions.set(frame.definitionId, definition);
+          value = definition.observation();
+        } else if (['definitionEdit', 'definitionGoTo', 'definitionDispose'].includes(frame.operation) && typeof frame.definitionId === 'string') {
+          const definition = sourceDefinitions.get(frame.definitionId);
+          if (frame.operation === 'definitionDispose' && !definition) value = null;
+          else {
+            if (!definition) throw new Error('The owned definition case is unavailable.');
+            if (frame.operation === 'definitionEdit' && ['entry', 'import'].includes(frame.kind) && typeof frame.text === 'string') {
+              value = await definition.edit(frame.kind, frame.text);
+            } else if (frame.operation === 'definitionGoTo' && Number.isInteger(frame.line) && frame.line >= 0
+              && Number.isInteger(frame.character) && frame.character >= 0) value = await definition.goTo(frame.line, frame.character);
+            else if (frame.operation === 'definitionDispose') {
+              await definition.dispose(); sourceDefinitions.delete(frame.definitionId); value = null;
+            } else throw new Error('Invalid owned definition operation.');
+          }
         } else if (frame.operation === 'diagnosticOpen' && typeof frame.documentId === 'string' && typeof frame.extensionId === 'string'
           && typeof frame.text === 'string' && (frame.untitled === true || typeof frame.file === 'string')) {
           if (diagnosticDocuments.has(frame.documentId)) throw new Error('The owned native document already exists.');
@@ -133,6 +155,8 @@ exports.run = async function run() {
           previewEditors.clear();
           for (const document of diagnosticDocuments.values()) await document.dispose();
           diagnosticDocuments.clear();
+          for (const definition of sourceDefinitions.values()) await definition.dispose();
+          sourceDefinitions.clear();
           for (const sidebar of connectionSidebars.values()) await sidebar.dispose();
           connectionSidebars.clear();
           value = null; shuttingDown = true;

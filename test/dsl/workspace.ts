@@ -1490,4 +1490,321 @@ readonly nativeGenerationLibrary: string = "component Library {\n  public count\
 readonly nativeGenerationAddition: string = "component Library {\n  public count, title\n  capability count() returns Number\n  capability title() returns Text\n}";
 
 readonly nativeGenerationShelf: string = "type Shelf { copies: Number }";
+
+async sourceNavigation(): Promise<void> {
+    return await this.driver.sourceNavigation();
+  }
+
+async localDefinitionEditor(entry: string): Promise<void> {
+    return await this.driver.localDefinitionEditor(entry);
+  }
+
+async importedDefinitionEditor(entry: string, imported: string): Promise<void> {
+    return await this.driver.importedDefinitionEditor(entry, imported);
+  }
+
+async ambiguousDefinitionEditor(entry: string, first: string, second: string): Promise<void> {
+    return await this.driver.ambiguousDefinitionEditor(entry, first, second);
+  }
+
+async definitionConversion(text: string): Promise<void> {
+    return await this.driver.definitionConversion(text);
+  }
+
+async saveNavigationSource(source: SourceDocument): Promise<void> {
+    return await this.driver.saveNavigationSource(source);
+  }
+
+async openNavigationSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.openNavigationSource(source, version);
+  }
+
+async changeNavigationSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.changeNavigationSource(source, version);
+  }
+
+async closeNavigationSource(uri: string): Promise<void> {
+    return await this.driver.closeNavigationSource(uri);
+  }
+
+async disposeNavigation(): Promise<void> {
+    return await this.driver.disposeNavigation();
+  }
+
+async requestSourceDefinition(uri: string, version: number, line: number, column: number): Promise<void> {
+    return await this.driver.requestSourceDefinition(uri, version, line, column);
+  }
+
+async rememberNavigationWork(): Promise<void> {
+    return await this.driver.rememberNavigationWork();
+  }
+
+async editDefinitionEntry(text: string): Promise<void> {
+    return await this.driver.editDefinitionEntry(text);
+  }
+
+async editDefinitionImport(text: string): Promise<void> {
+    return await this.driver.editDefinitionImport(text);
+  }
+
+async goToNativeDefinition(line: number, column: number): Promise<void> {
+    return await this.driver.goToNativeDefinition(line, column);
+  }
+
+async requestConvertedDefinition(line: number, character: number): Promise<void> {
+    return await this.driver.requestConvertedDefinition(line, character);
+  }
+
+async hasSourceDefinition(request: number): Promise<boolean> {
+    return await this.driver.hasSourceDefinition(request);
+  }
+
+async sourceDefinitionUri(request: number): Promise<string> {
+    return await this.driver.sourceDefinitionUri(request);
+  }
+
+async sourceDefinitionText(request: number): Promise<string> {
+    return await this.driver.sourceDefinitionText(request);
+  }
+
+async sourceDefinitionName(request: number): Promise<string> {
+    return await this.driver.sourceDefinitionName(request);
+  }
+
+async sourceDefinitionStartLine(request: number): Promise<number> {
+    return await this.driver.sourceDefinitionStartLine(request);
+  }
+
+async sourceDefinitionStartColumn(request: number): Promise<number> {
+    return await this.driver.sourceDefinitionStartColumn(request);
+  }
+
+async sourceDefinitionEndLine(request: number): Promise<number> {
+    return await this.driver.sourceDefinitionEndLine(request);
+  }
+
+async sourceDefinitionEndColumn(request: number): Promise<number> {
+    return await this.driver.sourceDefinitionEndColumn(request);
+  }
+
+async navigationWorkUnchanged(): Promise<boolean> {
+    return await this.driver.navigationWorkUnchanged();
+  }
+
+async navigationHasProblem(uri: string, code: string): Promise<boolean> {
+    return await this.driver.navigationHasProblem(uri, code);
+  }
+
+async nativeDefinitionCount(): Promise<number> {
+    return await this.driver.nativeDefinitionCount();
+  }
+
+async nativeDefinitionFileName(): Promise<string> {
+    return await this.driver.nativeDefinitionFileName();
+  }
+
+async nativeDefinitionUsesOwnedFile(fileName: string): Promise<boolean> {
+    return await this.driver.nativeDefinitionUsesOwnedFile(fileName);
+  }
+
+async nativeDefinitionName(): Promise<string> {
+    return await this.driver.nativeDefinitionName();
+  }
+
+async nativeDefinitionStartLine(): Promise<number> {
+    return await this.driver.nativeDefinitionStartLine();
+  }
+
+async nativeDefinitionStartColumn(): Promise<number> {
+    return await this.driver.nativeDefinitionStartColumn();
+  }
+
+async nativeDefinitionEndLine(): Promise<number> {
+    return await this.driver.nativeDefinitionEndLine();
+  }
+
+async nativeDefinitionEndColumn(): Promise<number> {
+    return await this.driver.nativeDefinitionEndColumn();
+  }
+
+async activeDefinitionFileName(): Promise<string> {
+    return await this.driver.activeDefinitionFileName();
+  }
+
+async activeDefinitionUsesOwnedFile(fileName: string): Promise<boolean> {
+    return await this.driver.activeDefinitionUsesOwnedFile(fileName);
+  }
+
+async activeDefinitionLine(): Promise<number> {
+    return await this.driver.activeDefinitionLine();
+  }
+
+async activeDefinitionColumn(): Promise<number> {
+    return await this.driver.activeDefinitionColumn();
+  }
+
+async definitionEntryIsDirty(): Promise<boolean> {
+    return await this.driver.definitionEntryIsDirty();
+  }
+
+async definitionImportIsDirty(): Promise<boolean> {
+    return await this.driver.definitionImportIsDirty();
+  }
+
+async definitionFilesUnchanged(): Promise<boolean> {
+    return await this.driver.definitionFilesUnchanged();
+  }
+
+async definitionEditorHasProblem(code: string): Promise<boolean> {
+    return await this.driver.definitionEditorHasProblem(code);
+  }
+
+async hasConvertedDefinition(request: number): Promise<boolean> {
+    return await this.driver.hasConvertedDefinition(request);
+  }
+
+async convertedDefinitionName(request: number): Promise<string> {
+    return await this.driver.convertedDefinitionName(request);
+  }
+
+async convertedDefinitionStartLine(request: number): Promise<number> {
+    return await this.driver.convertedDefinitionStartLine(request);
+  }
+
+async convertedDefinitionStartCharacter(request: number): Promise<number> {
+    return await this.driver.convertedDefinitionStartCharacter(request);
+  }
+
+async convertedDefinitionEndLine(request: number): Promise<number> {
+    return await this.driver.convertedDefinitionEndLine(request);
+  }
+
+async convertedDefinitionEndCharacter(request: number): Promise<number> {
+    return await this.driver.convertedDefinitionEndCharacter(request);
+  }
+
+async expectSourceDefinition(request: number, uri: string, text: string, name: string, line: number, column: number, endColumn: number): Promise<void> {
+    const present = await this.driver.hasSourceDefinition(request);
+    const actualUri = await this.driver.sourceDefinitionUri(request);
+    const actualText = await this.driver.sourceDefinitionText(request);
+    const actualName = await this.driver.sourceDefinitionName(request);
+    const startLine = await this.driver.sourceDefinitionStartLine(request);
+    const startColumn = await this.driver.sourceDefinitionStartColumn(request);
+    const endLine = await this.driver.sourceDefinitionEndLine(request);
+    const actualEnd = await this.driver.sourceDefinitionEndColumn(request);
+    expectData(present, true);
+    expectData(actualUri, uri);
+    expectData(actualText, text);
+    expectData(actualName, name);
+    expectData(startLine, line);
+    expectData(startColumn, column);
+    expectData(endLine, line);
+    expectData(actualEnd, endColumn);
+  }
+
+async expectNoSourceDefinition(request: number): Promise<void> {
+    const present = await this.driver.hasSourceDefinition(request);
+    expectData(present, false);
+  }
+
+async expectNoNavigationAnalysis(): Promise<void> {
+    const unchanged = await this.driver.navigationWorkUnchanged();
+    expectData(unchanged, true);
+  }
+
+async expectNavigationProblem(uri: string, code: string): Promise<void> {
+    const present = await this.driver.navigationHasProblem(uri, code);
+    expectData(present, true);
+  }
+
+async expectNativeSourceDefinition(fileName: string, name: string, line: number, column: number, endColumn: number): Promise<void> {
+    const count = await this.driver.nativeDefinitionCount();
+    const file = await this.driver.nativeDefinitionFileName();
+    const ownedTarget = await this.driver.nativeDefinitionUsesOwnedFile(fileName);
+    const actualName = await this.driver.nativeDefinitionName();
+    const startLine = await this.driver.nativeDefinitionStartLine();
+    const startColumn = await this.driver.nativeDefinitionStartColumn();
+    const endLine = await this.driver.nativeDefinitionEndLine();
+    const actualEnd = await this.driver.nativeDefinitionEndColumn();
+    const activeFile = await this.driver.activeDefinitionFileName();
+    const ownedActive = await this.driver.activeDefinitionUsesOwnedFile(fileName);
+    const activeLine = await this.driver.activeDefinitionLine();
+    const activeColumn = await this.driver.activeDefinitionColumn();
+    expectData(count, 1);
+    expectData(file, fileName);
+    expectData(ownedTarget, true);
+    expectData(actualName, name);
+    expectData(startLine, line);
+    expectData(startColumn, column);
+    expectData(endLine, line);
+    expectData(actualEnd, endColumn);
+    expectData(activeFile, fileName);
+    expectData(ownedActive, true);
+    expectData(activeLine, line);
+    expectData(activeColumn, column);
+  }
+
+async expectNoNativeSourceDefinition(): Promise<void> {
+    const count = await this.driver.nativeDefinitionCount();
+    const activeFile = await this.driver.activeDefinitionFileName();
+    const ownedActive = await this.driver.activeDefinitionUsesOwnedFile("entry.expec");
+    expectData(count, 0);
+    expectData(activeFile, "entry.expec");
+    expectData(ownedActive, true);
+  }
+
+async expectDefinitionFilesUnchanged(): Promise<void> {
+    const unchanged = await this.driver.definitionFilesUnchanged();
+    expectData(unchanged, true);
+  }
+
+async expectDefinitionBuffersDirty(): Promise<void> {
+    const entryDirty = await this.driver.definitionEntryIsDirty();
+    const importDirty = await this.driver.definitionImportIsDirty();
+    expectData(entryDirty, true);
+    expectData(importDirty, true);
+  }
+
+async expectDefinitionEditorProblem(code: string): Promise<void> {
+    const present = await this.driver.definitionEditorHasProblem(code);
+    expectData(present, true);
+  }
+
+async expectConvertedDefinition(request: number, name: string, line: number, character: number, endCharacter: number): Promise<void> {
+    const present = await this.driver.hasConvertedDefinition(request);
+    const actualName = await this.driver.convertedDefinitionName(request);
+    const startLine = await this.driver.convertedDefinitionStartLine(request);
+    const startCharacter = await this.driver.convertedDefinitionStartCharacter(request);
+    const endLine = await this.driver.convertedDefinitionEndLine(request);
+    const actualEnd = await this.driver.convertedDefinitionEndCharacter(request);
+    expectData(present, true);
+    expectData(actualName, name);
+    expectData(startLine, line);
+    expectData(startCharacter, character);
+    expectData(endLine, line);
+    expectData(actualEnd, endCharacter);
+  }
+
+async expectNoConvertedDefinition(request: number): Promise<void> {
+    const present = await this.driver.hasConvertedDefinition(request);
+    expectData(present, false);
+  }
+
+readonly navigationLocal: SourceDocument = { ["uri"]: "file:///workspace/catalog.expec", ["text"]: "type Book { title: Text }\ntype Basket { book: Book }" };
+
+readonly navigationEntry: SourceDocument = { ["uri"]: "file:///workspace/basket.expec", ["text"]: "use Book from \"./book.expec\"\ntype Basket { book: Book }" };
+
+readonly navigationBook: SourceDocument = { ["uri"]: "file:///workspace/book.expec", ["text"]: "type Book { title: Text }" };
+
+readonly navigationUnicodeBook: SourceDocument = { ["uri"]: "file:///workspace/book.expec", ["text"]: "type Marker { label: Text = \"📚\" }\n\ntype Book { title: Text }" };
+
+readonly nativeDefinitionLocal: string = "type Book { title: Text }\ntype Basket { book: Book }";
+
+readonly nativeDefinitionEntry: string = "use Book from \"./book.expec\"\ntype Basket { book: Book }";
+
+readonly nativeDefinitionBook: string = "type Book { title: Text }";
+
+readonly nativeDefinitionUnicodeEntry: string = "use Book from \"./book.expec\"\ntype Marker { label: Text = \"📚\" }\ntype Basket { book: Book }";
+
+readonly nativeDefinitionUnicodeBook: string = "type Marker { label: Text = \"📚\" }\n\ntype Book { title: Text }";
 }

@@ -27,7 +27,7 @@ export class EditorLanguageSupport {
     }
     /**
      * Unverified implementation obligation.
-     * Request startup of the supplied native LanguageClient once. The native entry point owns its construction, packaged TypeScript server, expec selector (file and untitled), and single awaited stop on deactivation. Return that native client through the standard VS Code activation export for callers of its native feature APIs. Register owned resources with this extension context. Use native document diagnostic pull on edits. In the public provideDiagnostics middleware capture native document identity/version before awaiting next, then cancel an obsolete/closed result instead of returning empty success. The SDK owns scheduling, cancellation and diagnostic collections. Never replace newer feedback or reopen diagnostics for a closed document; do not rely on push version fields. Keep startup failures observable and keep core policy out of this host adapter.
+     * Request startup of the supplied native LanguageClient once. The native entry point owns its construction, packaged TypeScript server, expec selector (file and untitled), and single awaited stop on deactivation. Return that native client through the standard VS Code activation export for callers of its native feature APIs. Register owned resources with this extension context. Use native document diagnostic pull on edits. In the public provideDiagnostics middleware capture native document identity/version before awaiting next, then cancel an obsolete/closed result instead of returning empty success. The SDK owns scheduling, cancellation and diagnostic collections. Never replace newer feedback or reopen diagnostics for a closed document; do not rely on push version fields. Guard public provideDefinition middleware with the requesting native document identity/version around its await, preserving prior middleware. Cancel obsolete, closed, disposed or cancelled requests rather than returning an old target. For returned target URIs already open when the request began, also refuse a result if that captured target buffer changed or ended its lifetime while awaiting. Core reports establish point-in-time meaning; this does not promise editor/filesystem atomicity across the process boundary. Keep startup failures observable and keep core policy out of this host adapter.
      */
     start(): void {
         if (this.started || this.disposed) return;
@@ -47,7 +47,28 @@ export class EditorLanguageSupport {
             return result;
         };
         middleware.provideDiagnostics = guard;
-        this.releaseMiddleware = () => { if (middleware.provideDiagnostics === guard) middleware.provideDiagnostics = previous; };
+        const previousDefinition = middleware.provideDefinition;
+        const definitionGuard: NonNullable<typeof previousDefinition> = async (document, position, token, next) => {
+            const current = (captured: typeof document, version: number) => !this.disposed && !token.isCancellationRequested &&
+                !captured.isClosed && captured.version === version && workspace.textDocuments.includes(captured);
+            const version = document.version;
+            if (!current(document, version)) throw new CancellationError();
+            const targets = new Map(workspace.textDocuments.filter(open => !open.isClosed)
+                .map(open => [open.uri.toString(), { document: open, version: open.version }]));
+            const result = await (previousDefinition ? previousDefinition(document, position, token, next) : next(document, position, token));
+            if (!current(document, version)) throw new CancellationError();
+            for (const location of Array.isArray(result) ? result : result ? [result] : []) {
+                const uri = 'targetUri' in location ? location.targetUri : location.uri;
+                const target = targets.get(uri.toString());
+                if (target && !current(target.document, target.version)) throw new CancellationError();
+            }
+            return result;
+        };
+        middleware.provideDefinition = definitionGuard;
+        this.releaseMiddleware = () => {
+            if (middleware.provideDiagnostics === guard) middleware.provideDiagnostics = previous;
+            if (middleware.provideDefinition === definitionGuard) middleware.provideDefinition = previousDefinition;
+        };
         this.context.subscriptions.push(this);
         void this.client.start().catch(error => this.client.error('.expec language server failed to start.', error, true));
     }
