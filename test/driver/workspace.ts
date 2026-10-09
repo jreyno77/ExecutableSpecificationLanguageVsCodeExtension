@@ -837,4 +837,172 @@ async nativePreviewFilesUnchanged(): Promise<boolean> {
 
     private previewRecording!: OutputPreviewsRecording;
     private nativePreview!: NativePreviewCase;
+
+async savedGenerationWorkspace(source: string, otherEntry: string, enabled: boolean): Promise<void> {
+    throw new Error("Not implemented: workspace.savedGenerationWorkspace");
+  }
+
+async heldGenerationWorkspace(source: string, otherEntry: string): Promise<void> {
+    throw new Error("Not implemented: workspace.heldGenerationWorkspace");
+  }
+
+async generationEditor(source: string, otherEntry: string, enabled: boolean): Promise<void> {
+    throw new Error("Not implemented: workspace.generationEditor");
+  }
+
+async generationEditorWithOutputs(source: string, otherEntry: string, enabled: boolean): Promise<void> {
+    throw new Error("Not implemented: workspace.generationEditorWithOutputs");
+  }
+
+async generationEditorWithoutRuntime(source: string): Promise<void> {
+    throw new Error("Not implemented: workspace.generationEditorWithoutRuntime");
+  }
+
+async editGenerationSource(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.editGenerationSource");
+  }
+
+async saveGenerationSource(): Promise<void> {
+    throw new Error("Not implemented: workspace.saveGenerationSource");
+  }
+
+async saveGenerationOtherEntry(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.saveGenerationOtherEntry");
+  }
+
+async setGenerationEnabled(enabled: boolean): Promise<void> {
+    throw new Error("Not implemented: workspace.setGenerationEnabled");
+  }
+
+async dirtyGenerationOtherEntry(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.dirtyGenerationOtherEntry");
+  }
+
+async replaceGenerationSavedConfiguration(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.replaceGenerationSavedConfiguration");
+  }
+
+async saveUnrelatedGenerationSource(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.saveUnrelatedGenerationSource");
+  }
+
+async requestGenerationSaveSnapshot(text: string, version: number): Promise<void> {
+    throw new Error("Not implemented: workspace.requestGenerationSaveSnapshot");
+  }
+
+async keepGenerationImplementation(path: string, body: string): Promise<void> {
+    throw new Error("Not implemented: workspace.keepGenerationImplementation");
+  }
+
+async awaitGenerationSettlement(): Promise<void> {
+    throw new Error("Not implemented: workspace.awaitGenerationSettlement");
+  }
+
+async awaitGenerationPermission(): Promise<void> {
+    throw new Error("Not implemented: workspace.awaitGenerationPermission");
+  }
+
+async dirtyGenerationTarget(path: string, text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.dirtyGenerationTarget");
+  }
+
+async releaseGenerationPermission(): Promise<void> {
+    throw new Error("Not implemented: workspace.releaseGenerationPermission");
+  }
+
+async editNativeGenerationSource(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.editNativeGenerationSource");
+  }
+
+async saveNativeGenerationSource(): Promise<void> {
+    throw new Error("Not implemented: workspace.saveNativeGenerationSource");
+  }
+
+async saveNativeGenerationOtherEntry(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.saveNativeGenerationOtherEntry");
+  }
+
+async setNativeGenerationEnabled(enabled: boolean): Promise<void> {
+    throw new Error("Not implemented: workspace.setNativeGenerationEnabled");
+  }
+
+async dirtyNativeGenerationOtherEntry(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.dirtyNativeGenerationOtherEntry");
+  }
+
+async selectOtherGenerationConfiguration(): Promise<void> {
+    throw new Error("Not implemented: workspace.selectOtherGenerationConfiguration");
+  }
+
+async selectOriginalGenerationConfiguration(): Promise<void> {
+    throw new Error("Not implemented: workspace.selectOriginalGenerationConfiguration");
+  }
+
+async awaitNativeGeneration(): Promise<void> {
+    throw new Error("Not implemented: workspace.awaitNativeGeneration");
+  }
+
+async keepNativeGenerationImplementation(path: string, body: string): Promise<void> {
+    throw new Error("Not implemented: workspace.keepNativeGenerationImplementation");
+  }
+
+async dirtyHiddenGenerationTarget(path: string, body: string): Promise<void> {
+    throw new Error("Not implemented: workspace.dirtyHiddenGenerationTarget");
+  }
+
+async generationStatus(): Promise<string> {
+    throw new Error("Not implemented: workspace.generationStatus");
+  }
+
+async generationExplanation(): Promise<string> {
+    throw new Error("Not implemented: workspace.generationExplanation");
+  }
+
+async generationFileIncludes(path: string, text: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.generationFileIncludes");
+  }
+
+async generationTargetTreeUnchanged(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.generationTargetTreeUnchanged");
+  }
+
+async generationWorkerStarts(): Promise<number> {
+    throw new Error("Not implemented: workspace.generationWorkerStarts");
+  }
+
+async generationTargetDirtyTextIncludes(text: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.generationTargetDirtyTextIncludes");
+  }
+
+async nativeGenerationRuntimeVersion(): Promise<string> {
+    throw new Error("Not implemented: workspace.nativeGenerationRuntimeVersion");
+  }
+
+async nativeGenerationStatus(): Promise<string> {
+    throw new Error("Not implemented: workspace.nativeGenerationStatus");
+  }
+
+async nativeGenerationExplanation(): Promise<string> {
+    throw new Error("Not implemented: workspace.nativeGenerationExplanation");
+  }
+
+async nativeGenerationFileIncludes(path: string, text: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.nativeGenerationFileIncludes");
+  }
+
+async nativeGenerationTargetTreeUnchanged(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.nativeGenerationTargetTreeUnchanged");
+  }
+
+async nativeGenerationDiagramIncludes(text: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.nativeGenerationDiagramIncludes");
+  }
+
+async nativeGenerationDirtyTextIncludes(text: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.nativeGenerationDirtyTextIncludes");
+  }
+
+async nativeGenerationLaunchExplanationIncludes(text: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.nativeGenerationLaunchExplanationIncludes");
+  }
 }

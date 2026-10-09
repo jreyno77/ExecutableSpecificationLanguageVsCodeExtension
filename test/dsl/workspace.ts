@@ -1240,4 +1240,254 @@ readonly configuredPreviews: string = "{\"formatVersion\":1,\"version\":\"0.1.0\
 readonly revisedPreviews: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"revised/docs\"}}]}";
 
 readonly largeBookSource: string = "type Book { title: Text }\ntype Shelf1 { book: Book }\ntype Shelf2 { book: Book }\ntype Shelf3 { book: Book }\ntype Shelf4 { book: Book }\ntype Shelf5 { book: Book }\ntype Shelf6 { book: Book }\ntype Shelf7 { book: Book }\ntype Shelf8 { book: Book }\ntype Shelf9 { book: Book }\ntype Shelf10 { book: Book }\ntype Shelf11 { book: Book }\ntype Shelf12 { book: Book }\ntype Shelf13 { book: Book }\ntype Shelf14 { book: Book }\ntype Shelf15 { book: Book }\ntype Shelf16 { book: Book }\ntype Shelf17 { book: Book }\ntype Shelf18 { book: Book }\ntype Shelf19 { book: Book }\ntype Shelf20 { book: Book }";
+
+async savedGenerationWorkspace(source: string, otherEntry: string, enabled: boolean): Promise<void> {
+    return await this.driver.savedGenerationWorkspace(source, otherEntry, enabled);
+  }
+
+async heldGenerationWorkspace(source: string, otherEntry: string): Promise<void> {
+    return await this.driver.heldGenerationWorkspace(source, otherEntry);
+  }
+
+async generationEditor(source: string, otherEntry: string, enabled: boolean): Promise<void> {
+    return await this.driver.generationEditor(source, otherEntry, enabled);
+  }
+
+async generationEditorWithOutputs(source: string, otherEntry: string, enabled: boolean): Promise<void> {
+    return await this.driver.generationEditorWithOutputs(source, otherEntry, enabled);
+  }
+
+async generationEditorWithoutRuntime(source: string): Promise<void> {
+    return await this.driver.generationEditorWithoutRuntime(source);
+  }
+
+async editGenerationSource(text: string): Promise<void> {
+    return await this.driver.editGenerationSource(text);
+  }
+
+async saveGenerationSource(): Promise<void> {
+    return await this.driver.saveGenerationSource();
+  }
+
+async saveGenerationOtherEntry(text: string): Promise<void> {
+    return await this.driver.saveGenerationOtherEntry(text);
+  }
+
+async setGenerationEnabled(enabled: boolean): Promise<void> {
+    return await this.driver.setGenerationEnabled(enabled);
+  }
+
+async dirtyGenerationOtherEntry(text: string): Promise<void> {
+    return await this.driver.dirtyGenerationOtherEntry(text);
+  }
+
+async replaceGenerationSavedConfiguration(text: string): Promise<void> {
+    return await this.driver.replaceGenerationSavedConfiguration(text);
+  }
+
+async saveUnrelatedGenerationSource(text: string): Promise<void> {
+    return await this.driver.saveUnrelatedGenerationSource(text);
+  }
+
+async requestGenerationSaveSnapshot(text: string, version: number): Promise<void> {
+    return await this.driver.requestGenerationSaveSnapshot(text, version);
+  }
+
+async keepGenerationImplementation(path: string, body: string): Promise<void> {
+    return await this.driver.keepGenerationImplementation(path, body);
+  }
+
+async awaitGenerationSettlement(): Promise<void> {
+    return await this.driver.awaitGenerationSettlement();
+  }
+
+async awaitGenerationPermission(): Promise<void> {
+    return await this.driver.awaitGenerationPermission();
+  }
+
+async dirtyGenerationTarget(path: string, text: string): Promise<void> {
+    return await this.driver.dirtyGenerationTarget(path, text);
+  }
+
+async releaseGenerationPermission(): Promise<void> {
+    return await this.driver.releaseGenerationPermission();
+  }
+
+async editNativeGenerationSource(text: string): Promise<void> {
+    return await this.driver.editNativeGenerationSource(text);
+  }
+
+async saveNativeGenerationSource(): Promise<void> {
+    return await this.driver.saveNativeGenerationSource();
+  }
+
+async saveNativeGenerationOtherEntry(text: string): Promise<void> {
+    return await this.driver.saveNativeGenerationOtherEntry(text);
+  }
+
+async setNativeGenerationEnabled(enabled: boolean): Promise<void> {
+    return await this.driver.setNativeGenerationEnabled(enabled);
+  }
+
+async dirtyNativeGenerationOtherEntry(text: string): Promise<void> {
+    return await this.driver.dirtyNativeGenerationOtherEntry(text);
+  }
+
+async selectOtherGenerationConfiguration(): Promise<void> {
+    return await this.driver.selectOtherGenerationConfiguration();
+  }
+
+async selectOriginalGenerationConfiguration(): Promise<void> {
+    return await this.driver.selectOriginalGenerationConfiguration();
+  }
+
+async awaitNativeGeneration(): Promise<void> {
+    return await this.driver.awaitNativeGeneration();
+  }
+
+async keepNativeGenerationImplementation(path: string, body: string): Promise<void> {
+    return await this.driver.keepNativeGenerationImplementation(path, body);
+  }
+
+async dirtyHiddenGenerationTarget(path: string, body: string): Promise<void> {
+    return await this.driver.dirtyHiddenGenerationTarget(path, body);
+  }
+
+async generationStatus(): Promise<string> {
+    return await this.driver.generationStatus();
+  }
+
+async generationExplanation(): Promise<string> {
+    return await this.driver.generationExplanation();
+  }
+
+async generationFileIncludes(path: string, text: string): Promise<boolean> {
+    return await this.driver.generationFileIncludes(path, text);
+  }
+
+async generationTargetTreeUnchanged(): Promise<boolean> {
+    return await this.driver.generationTargetTreeUnchanged();
+  }
+
+async generationWorkerStarts(): Promise<number> {
+    return await this.driver.generationWorkerStarts();
+  }
+
+async generationTargetDirtyTextIncludes(text: string): Promise<boolean> {
+    return await this.driver.generationTargetDirtyTextIncludes(text);
+  }
+
+async nativeGenerationRuntimeVersion(): Promise<string> {
+    return await this.driver.nativeGenerationRuntimeVersion();
+  }
+
+async nativeGenerationStatus(): Promise<string> {
+    return await this.driver.nativeGenerationStatus();
+  }
+
+async nativeGenerationExplanation(): Promise<string> {
+    return await this.driver.nativeGenerationExplanation();
+  }
+
+async nativeGenerationFileIncludes(path: string, text: string): Promise<boolean> {
+    return await this.driver.nativeGenerationFileIncludes(path, text);
+  }
+
+async nativeGenerationTargetTreeUnchanged(): Promise<boolean> {
+    return await this.driver.nativeGenerationTargetTreeUnchanged();
+  }
+
+async nativeGenerationDiagramIncludes(text: string): Promise<boolean> {
+    return await this.driver.nativeGenerationDiagramIncludes(text);
+  }
+
+async nativeGenerationDirtyTextIncludes(text: string): Promise<boolean> {
+    return await this.driver.nativeGenerationDirtyTextIncludes(text);
+  }
+
+async nativeGenerationLaunchExplanationIncludes(text: string): Promise<boolean> {
+    return await this.driver.nativeGenerationLaunchExplanationIncludes(text);
+  }
+
+async expectGenerationStatus(status: string): Promise<void> {
+    const actual = await this.driver.generationStatus();
+    expectData(actual, status);
+  }
+
+async expectGenerationFile(path: string, text: string): Promise<void> {
+    const present = await this.driver.generationFileIncludes(path, text);
+    expectData(present, true);
+  }
+
+async expectGenerationUntouched(starts: number): Promise<void> {
+    const unchanged = await this.driver.generationTargetTreeUnchanged();
+    const actualStarts = await this.driver.generationWorkerStarts();
+    expectData(unchanged, true);
+    expectData(actualStarts, starts);
+  }
+
+async expectGenerationRefused(): Promise<void> {
+    const status = await this.driver.generationStatus();
+    const explanation = await this.driver.generationExplanation();
+    expectData(status, "blocked");
+    expect(!comparisonEqual(explanation, "")).toBe(true);
+  }
+
+async expectGenerationDirtyText(text: string): Promise<void> {
+    const present = await this.driver.generationTargetDirtyTextIncludes(text);
+    expectData(present, true);
+  }
+
+async expectNativeGenerationRuntime(version: string): Promise<void> {
+    const actual = await this.driver.nativeGenerationRuntimeVersion();
+    expectData(actual, version);
+  }
+
+async expectNativeGenerationStatus(status: string): Promise<void> {
+    const actual = await this.driver.nativeGenerationStatus();
+    expectData(actual, status);
+  }
+
+async expectNativeGenerationFile(path: string, text: string): Promise<void> {
+    const present = await this.driver.nativeGenerationFileIncludes(path, text);
+    expectData(present, true);
+  }
+
+async expectNativeGenerationDiagram(text: string): Promise<void> {
+    const present = await this.driver.nativeGenerationDiagramIncludes(text);
+    expectData(present, true);
+  }
+
+async expectNativeGenerationUntouched(): Promise<void> {
+    const unchanged = await this.driver.nativeGenerationTargetTreeUnchanged();
+    expectData(unchanged, true);
+  }
+
+async expectNativeGenerationDirtyRefusal(text: string): Promise<void> {
+    const status = await this.driver.nativeGenerationStatus();
+    const explanation = await this.driver.nativeGenerationExplanation();
+    const present = await this.driver.nativeGenerationDirtyTextIncludes(text);
+    expectData(status, "blocked");
+    expect(!comparisonEqual(explanation, "")).toBe(true);
+    expectData(present, true);
+  }
+
+async expectNativeGenerationLaunchFailure(text: string): Promise<void> {
+    const status = await this.driver.nativeGenerationStatus();
+    const present = await this.driver.nativeGenerationLaunchExplanationIncludes(text);
+    expectData(status, "failed");
+    expectData(present, true);
+  }
+
+readonly generationOtherEntry: string = "type Shelf { copies: Number }";
+
+readonly generationLibraryInitial: string = "component Library { capability count() returns Number }";
+
+readonly generationLibraryChanged: string = "component Library {\n  capability count() returns Number\n  capability title() returns Text\n}";
+
+readonly nativeGenerationLibrary: string = "component Library { capability count() returns Number }";
+
+readonly nativeGenerationAddition: string = "component Library {\n  capability count() returns Number\n  capability title() returns Text\n}";
+
+readonly nativeGenerationShelf: string = "type Shelf { copies: Number }";
 }
