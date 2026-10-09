@@ -1,3 +1,5 @@
+import { GenerationOnSaveRecording } from './generation-on-save.js';
+import type { NativeGenerationCase } from './vscode/native-generation.js';
 import type { ConnectionSidebarCase } from './vscode/connection-sidebar.js';
 import { basename } from 'node:path';
 import { stat } from 'node:fs/promises';
@@ -837,4 +839,177 @@ async nativePreviewFilesUnchanged(): Promise<boolean> {
 
     private previewRecording!: OutputPreviewsRecording;
     private nativePreview!: NativePreviewCase;
+    private savedGeneration!: GenerationOnSaveRecording;
+    private nativeGeneration!: NativeGenerationCase;
+
+async savedGenerationWorkspace(source: string, otherEntry: string, enabled: boolean): Promise<void> {
+    this.savedGeneration = await GenerationOnSaveRecording.create(source, otherEntry, enabled);
+  }
+
+async heldGenerationWorkspace(source: string, otherEntry: string): Promise<void> {
+    this.savedGeneration = await GenerationOnSaveRecording.create(source, otherEntry, true, true);
+  }
+
+async generationEditor(source: string, otherEntry: string, enabled: boolean): Promise<void> {
+    this.installedEditor = await InstalledExpecEditor.prepare();
+    this.nativeGeneration = await this.installedEditor.generationEditor(source, otherEntry, enabled);
+  }
+
+async generationEditorWithOutputs(source: string, otherEntry: string, enabled: boolean): Promise<void> {
+    this.installedEditor = await InstalledExpecEditor.prepare();
+    this.nativeGeneration = await this.installedEditor.generationEditor(source, otherEntry, enabled, true);
+  }
+
+async generationEditorWithoutRuntime(source: string): Promise<void> {
+    this.installedEditor = await InstalledExpecEditor.prepare();
+    this.nativeGeneration = await this.installedEditor.generationEditor(source, "type Shelf { copies: Number }", true, false, true);
+  }
+
+async editGenerationSource(text: string): Promise<void> {
+    await this.savedGeneration.edit(text);
+  }
+
+async saveGenerationSource(): Promise<void> {
+    await this.savedGeneration.save();
+  }
+
+async saveGenerationOtherEntry(text: string): Promise<void> {
+    await this.savedGeneration.saveOther(text);
+  }
+
+async setGenerationEnabled(enabled: boolean): Promise<void> {
+    this.savedGeneration.setEnabled(enabled);
+  }
+
+async dirtyGenerationOtherEntry(text: string): Promise<void> {
+    this.savedGeneration.dirtyOther(text);
+  }
+
+async replaceGenerationSavedConfiguration(text: string): Promise<void> {
+    await this.savedGeneration.replaceSavedConfiguration(text);
+  }
+
+async saveUnrelatedGenerationSource(text: string): Promise<void> {
+    await this.savedGeneration.saveUnrelated(text);
+  }
+
+async requestGenerationSaveSnapshot(text: string, version: number): Promise<void> {
+    this.savedGeneration.request(text, version);
+  }
+
+async keepGenerationImplementation(path: string, body: string): Promise<void> {
+    await this.savedGeneration.keepImplementation(path, body);
+  }
+
+async awaitGenerationSettlement(): Promise<void> {
+    await this.savedGeneration.settle();
+  }
+
+async awaitGenerationPermission(): Promise<void> {
+    await this.savedGeneration.awaitPermission();
+  }
+
+async dirtyGenerationTarget(path: string, text: string): Promise<void> {
+    await this.savedGeneration.dirtyTarget(path, text);
+  }
+
+async releaseGenerationPermission(): Promise<void> {
+    this.savedGeneration.releasePermission();
+  }
+
+async editNativeGenerationSource(text: string): Promise<void> {
+    await this.nativeGeneration.edit(text);
+  }
+
+async saveNativeGenerationSource(): Promise<void> {
+    await this.nativeGeneration.save();
+  }
+
+async saveNativeGenerationOtherEntry(text: string): Promise<void> {
+    await this.nativeGeneration.saveOther(text);
+  }
+
+async setNativeGenerationEnabled(enabled: boolean): Promise<void> {
+    await this.nativeGeneration.setEnabled(enabled);
+  }
+
+async dirtyNativeGenerationOtherEntry(text: string): Promise<void> {
+    await this.nativeGeneration.dirtyOther(text);
+  }
+
+async selectOtherGenerationConfiguration(): Promise<void> {
+    await this.nativeGeneration.selectOther();
+  }
+
+async selectOriginalGenerationConfiguration(): Promise<void> {
+    await this.nativeGeneration.selectOriginal();
+  }
+
+async awaitNativeGeneration(): Promise<void> {
+    await this.nativeGeneration.settle();
+  }
+
+async keepNativeGenerationImplementation(path: string, body: string): Promise<void> {
+    await this.nativeGeneration.keepImplementation(path, body);
+  }
+
+async dirtyHiddenGenerationTarget(path: string, body: string): Promise<void> {
+    await this.nativeGeneration.dirtyTarget(path, body);
+  }
+
+async generationStatus(): Promise<string> {
+    return this.savedGeneration.status();
+  }
+
+async generationExplanation(): Promise<string> {
+    return this.savedGeneration.explanation();
+  }
+
+async generationFileIncludes(path: string, text: string): Promise<boolean> {
+    return await this.savedGeneration.fileIncludes(path, text);
+  }
+
+async generationTargetTreeUnchanged(): Promise<boolean> {
+    return await this.savedGeneration.unchanged();
+  }
+
+async generationWorkerStarts(): Promise<number> {
+    return this.savedGeneration.starts();
+  }
+
+async generationTargetDirtyTextIncludes(text: string): Promise<boolean> {
+    return this.savedGeneration.dirtyTextIncludes(text);
+  }
+
+async nativeGenerationRuntimeVersion(): Promise<string> {
+    return await this.nativeGeneration.runtimeVersion();
+  }
+
+async nativeGenerationStatus(): Promise<string> {
+    return await this.nativeGeneration.status();
+  }
+
+async nativeGenerationExplanation(): Promise<string> {
+    return await this.nativeGeneration.explanation();
+  }
+
+async nativeGenerationFileIncludes(path: string, text: string): Promise<boolean> {
+    return await this.nativeGeneration.fileIncludes(path, text);
+  }
+
+async nativeGenerationTargetTreeUnchanged(): Promise<boolean> {
+    return await this.nativeGeneration.unchanged();
+  }
+
+async nativeGenerationDiagramIncludes(text: string): Promise<boolean> {
+    return await this.nativeGeneration.diagramIncludes(text);
+  }
+
+async nativeGenerationDirtyTextIncludes(text: string): Promise<boolean> {
+    return await this.nativeGeneration.dirtyTextIncludes(text);
+  }
+
+async nativeGenerationLaunchExplanationIncludes(text: string): Promise<boolean> {
+    return await this.nativeGeneration.launchExplanationIncludes(text);
+  }
 }

@@ -49,9 +49,9 @@ jobs:
               `${process.env.BASE_SHA}...${process.env.HEAD_SHA}`], { encoding: 'utf8' }).split('\0').filter(Boolean);
             for (const file of files) {
               if (/\.md$/.test(file) || file.startsWith('generation/uml/')) continue;
-              if (/^(src\/core\/|generation\/expec\/src\/core\/|test\/(?:unit\/)?core\/|test\/acceptance\/(?:WorkspaceCore|DocumentAnalysis|ConnectionController)(?:\.|\/))/.test(file)) {
+              if (/^(src\/core\/|generation\/expec\/src\/core\/|test\/(?:unit\/)?core\/|test\/resources\/generation-worker\/|test\/acceptance\/(?:WorkspaceCore|DocumentAnalysis|ConnectionController|OutputPreviews|GenerationOnSave)(?:\.|\/))/.test(file)) {
                 selected.add('core'); selected.add('editor'); selected.add('ui');
-              } else if (/^(src\/vscode\/|generation\/expec\/src\/vscode\/|test\/(?:unit\/|driver\/|resources\/)?vscode\/|test\/acceptance\/(?:EditorAdapter(?:\.|\/)|EditorLanguageSupport\.test\.ts|ConnectionSidebar\.test\.ts|native-editor\.test\.ts|workspace\.test\.ts))/.test(file)) {
+              } else if (/^(src\/vscode\/|generation\/expec\/src\/vscode\/|test\/(?:unit\/|driver\/|resources\/)?vscode\/|test\/acceptance\/(?:EditorAdapter(?:\.|\/)|EditorLanguageSupport\.test\.ts|ConnectionSidebar\.test\.ts|OutputPreviewHost\.test\.ts|GenerationHost\.test\.ts|native-editor\.test\.ts|workspace\.test\.ts))/.test(file)) {
                 selected.add('editor');
               } else if (/^(src\/ui\/|generation\/expec\/src\/ui\/|test\/(?:unit\/)?ui\/|test\/acceptance\/OutputTabs(?:\.|\/)|test\/resources\/)/.test(file)) {
                 selected.add('ui');
@@ -62,12 +62,12 @@ jobs:
             }
           }
           const filters = {
-            core: ['test/acceptance/ConnectionController', 'test/acceptance/DocumentAnalysis', 'test/acceptance/WorkspaceCore', 'test/unit/core/', 'test/core/'],
+            core: ['test/acceptance/ConnectionController', 'test/acceptance/DocumentAnalysis', 'test/acceptance/WorkspaceCore', 'test/acceptance/OutputPreviews', 'test/acceptance/GenerationOnSave', 'test/unit/core/', 'test/core/'],
             editor: ['test/acceptance/native-editor.test.ts', 'test/acceptance/EditorAdapter', 'test/acceptance/workspace.test.ts', 'test/unit/vscode/', 'test/vscode/'],
             ui: ['test/acceptance/OutputTabs', 'test/unit/ui/', 'test/ui/'],
           };
           const tests = all || selected.size > 0;
-          appendFileSync(process.env.GITHUB_OUTPUT, `tests=${tests}\nui=${all || selected.has('ui')}\nfilters=${all ? '' : [...selected].flatMap(part => filters[part]).join(' ')}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `tests=${tests}\nui=${all || selected.has('ui') || selected.has('editor')}\nfilters=${all ? '' : [...selected].flatMap(part => filters[part]).join(' ')}\n`);
           console.log(all ? 'Full extension suite' : tests ? `Affected components: ${[...selected].join(', ')}` : 'Documentation only; no tests selected');
           NODE
       - name: Install dependencies
@@ -85,7 +85,7 @@ jobs:
           name: expec-vsix-${{ matrix.os }}
           path: dist/expec-vscode-extension.vsix
           if-no-files-found: error
-      - name: Install Chromium for UI tests
+      - name: Install Chromium for browser observations
         if: steps.scope.outputs.ui == 'true'
         run: npx --no-install playwright install --with-deps chromium
       - name: Test affected components

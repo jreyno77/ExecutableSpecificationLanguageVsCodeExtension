@@ -10,6 +10,8 @@ exports.run = async function run() {
   const connectionSidebars = new Map();
   const { openPreviewEditor } = require('./preview-editor.cjs');
   const previewEditors = new Map();
+  const { openGenerationEditor } = require('./generation-editor.cjs');
+  const generationEditors = new Map();
   const request = JSON.parse(await fs.readFile(process.env.EXPEC_NATIVE_REQUEST, 'utf8'));
   const socket = net.createConnection({ host: '127.0.0.1', port: request.port });
   await new Promise((resolveRun, rejectRun) => {
@@ -85,6 +87,26 @@ exports.run = async function run() {
               await sidebar.dispose(); connectionSidebars.delete(frame.sidebarId); value = null;
             } else throw new Error('Invalid native sidebar operation.');
           }
+        } else if (frame.operation === 'generationOpen' && typeof frame.generationId === 'string' && typeof frame.extensionId === 'string'
+          && ['file', 'other', 'directory', 'workspace', 'configurationFile', 'resetFile', 'nodeExecutable'].every(key => typeof frame[key] === 'string')
+          && typeof frame.enabled === 'boolean') {
+          if (generationEditors.has(frame.generationId)) throw new Error('The owned native generation case already exists.');
+          const editor = await openGenerationEditor(vscode, frame.extensionId, frame);
+          generationEditors.set(frame.generationId, editor); value = await editor.observation();
+        } else if (['generationAction', 'generationObserve', 'generationDispose'].includes(frame.operation) && typeof frame.generationId === 'string') {
+          const editor = generationEditors.get(frame.generationId);
+          if (frame.operation === 'generationDispose' && !editor) value = null;
+          else {
+            if (!editor) throw new Error('The owned native generation case is unavailable.');
+            if (frame.operation === 'generationObserve') value = await editor.observation();
+            else if (frame.operation === 'generationDispose') { await editor.dispose(); generationEditors.delete(frame.generationId); value = null; }
+            else if (['edit', 'otherEdit', 'otherSave', 'keep', 'dirtyTarget'].includes(frame.kind) && typeof frame.text === 'string'
+              && (!['keep', 'dirtyTarget'].includes(frame.kind) || typeof frame.file === 'string')) value = await editor.action(frame.kind, frame);
+            else if (frame.kind === 'enable' && typeof frame.enabled === 'boolean') value = await editor.action(frame.kind, frame);
+            else if (['save', 'selectOriginal', 'showLog'].includes(frame.kind)) value = await editor.action(frame.kind, frame);
+            else if (frame.kind === 'selectOther' && ['file', 'other', 'directory', 'configurationFile'].every(key => typeof frame[key] === 'string')) value = await editor.action(frame.kind, frame);
+            else throw new Error('Invalid actual generation editor action.');
+          }
         } else if (frame.operation === 'previewOpen' && typeof frame.previewId === 'string' && typeof frame.extensionId === 'string'
           && typeof frame.file === 'string' && typeof frame.configurationFile === 'string' && typeof frame.resetFile === 'string') {
           if (previewEditors.has(frame.previewId)) throw new Error('The owned native preview case already exists.');
@@ -105,6 +127,8 @@ exports.run = async function run() {
             else throw new Error('Invalid native preview operation.');
           }
         } else if (frame.operation === 'shutdown') {
+          for (const editor of generationEditors.values()) await editor.dispose();
+          generationEditors.clear();
           for (const editor of previewEditors.values()) await editor.dispose();
           previewEditors.clear();
           for (const document of diagnosticDocuments.values()) await document.dispose();

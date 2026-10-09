@@ -1,8 +1,9 @@
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
-import { afterAll, onTestFinished } from 'vitest';
-import type { Browser, BrowserContext, Page } from 'playwright';
+import { onTestFinished } from 'vitest';
+import type { BrowserContext, Page } from 'playwright';
+import { svgBrowser, svgTextLabels } from './svg-labels.js';
 import { acceptanceOutput, contractListOutput, javaAcceptanceOutput, javaOutput, kotlinAcceptanceOutput, kotlinOutput,
   markdownOutput, pythonAcceptanceOutput, pythonOutput, structureListOutput, typescriptOutput, umlOutput,
   type OutputRegistration } from 'executable-specification-language';
@@ -14,8 +15,6 @@ import type { OutputTab } from '../../src/core/OutputTab.js';
 
 const shipped = [typescriptOutput, markdownOutput, umlOutput, contractListOutput, structureListOutput,
   acceptanceOutput, javaOutput, javaAcceptanceOutput, kotlinOutput, kotlinAcceptanceOutput, pythonOutput, pythonAcceptanceOutput];
-let browser: Promise<Browser> | undefined;
-afterAll(async () => { await (await browser?.catch(() => undefined))?.close(); });
 function signal(): { promise: Promise<void>; resolve(): void } {
   let resolve!: () => void; const promise = new Promise<void>(yes => { resolve = yes; }); return { promise, resolve };
 }
@@ -121,13 +120,8 @@ export class OutputPreviewsRecording {
   async preserved(): Promise<boolean> { return await this.tree() === this.initialTree; }
   async svgHasLabel(id: string, path: string, label: string): Promise<boolean> {
     const document = this.document(id, path); if (document.mediaType !== 'image/svg+xml') throw Error('That actual document is not SVG.');
-    browser ??= import('playwright').then(({ chromium }) => chromium.launch({ headless: true }));
-    if (!this.context) { this.context = await (await browser).newContext(); this.context.on('close', () => { this.contextClosed = true; }); await this.context.route('**/*', route => route.abort()); this.page = await this.context.newPage(); }
-    return this.page!.evaluate(({ svg, label }) => {
-      const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml');
-      if (parsed.querySelector('parsererror')) throw Error('Actual renderer returned invalid SVG.');
-      return [...parsed.querySelectorAll('text,tspan')].some(node => node.textContent?.trim() === label);
-    }, { svg: document.content, label });
+    if (!this.context) { this.context = await (await svgBrowser()).newContext(); this.context.on('close', () => { this.contextClosed = true; }); await this.context.route('**/*', route => route.abort()); this.page = await this.context.newPage(); }
+    return (await svgTextLabels(this.page!, document.content)).some(actual => actual.trim() === label);
   }
   async releasedResources(): Promise<{ context: boolean; fixture: boolean }> {
     let fixture = false;
