@@ -115,8 +115,33 @@ exports.openDiagnosticDocument = async function openDiagnosticDocument(vscode, e
     if (!tabClosed) {
       previousProblemCount = currentDiagnostics().length;
       const afterEvent = eventNumber;
-      await vscode.window.showTextDocument(document);
-      await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+      const deadline = Date.now() + 30_000;
+      await beforeDeadline(vscode.window.showTextDocument(document), deadline, 'The owned native editor did not activate before its cleanup deadline.');
+      if (document.uri.scheme === 'untitled') {
+        // Discard only this test-owned unsaved buffer. Empty unassociated untitled
+        // documents are clean in VS Code, so explicit tab closure cannot prompt.
+        if (document.getText() !== '') {
+          const edit = new vscode.WorkspaceEdit();
+          edit.set(document.uri, [vscode.TextEdit.replace(new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), '')]);
+          if (!await beforeDeadline(vscode.workspace.applyEdit(edit), deadline, 'Discarding the owned untitled text did not finish before its cleanup deadline.')) {
+            throw new Error('VS Code refused to discard the owned untitled text.');
+          }
+          // The tab model is the native close-confirmation authority. Untitled
+          // TextDocument.isDirty can lag its model's dirty-state notification.
+          await until(() => document.getText() === '' && vscode.window.tabGroups.all.flatMap(group => group.tabs).filter(ownsTab).every(tab => !tab.isDirty),
+            () => 'The owned untitled tabs did not become clean. ' + JSON.stringify({
+              uri: document.uri.toString(), textLength: document.getText().length, documentDirty: document.isDirty,
+              tabs: vscode.window.tabGroups.all.flatMap(group => group.tabs).filter(ownsTab).map(tab => ({ isDirty: tab.isDirty })),
+            }), deadline);
+        }
+        const ownedTabs = vscode.window.tabGroups.all.flatMap(group => group.tabs).filter(ownsTab);
+        if (!await beforeDeadline(vscode.window.tabGroups.close(ownedTabs, true), deadline, 'The owned native tab close did not finish before its cleanup deadline.')) {
+          throw new Error('VS Code refused to close the owned native tabs.');
+        }
+      } else {
+        await beforeDeadline(vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor'), deadline,
+          'The owned native discard command did not finish before its cleanup deadline.');
+      }
       await until(() => tabClosed && !hasTab() && !visible() && currentDiagnostics().length === 0
         && (previousProblemCount === 0 || applied.some(event => event.number > afterEvent && event.diagnostics.length === 0)),
       () => 'Closing the owned native document did not clear its diagnostics. ' + JSON.stringify({
@@ -128,7 +153,7 @@ exports.openDiagnosticDocument = async function openDiagnosticDocument(vscode, e
         visible: vscode.window.visibleTextEditors.some(editor => editor.document === document),
         active: vscode.window.activeTextEditor?.document.uri.toString(),
         tabs: vscode.window.tabGroups.all.flatMap(group => group.tabs).map(tab => tab.input?.uri?.toString()).filter(Boolean),
-      }));
+      }), deadline);
     }
     return observation();
   }
@@ -197,14 +222,21 @@ function diagnosticPacket(diagnostic) {
       location: { uri: related.location.uri.toString(), range: range(related.location.range) } })) };
 }
 function sameDiagnostics(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
-async function until(predicate, explanation) {
-  const deadline = Date.now() + 30_000;
+async function until(predicate, explanation, deadline = Date.now() + 30_000) {
   while (!predicate()) {
     if (Date.now() >= deadline) throw new Error(typeof explanation === 'function' ? explanation() : explanation);
     await new Promise(resolve => setTimeout(resolve, 10));
   }
 }
 
+async function beforeDeadline(operation, deadline, explanation) {
+  let timer;
+  try {
+    return await Promise.race([operation, new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(explanation)), Math.max(0, deadline - Date.now()));
+    })]);
+  } finally { clearTimeout(timer); }
+}
 // GIVEN setup needs an operational native folder watch, not just the SDK's
 // registration acknowledgment. The probe never changes the authored dependency.
 async function preparedWorkspaceWatch(vscode, dependencyFile) {
