@@ -117,4 +117,128 @@ async editorLanguageId(): Promise<string> {
 async syntaxScopeAt(line: number, column: number): Promise<string> {
     return this.syntax.scopeAt(line, column);
   }
+
+async syntaxAnalysis(): Promise<void> {
+    throw new Error("Not implemented: workspace.syntaxAnalysis");
+  }
+
+async diagnosticEditor(fileName: string, initialText: string): Promise<void> {
+    throw new Error("Not implemented: workspace.diagnosticEditor");
+  }
+
+async openSource(source: SourceDocument, version: number): Promise<void> {
+    throw new Error("Not implemented: workspace.openSource");
+  }
+
+async changeSource(source: SourceDocument, version: number): Promise<void> {
+    throw new Error("Not implemented: workspace.changeSource");
+  }
+
+async closeSource(uri: string): Promise<void> {
+    throw new Error("Not implemented: workspace.closeSource");
+  }
+
+async tryOpeningSource(source: SourceDocument, version: number): Promise<void> {
+    throw new Error("Not implemented: workspace.tryOpeningSource");
+  }
+
+async tryChangingSource(source: SourceDocument, version: number): Promise<void> {
+    throw new Error("Not implemented: workspace.tryChangingSource");
+  }
+
+async editWithoutSaving(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.editWithoutSaving");
+  }
+
+async editQuickly(first: string, latest: string): Promise<void> {
+    throw new Error("Not implemented: workspace.editQuickly");
+  }
+
+async closeEditedDocument(): Promise<void> {
+    throw new Error("Not implemented: workspace.closeEditedDocument");
+  }
+
+async publishedVersion(uri: string): Promise<number> {
+    throw new Error("Not implemented: workspace.publishedVersion");
+  }
+
+async publicationCount(uri: string): Promise<number> {
+    throw new Error("Not implemented: workspace.publicationCount");
+  }
+
+async syntaxProblemCount(uri: string): Promise<number> {
+    throw new Error("Not implemented: workspace.syntaxProblemCount");
+  }
+
+async syntaxExplanation(uri: string): Promise<string> {
+    throw new Error("Not implemented: workspace.syntaxExplanation");
+  }
+
+async syntaxStartLine(uri: string): Promise<number> {
+    throw new Error("Not implemented: workspace.syntaxStartLine");
+  }
+
+async syntaxStartColumn(uri: string): Promise<number> {
+    throw new Error("Not implemented: workspace.syntaxStartColumn");
+  }
+
+async syntaxEndLine(uri: string): Promise<number> {
+    throw new Error("Not implemented: workspace.syntaxEndLine");
+  }
+
+async syntaxEndColumn(uri: string): Promise<number> {
+    throw new Error("Not implemented: workspace.syntaxEndColumn");
+  }
+
+async clearCount(uri: string): Promise<number> {
+    throw new Error("Not implemented: workspace.clearCount");
+  }
+
+async invalidVersionRejected(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.invalidVersionRejected");
+  }
+
+async previouslyVisibleProblemCount(): Promise<number> {
+    throw new Error("Not implemented: workspace.previouslyVisibleProblemCount");
+  }
+
+async editorProblemCount(): Promise<number> {
+    throw new Error("Not implemented: workspace.editorProblemCount");
+  }
+
+async editorProblemMessage(): Promise<string> {
+    throw new Error("Not implemented: workspace.editorProblemMessage");
+  }
+
+async editorProblemIsError(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.editorProblemIsError");
+  }
+
+async editorProblemStartLine(): Promise<number> {
+    throw new Error("Not implemented: workspace.editorProblemStartLine");
+  }
+
+async editorProblemStartColumn(): Promise<number> {
+    throw new Error("Not implemented: workspace.editorProblemStartColumn");
+  }
+
+async editorProblemEndLine(): Promise<number> {
+    throw new Error("Not implemented: workspace.editorProblemEndLine");
+  }
+
+async editorProblemEndColumn(): Promise<number> {
+    throw new Error("Not implemented: workspace.editorProblemEndColumn");
+  }
+
+async savedDocumentText(): Promise<string> {
+    throw new Error("Not implemented: workspace.savedDocumentText");
+  }
+
+async openDocumentText(): Promise<string> {
+    throw new Error("Not implemented: workspace.openDocumentText");
+  }
+
+async openDocumentIsDirty(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.openDocumentIsDirty");
+  }
 }
