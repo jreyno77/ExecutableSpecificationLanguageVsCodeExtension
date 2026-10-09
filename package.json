@@ -90,6 +90,16 @@
         "command": "expec.showOutputPreviews",
         "title": "Show Output Previews",
         "category": ".expec"
+      },
+      {
+        "command": "expec.enableGenerationOnSave",
+        "title": "Enable Generation on Save",
+        "category": ".expec"
+      },
+      {
+        "command": "expec.disableGenerationOnSave",
+        "title": "Disable Generation on Save",
+        "category": ".expec"
       }
     ],
     "views": {
@@ -117,6 +127,12 @@
           "default": "expec.json",
           "scope": "resource",
           "description": "Configuration file for the selected workspace. Relative paths resolve from its folder. The connection view reports directory availability; build and generation readiness are checked separately."
+        },
+        "expec.nodeExecutable": {
+          "type": "string",
+          "default": "node",
+          "scope": "resource",
+          "description": "Node executable for saved-project generation. Use Node 24.19 or newer in the 24 release line. The extension verifies the runtime before generating; it does not install one."
         }
       }
     }

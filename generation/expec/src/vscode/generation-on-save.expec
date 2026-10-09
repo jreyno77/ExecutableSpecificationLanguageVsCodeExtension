@@ -1,0 +1,196 @@
+use GenerationWorker, GenerationBuffer, GenerationState, GenerationResult, GenerationOnSave, GenerationShutdownFeedback from "../core/generation-on-save.expec"
+use ConnectionConfiguration from "../core/project-connection.expec"
+use VsCodeExtensionContext from "./live-diagnostics.expec"
+
+// The coordinator runs beside this native adapter; only plain child IPC values
+// cross processes. Live diagnostics/previews retain their established LSP flow.
+component GenerationHost {
+  requires package "vscode-types" for build
+  requires package "node-types" for build
+  requires package "typescript" for build
+  requires package "vite" for build
+  requires package "vscode-test-electron" for test
+  depends on GenerationOnSave
+
+  construction(context: VsCodeExtensionContext, worker: GenerationWorker)
+  public start, configurationChanged, buffers, present, record, shutdown, dispose
+
+  capability start() returns Nothing {
+    promises "Register once the real post-save and open/change/close events, Enable Generation on Save (expec.enableGenerationOnSave) and Disable Generation on Save (expec.disableGenerationOnSave). Capture URI/text/version directly from ordinary local .expec save events and forward sourceSaved without saving again. Other documents only update buffer facts. Commands adapt an explicit author choice for the selected manifest; retain its boolean in workspace state keyed by exact manifest URI, default false. Assemble one core coordinator with this native buffer/presentation adapter and supplied worker. No native parsing, generation policy or output planning. Package the owned generation-worker entry with the pinned SDK. Supply resource-scoped expec.nodeExecutable (default node; explicit path allowed) to the concrete NodeGenerationWorker with its packaged entry. Launch without a shell, never fork's default Electron executable. Show the actual child version or launch error; preview packaging alone does not prove full CLI resource closure."
+  }
+  capability configurationChanged(configuration: ConnectionConfiguration?) returns Nothing {
+    promises "Receive the same raw selected saved ConnectionConfiguration as previews, independently of directory status. Withdraw the old selection before switching; load only the new manifest's explicit opt-in and forward both facts to core. Dirty configuration events retain saved text and notify core of actual buffer changes. Restart may replay configuration and current buffer facts, never previous save intents. Do not edit the language manifest or infer enabled from writable/connected."
+  }
+  capability buffers() returns List<GenerationBuffer> {
+    promises "Snapshot every current workspace.textDocuments ordinary file buffer, including hidden target buffers of other languages, using its actual uri/version/getText/isDirty. Closed buffers are absent. Keep native document object/lifetime checks around delayed callbacks; never provide a cached empty or clean set. Core decides which roots/inputs these facts protect."
+  }
+  capability present(state: GenerationState) returns Nothing {
+    promises "Show core's current generation status and actual explanation in one owned native status-bar item and its .expec Generation output channel. Keep this distinct from the connection directory status. Do not reinterpret permission, hide a partial-write warning or show a superseded success as current."
+  }
+  capability record(configurationFile: Text, result: GenerationResult) returns Nothing {
+    promises "Append the actual observed child runtime version and unchanged CLI JSON or launch/transport/cleanup failure to the owned output channel with its selected manifest context, including superseded or cancelled runs and partial effects. An exit code or dispatched notification alone is not proof of saved output."
+  }
+  capability shutdown(completion: GenerationShutdownFeedback) returns Nothing {
+    promises "Invalidate save/configuration callbacks and remove owned events/commands, then dispose core and request worker shutdown. Keep terminal effect recording and its output channel alive until worker completion; then dispose remaining status/output resources, attempt all cleanup and notify this completion with any actual causes. Repeated callers join the same shutdown. The native entry wraps this callback in its one awaited Promise, preserving cleanup failures."
+  }
+  capability dispose() returns Nothing {
+    promises "Initiate this same shutdown once, retaining asynchronous failure evidence. The entry point explicitly awaits shutdown completion; this native Disposable method alone is not proof of process termination. Never roll back user edits."
+  }
+}
+
+// Reuse one installed VSIX/owned VS Code host and a verified Node24.19/npm11.20
+// toolchain. Each case owns its actual TypeScript target, manifest, source buffers
+// and workspace-state opt-in. Setup uses a real initial SDK build, then inserts
+// the stated implementation through actual editor APIs and saves it. The two
+// authored sources are separate configured entries outside the target root:
+// authoring/main.expec and authoring/shelf.expec, beside expec.json above target. Saves use TextDocument.save,
+// dirty targets use actual WorkspaceEdit and are hidden without closing. Observe
+// actual saved target bytes, dirty buffer text and native status/output channel;
+// no input-copy, postMessage-return or fabricated worker result proves success.
+// A missing-runtime case supplies an owned verified-absent absolute executable.
+// Full CLI package resources must retain the pinned SDK packageRoot/module roots,
+// including all Java/Kotlin/Python resources and TypeScript standard libraries; the existing
+// preview-only D2 copy is insufficient proof. Ship a small ESM worker with the pinned
+// SDK external and its pristine locked runtime package closure beside the CJS host.
+// Preserve both D2 Node entry branches and their workers/WASM. The all-output setup
+// configures TypeScript, Markdown and UML and observes their actual saved files.
+// No runtime download or new dependency.
+// Clean up opt-in, source/target buffers, owned files and every worker on failure.
+examples for GenerationHost {
+  fixture nativeGenerationLibrary: Text = "component Library { capability count() returns Number }"
+  fixture nativeGenerationAddition: Text = "component Library {\n  capability count() returns Number\n  capability title() returns Text\n}"
+  fixture nativeGenerationShelf: Text = "type Shelf { copies: Number }"
+
+  setup generationEditor(source: Text, otherEntry: Text, enabled: Boolean) returns Nothing
+  setup generationEditorWithOutputs(source: Text, otherEntry: Text, enabled: Boolean) returns Nothing
+  setup generationEditorWithoutRuntime(source: Text) returns Nothing
+  action editNativeGenerationSource(text: Text) returns Nothing
+  action saveNativeGenerationSource() returns Nothing
+  // This performs an actual second-entry save while disabled; enable/disable
+  // actions invoke the corresponding registered native command.
+  action saveNativeGenerationOtherEntry(text: Text) returns Nothing
+  action setNativeGenerationEnabled(enabled: Boolean) returns Nothing
+  action dirtyNativeGenerationOtherEntry(text: Text) returns Nothing
+  // Select a second owned saved manifest/source/target through the native
+  // configuration path. It has no opt-in. Return to the original saved selection.
+  action selectOtherGenerationConfiguration() returns Nothing
+  action selectOriginalGenerationConfiguration() returns Nothing
+  action awaitNativeGeneration() returns Nothing
+  action keepNativeGenerationImplementation(path: Text, body: Text) returns Nothing
+  action dirtyHiddenGenerationTarget(path: Text, body: Text) returns Nothing
+  observation nativeGenerationRuntimeVersion() returns Text
+  observation nativeGenerationStatus() returns Text
+  observation nativeGenerationExplanation() returns Text
+  observation nativeGenerationFileIncludes(path: Text, text: Text) returns Boolean
+  observation nativeGenerationTargetTreeUnchanged() returns Boolean
+  observation nativeGenerationDiagramIncludes(text: Text) returns Boolean
+  observation nativeGenerationDirtyTextIncludes(text: Text) returns Boolean
+  observation nativeGenerationLaunchExplanationIncludes(text: Text) returns Boolean
+
+  check expectNativeGenerationRuntime(version: Text) {
+    let actual = nativeGenerationRuntimeVersion()
+    assert actual == version
+  }
+  check expectNativeGenerationStatus(status: Text) {
+    let actual = nativeGenerationStatus()
+    assert actual == status
+  }
+  check expectNativeGenerationFile(path: Text, text: Text) {
+    let present = nativeGenerationFileIncludes(path, text)
+    assert present == true
+  }
+  check expectNativeGenerationDiagram(text: Text) {
+    let present = nativeGenerationDiagramIncludes(text)
+    assert present == true
+  }
+  check expectNativeGenerationUntouched() {
+    let unchanged = nativeGenerationTargetTreeUnchanged()
+    assert unchanged == true
+  }
+  check expectNativeGenerationDirtyRefusal(text: Text) {
+    let status = nativeGenerationStatus()
+    let explanation = nativeGenerationExplanation()
+    let present = nativeGenerationDirtyTextIncludes(text)
+    assert status == "blocked"
+    assert explanation != ""
+    assert present == true
+  }
+  check expectNativeGenerationLaunchFailure(text: Text) {
+    let status = nativeGenerationStatus()
+    let present = nativeGenerationLaunchExplanationIncludes(text)
+    assert status == "failed"
+    assert present == true
+  }
+
+  scenario "an installed save generates all saved entries and preserves manual code" {
+    given generationEditorWithOutputs(nativeGenerationLibrary, nativeGenerationShelf, false)
+    when saveNativeGenerationOtherEntry("type Shelf { copies: Text }")
+    when setNativeGenerationEnabled(true)
+    when keepNativeGenerationImplementation("src/Library.ts", "return 41;")
+    when editNativeGenerationSource(nativeGenerationAddition)
+    when saveNativeGenerationSource()
+    when awaitNativeGeneration()
+    then expectNativeGenerationStatus("built")
+    then expectNativeGenerationRuntime("24.19.0")
+    then expectNativeGenerationFile("src/Library.ts", "title(): string")
+    then expectNativeGenerationFile("src/Library.ts", "return 41;")
+    then expectNativeGenerationFile("src/Shelf.ts", "copies: string;")
+    then expectNativeGenerationFile("docs/Library.md", "title")
+    then expectNativeGenerationDiagram("Library")
+  }
+  scenario "typing alone starts no installed generation" {
+    given generationEditor(nativeGenerationLibrary, nativeGenerationShelf, true)
+    when editNativeGenerationSource(nativeGenerationAddition)
+    then expectNativeGenerationUntouched()
+  }
+  scenario "disabled installed generation preserves targets when saved" {
+    given generationEditor(nativeGenerationLibrary, nativeGenerationShelf, false)
+    when editNativeGenerationSource(nativeGenerationAddition)
+    when saveNativeGenerationSource()
+    when awaitNativeGeneration()
+    then expectNativeGenerationStatus("disabled")
+    then expectNativeGenerationUntouched()
+  }
+  scenario "an actual hidden dirty target is refused without overwriting its buffer" {
+    given generationEditor(nativeGenerationLibrary, nativeGenerationShelf, true)
+    when dirtyHiddenGenerationTarget("src/Library.ts", "return 42;")
+    when editNativeGenerationSource(nativeGenerationAddition)
+    when saveNativeGenerationSource()
+    when awaitNativeGeneration()
+    then expectNativeGenerationDirtyRefusal("return 42;")
+    then expectNativeGenerationUntouched()
+  }
+  scenario "an actual dirty other entry outside the target blocks installed generation" {
+    given generationEditor(nativeGenerationLibrary, nativeGenerationShelf, true)
+    when dirtyNativeGenerationOtherEntry("type Shelf { copies: Text }")
+    when editNativeGenerationSource(nativeGenerationAddition)
+    when saveNativeGenerationSource()
+    when awaitNativeGeneration()
+    then expectNativeGenerationDirtyRefusal("type Shelf { copies: Text }")
+    then expectNativeGenerationUntouched()
+  }
+  scenario "generation opt-in does not transfer to another selected saved manifest" {
+    given generationEditor(nativeGenerationLibrary, nativeGenerationShelf, true)
+    when selectOtherGenerationConfiguration()
+    when editNativeGenerationSource(nativeGenerationAddition)
+    when saveNativeGenerationSource()
+    when awaitNativeGeneration()
+    then expectNativeGenerationStatus("disabled")
+    then expectNativeGenerationUntouched()
+  }
+  scenario "returning to the original selected saved manifest retains only its opt-in" {
+    given generationEditor(nativeGenerationLibrary, nativeGenerationShelf, true)
+    when selectOtherGenerationConfiguration()
+    when selectOriginalGenerationConfiguration()
+    then expectNativeGenerationStatus("idle")
+    then expectNativeGenerationUntouched()
+  }
+  scenario "a missing generation runtime is an actual visible launch failure" {
+    given generationEditorWithoutRuntime(nativeGenerationLibrary)
+    when editNativeGenerationSource(nativeGenerationAddition)
+    when saveNativeGenerationSource()
+    when awaitNativeGeneration()
+    then expectNativeGenerationLaunchFailure("ENOENT")
+    then expectNativeGenerationUntouched()
+  }
+}

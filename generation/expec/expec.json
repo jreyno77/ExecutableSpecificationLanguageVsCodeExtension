@@ -15,7 +15,9 @@
       "src/core/project-connection.expec",
       "src/vscode/project-connection.expec",
       "src/core/output-previews.expec",
-      "src/vscode/output-previews.expec"
+      "src/vscode/output-previews.expec",
+      "src/core/generation-on-save.expec",
+      "src/vscode/generation-on-save.expec"
     ]
   },
   "outputs": [

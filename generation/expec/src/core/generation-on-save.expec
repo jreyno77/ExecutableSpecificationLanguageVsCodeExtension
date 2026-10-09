@@ -1,0 +1,282 @@
+use SourceDocument from "./workspace.expec"
+use ConnectionConfiguration from "./project-connection.expec"
+
+// EXT-06 coordinates saved full builds. Live DocumentReport/preview state is not
+// a replacement for the manifest's complete entries, native capture or writer.
+type GenerationBuffer {
+  uri: Text
+  version: Number
+  text: Text
+  dirty: Boolean
+}
+
+type GenerationRequest {
+  configuration: ConnectionConfiguration
+  source: SourceDocument
+  version: Number
+}
+
+type GenerationWriteProblem {
+  code: Text
+  path: Text
+  `message`: Text
+}
+
+type GenerationResult {
+  runtimeVersion: Text?
+  exitCode: Number?
+  report: Text
+  error: Text?
+}
+
+type GenerationState {
+  configurationFile: Text?
+  sourceUri: Text?
+  sourceVersion: Number?
+  status: Text
+  `message`: Text
+}
+
+interface GenerationFiles {
+  public buffers
+  capability buffers() returns List<GenerationBuffer> {
+    promises "Return a complete new snapshot of all ordinary file text documents currently open in the editor, including hidden buffers, with actual URI/version/text/dirty facts. Closed documents are absent. No source parsing, output inference or cached permission result."
+  }
+}
+
+interface GenerationFeedback {
+  public present, record
+  capability present(state: GenerationState) returns Nothing {
+    promises "Present this complete current state. Status is disabled, idle, generating, queued, blocked, built, cancelled or failed. Directory connection and generation outcome remain distinct. Show the actual explanation without claiming rollback or unchanged files from cancellation."
+  }
+  capability record(configurationFile: Text, result: GenerationResult) returns Nothing {
+    promises "Retain this actual terminal result even when its save was superseded. report is the unchanged SDK commandJson text, including partial applied/not-applied/uncertain receipts and retained recovery state; runtimeVersion is the actual child process.versions.node when observed; an absent report is empty text, and error preserves actual launch/transport/cleanup failure alongside any report. Do not manufacture a successful report or discard earlier effects."
+  }
+}
+
+interface GenerationRunFeedback {
+  public writeProblems, finished
+  capability writeProblems(root: Text) returns List<GenerationWriteProblem> {
+    promises "For this actual absolute project root, recheck the current save/connection lifetime, saved source/configuration bytes and fresh editor facts. Refuse a dirty selected manifest, any observed dirty .expec buffer in this workbench, or any dirty ordinary buffer within this logical/canonical target root. This conservative authored-input policy covers other entries/imports outside the target until precise SDK input membership is available. Explain uncertain alias/root classification rather than approve it. This is a point-in-time observation, not an editor/filesystem transaction."
+  }
+  capability finished(result: GenerationResult) returns Nothing {
+    promises "Report this invocation once after its owned process and permission IPC work have settled or cleanup failure is explicitly reported. Preserve actual JSON and exit/launch evidence. Never let a cancelled permission callback initiate later application."
+  }
+}
+
+interface GenerationShutdownFeedback {
+  public stopped
+  capability stopped(error: Text?) returns Nothing {
+    promises "Notify once after all owned work has settled, or report the actual cleanup failure and uncertain effects. This callback lets the native entry await shutdown without inventing a synchronous termination guarantee."
+  }
+}
+
+interface GenerationWorker {
+  public start, cancel, dispose
+  capability start(request: GenerationRequest, feedback: GenerationRunFeedback) returns Nothing {
+    promises "Start one owned full saved build and deliver its actual terminal result through this feedback. Reject overlapping starts or starts after disposal. Runtime, SDK invocation and process ownership are implemented by NodeGenerationWorker, not by a replacement generation pipeline."
+  }
+  capability cancel() returns Nothing {
+    promises "Request cooperative cancellation of the owned invocation. Cancellation cannot preempt synchronous analysis or undo an in-flight write."
+  }
+  capability dispose(completion: GenerationShutdownFeedback) returns Nothing {
+    promises "Reject future starts, request cancellation and notify completion after owned cleanup. Keep started callbacks observed. Cleanup failure reports its actual cause and uncertain effects instead of claiming a clean stop. Repeated disposal joins the same shutdown."
+  }
+}
+
+// Full CLI resources are a new packaging responsibility: the preview bundle does
+// not prove that packageRoot-relative package metadata, lib/assets/bootstrap and
+// native target resources survived bundling. The pinned SDK module/asset roots and
+// required transitive runtime resources must be shipped together, with the worker.
+// The child reports its actual process.versions.node before build admission. The
+// installed runCli does not itself enforce the declared >=24.19.0 <25 Node range.
+component NodeGenerationWorker {
+  requires package "expec" for runtime
+  requires package "node-types" for build
+  requires package "typescript" for build
+  requires package "vite" for build
+  requires package "vitest" for test
+
+  construction(nodeExecutable: Text, entry: Text)
+  public start, cancel, dispose
+
+  capability start(request: GenerationRequest, feedback: GenerationRunFeedback) returns Nothing {
+    promises "Spawn the supplied packaged entry without a shell using this explicit Node executable or workspace PATH node. Never substitute Electron process.execPath or download a runtime. Admit the actual child version only when compatible with the pinned SDK's declared Node range; retain actual launch/version errors. Verify readiness per child lifetime. The entry imports the shipped pinned SDK with its original module-relative asset roots and calls public runCli with build --config the exact absolute saved manifest --json and PROJECT-42 CliHost signal/stdout/stderr/asynchronous checkWrite. Forward actual root checks over owned plain IPC and map refusals to actual located Diagnostic values. Carry the actual child runtimeVersion separately from unchanged SDK JSON, including rejected versions. The SDK owns full entries, target order, preservation, journal recovery and native/disk guards. No CLI copy, temporary manifest, selected-entry Compilation, init or install."
+  }
+  capability cancel() returns Nothing {
+    promises "Send cooperative cancellation over owned child IPC to its CliHost AbortController. Never treat Windows child.kill(SIGINT) as graceful cancellation. Observe pending permission replies and process failure; do not allow a later reply to initiate application. Keep actual partial/uncertain receipts, not a rollback claim."
+  }
+  capability dispose(completion: GenerationShutdownFeedback) returns Nothing {
+    promises "Stop accepting work, request cancellation once and drain owned callbacks, IPC and child process before notifying completion. Attempt remaining cleanup after failure and preserve every actual cause. If force cleanup is necessary, explicitly record uncertain effects and cleanup failure. Repeated callers join this one shutdown."
+  }
+}
+
+component GenerationOnSave {
+  requires package "expec" for runtime
+  requires package "node-types" for build
+  requires package "typescript" for build
+  requires package "vitest" for test
+
+  construction(worker: GenerationWorker, files: GenerationFiles, feedback: GenerationFeedback)
+  public configurationChanged, sourceSaved, editorChanged, dispose
+
+  capability configurationChanged(configuration: ConnectionConfiguration?, enabled: Boolean) returns Nothing {
+    promises "Capture the selected saved manifest and its explicit opt-in. Absence or a different filename withdraws the prior lifetime; enabled never transfers to another manifest. Missing opt-in means disabled, independently of writable or connected status. Changed selection/text/enablement cancels obsolete work and clears its queue. Never rewrite configuration, install or build merely because configuration or enablement changed."
+  }
+  capability sourceSaved(source: SourceDocument, version: Number) returns Nothing {
+    promises "Reject a nonpositive or noninteger version with RangeError before changing state. Capture this actual local .expec post-save snapshot. Reject a missing/disabled connection, mismatched actual saved source/configuration bytes or a different current clean buffer, with an explanation and no new worker. Validate through the real registered ConfigurationReader, resolving entries from its actual manifest source URI. A save must belong to an actual configured entry or its saved import closure, established through real saved-source acquisition, public LangiumReader models and SourceComposer composition, not source-name guessing or a single-entry DocumentReport. An unrelated .expec save creates no build. The SDK full build owns remaining prerequisites and invalid compilation findings. Present built only for an actual successful complete build result; preserve actual refused/failed/cancelled findings and partial receipts. Superseded results are recorded but cannot replace current state. Start at most one full saved build for this connection. While it runs, keep only the latest save, cancel the obsolete run and wait for its settlement before starting that latest request after fresh checks. Repeated later saves can retry at the same editor version. Never feed a selected DocumentReport as a full build."
+  }
+  capability editorChanged() returns Nothing {
+    promises "Inspect fresh GenerationFiles facts. An edit/close of the triggering source, dirty selected manifest, any observed dirty .expec buffer or dirty ordinary buffer within the actual SDK target root invalidates the pending save and requests cancellation. Logical/canonical root aliases are checked conservatively; uncertain classification is an explained refusal. Unrelated buffer changes create no build. Only sourceSaved creates a generation intent; generated filesystem notifications still reach existing analysis/writer freshness checks without becoming new save intents or being globally muted. Each SDK permission query rechecks current facts."
+  }
+  capability dispose() returns Nothing {
+    promises "End this lifetime, clear queued saves and request cancellation once. Start no later work or current-state publication; retain actual terminal effect records. Native ownership uses GenerationWorker.dispose completion to await worker/process cleanup and keep effect recording alive until settlement. No synchronous termination or automatic rollback is promised."
+  }
+}
+
+// A real coordinator and owned GenerationWorker call the public hosted SDK over
+// small actual filesystem projects. Setup explicitly initializes a compatible
+// TypeScript target and completes its baseline build before recording case work;
+// worker execution itself never initializes or installs. The second source is a
+// separate configured build entry. Both authored inputs are outside the target
+// root target, at authoring/main.expec and authoring/shelf.expec, with expec.json
+// selected above both. Editor facts are caller-supplied plain values;
+// target observations read actual saved files, never reconstruct expected output.
+// A held permission decorates a real child SDK check before reading fresh facts;
+// it does not replace planning/writing or fabricate a refusal. Always release and
+// drain the owned callback/process on failure. Scheduling, same-version retry,
+// disposal, positive-version rejection and partial-result/stale-status controls
+// belong in focused unit tests
+// over these ports, with literal actual receipts and unchanged existing guards.
+examples for GenerationOnSave {
+  fixture generationOtherEntry: Text = "type Shelf { copies: Number }"
+  fixture generationLibraryInitial: Text = "component Library { capability count() returns Number }"
+  fixture generationLibraryChanged: Text = "component Library {\n  capability count() returns Number\n  capability title() returns Text\n}"
+
+  setup savedGenerationWorkspace(source: Text, otherEntry: Text, enabled: Boolean) returns Nothing
+  setup heldGenerationWorkspace(source: Text, otherEntry: Text) returns Nothing
+  action editGenerationSource(text: Text) returns Nothing
+  action saveGenerationSource() returns Nothing
+  // Save the actual second entry and forward its real post-save while disabled;
+  // enabling changes only configuration/opt-in, without generating.
+  action saveGenerationOtherEntry(text: Text) returns Nothing
+  action setGenerationEnabled(enabled: Boolean) returns Nothing
+  action dirtyGenerationOtherEntry(text: Text) returns Nothing
+  action replaceGenerationSavedConfiguration(text: Text) returns Nothing
+  action saveUnrelatedGenerationSource(text: Text) returns Nothing
+  action requestGenerationSaveSnapshot(text: Text, version: Number) returns Nothing
+  action keepGenerationImplementation(path: Text, body: Text) returns Nothing
+  action awaitGenerationSettlement() returns Nothing
+  action awaitGenerationPermission() returns Nothing
+  action dirtyGenerationTarget(path: Text, text: Text) returns Nothing
+  action releaseGenerationPermission() returns Nothing
+  observation generationStatus() returns Text
+  observation generationExplanation() returns Text
+  observation generationFileIncludes(path: Text, text: Text) returns Boolean
+  observation generationTargetTreeUnchanged() returns Boolean
+  observation generationWorkerStarts() returns Number
+  observation generationTargetDirtyTextIncludes(text: Text) returns Boolean
+
+  check expectGenerationStatus(status: Text) {
+    let actual = generationStatus()
+    assert actual == status
+  }
+  check expectGenerationFile(path: Text, text: Text) {
+    let present = generationFileIncludes(path, text)
+    assert present == true
+  }
+  check expectGenerationUntouched(starts: Number) {
+    let unchanged = generationTargetTreeUnchanged()
+    let actualStarts = generationWorkerStarts()
+    assert unchanged == true
+    assert actualStarts == starts
+  }
+  check expectGenerationRefused() {
+    let status = generationStatus()
+    let explanation = generationExplanation()
+    assert status == "blocked"
+    assert explanation != ""
+  }
+  check expectGenerationDirtyText(text: Text) {
+    let present = generationTargetDirtyTextIncludes(text)
+    assert present == true
+  }
+
+  scenario "saving one entry generates the complete configured saved build" {
+    given savedGenerationWorkspace("type Book { title: Text }", generationOtherEntry, false)
+    when saveGenerationOtherEntry("type Shelf { copies: Text }")
+    when setGenerationEnabled(true)
+    when editGenerationSource("type Book { title: Number }")
+    when saveGenerationSource()
+    when awaitGenerationSettlement()
+    then expectGenerationStatus("built")
+    then expectGenerationFile("src/Book.ts", "title: number;")
+    then expectGenerationFile("src/Shelf.ts", "copies: string;")
+  }
+  scenario "a saved contract addition preserves its handwritten implementation" {
+    given savedGenerationWorkspace(generationLibraryInitial, generationOtherEntry, true)
+    when keepGenerationImplementation("src/Library.ts", "return 41;")
+    when editGenerationSource(generationLibraryChanged)
+    when saveGenerationSource()
+    when awaitGenerationSettlement()
+    then expectGenerationStatus("built")
+    then expectGenerationFile("src/Library.ts", "title(): string")
+    then expectGenerationFile("src/Library.ts", "return 41;")
+  }
+  scenario "typing alone starts no full generation" {
+    given savedGenerationWorkspace("type Book { title: Text }", generationOtherEntry, true)
+    when editGenerationSource("type Book { title: Number }")
+    then expectGenerationUntouched(0)
+  }
+  scenario "a disabled connection does not generate when saved" {
+    given savedGenerationWorkspace("type Book { title: Text }", generationOtherEntry, false)
+    when editGenerationSource("type Book { title: Number }")
+    when saveGenerationSource()
+    when awaitGenerationSettlement()
+    then expectGenerationStatus("disabled")
+    then expectGenerationUntouched(0)
+  }
+  scenario "a save notification cannot substitute text that is not saved" {
+    given savedGenerationWorkspace("type Book { title: Text }", generationOtherEntry, true)
+    when requestGenerationSaveSnapshot("type Book { title: Number }", 1)
+    when awaitGenerationSettlement()
+    then expectGenerationRefused()
+    then expectGenerationUntouched(0)
+  }
+  scenario "a changed saved manifest cannot be replaced by the selected old snapshot" {
+    given savedGenerationWorkspace("type Book { title: Text }", generationOtherEntry, true)
+    when replaceGenerationSavedConfiguration("{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"target\"},\"build\":{\"entries\":[\"authoring/main.expec\"]},\"outputs\":[]}")
+    when editGenerationSource("type Book { title: Number }")
+    when saveGenerationSource()
+    when awaitGenerationSettlement()
+    then expectGenerationRefused()
+    then expectGenerationUntouched(0)
+  }
+  scenario "a dirty other configured entry outside the target blocks a selected save" {
+    given savedGenerationWorkspace("type Book { title: Text }", generationOtherEntry, true)
+    when dirtyGenerationOtherEntry("type Shelf { copies: Text }")
+    when editGenerationSource("type Book { title: Number }")
+    when saveGenerationSource()
+    when awaitGenerationSettlement()
+    then expectGenerationRefused()
+    then expectGenerationUntouched(0)
+  }
+  scenario "saving an unrelated authored file starts no configured build" {
+    given savedGenerationWorkspace("type Book { title: Text }", generationOtherEntry, true)
+    when saveUnrelatedGenerationSource("type Outside { label: Text }")
+    when awaitGenerationSettlement()
+    then expectGenerationUntouched(0)
+  }
+  scenario "a target dirtied before an outstanding permission check prevents application" {
+    given heldGenerationWorkspace(generationLibraryInitial, generationOtherEntry)
+    when editGenerationSource(generationLibraryChanged)
+    when saveGenerationSource()
+    when awaitGenerationPermission()
+    when dirtyGenerationTarget("src/Library.ts", "return 42;")
+    when releaseGenerationPermission()
+    when awaitGenerationSettlement()
+    then expectGenerationRefused()
+    then expectGenerationUntouched(1)
+    then expectGenerationDirtyText("return 42;")
+  }
+}
