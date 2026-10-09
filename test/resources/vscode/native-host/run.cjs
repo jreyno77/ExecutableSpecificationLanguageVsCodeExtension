@@ -106,7 +106,7 @@ if (require.main === module) {
       await runTests({
         vscodeExecutablePath: request.executable,
         extensionDevelopmentPath: __dirname, extensionTestsPath: __filename,
-        launchArgs: [...profile, '--disable-gpu', '--disable-telemetry'],
+        launchArgs: [...profile, request.workspaceDirectory, '--disable-gpu', '--disable-telemetry'],
         extensionTestsEnv: { EXPEC_NATIVE_REQUEST: requestPath },
       });
     } else throw new Error('Unsupported owned launcher command.');

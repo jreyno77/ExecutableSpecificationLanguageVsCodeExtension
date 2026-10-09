@@ -257,86 +257,104 @@ async openDocumentIsDirty(): Promise<boolean> {
     return problem;
   }
 async semanticAnalysis(): Promise<void> {
-    throw new Error("Not implemented: workspace.semanticAnalysis");
+    this.analysisRecording = new DocumentAnalysisRecording();
   }
 
 async importedEditor(entryText: string, dependencyText: string): Promise<void> {
-    throw new Error("Not implemented: workspace.importedEditor");
+    await this.openImportedEditor(entryText, dependencyText);
   }
 
 async missingImportedEditor(entryText: string): Promise<void> {
-    throw new Error("Not implemented: workspace.missingImportedEditor");
+    await this.openImportedEditor(entryText, null);
   }
 
 async saveSemanticSource(source: SourceDocument): Promise<void> {
-    throw new Error("Not implemented: workspace.saveSemanticSource");
+    this.analysisRecording.saved(source);
   }
 
 async removeSemanticSource(uri: string): Promise<void> {
-    throw new Error("Not implemented: workspace.removeSemanticSource");
+    this.analysisRecording.removed(uri);
   }
 
 async openSemanticSource(source: SourceDocument, version: number): Promise<void> {
-    throw new Error("Not implemented: workspace.openSemanticSource");
+    this.analysisRecording.opened(source, version);
   }
 
 async changeSemanticSource(source: SourceDocument, version: number): Promise<void> {
-    throw new Error("Not implemented: workspace.changeSemanticSource");
+    this.analysisRecording.changed(source, version);
   }
 
 async closeSemanticSource(uri: string): Promise<void> {
-    throw new Error("Not implemented: workspace.closeSemanticSource");
+    this.analysisRecording.closed(uri);
   }
 
 async saveImportedText(text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.saveImportedText");
+    this.diagnosticObservation = await this.diagnosticDocument.changeDependency(text);
   }
 
 async deleteImportedFile(): Promise<void> {
-    throw new Error("Not implemented: workspace.deleteImportedFile");
+    this.diagnosticObservation = await this.diagnosticDocument.changeDependency(null);
   }
 
 async semanticProblemCode(uri: string): Promise<string> {
-    throw new Error("Not implemented: workspace.semanticProblemCode");
+    return this.analysisRecording.semanticProblem(uri).code;
   }
 
 async semanticProblemCount(uri: string): Promise<number> {
-    throw new Error("Not implemented: workspace.semanticProblemCount");
+    return this.checkedCompilation(uri).problems.length;
   }
 
 async semanticStartLine(uri: string): Promise<number> {
-    throw new Error("Not implemented: workspace.semanticStartLine");
+    return this.semanticRange(uri).start.line;
   }
 
 async semanticStartColumn(uri: string): Promise<number> {
-    throw new Error("Not implemented: workspace.semanticStartColumn");
+    return this.semanticRange(uri).start.column;
   }
 
 async semanticEndColumn(uri: string): Promise<number> {
-    throw new Error("Not implemented: workspace.semanticEndColumn");
+    return this.semanticRange(uri).end.column;
   }
 
 async hasCheckedSpecification(uri: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.hasCheckedSpecification");
+    return this.analysisRecording.compilation(uri)?.value !== undefined;
   }
 
 async semanticDeferredCount(uri: string): Promise<number> {
-    throw new Error("Not implemented: workspace.semanticDeferredCount");
+    return this.checkedCompilation(uri).deferred.length;
   }
 
 async semanticPublicationCount(uri: string): Promise<number> {
-    throw new Error("Not implemented: workspace.semanticPublicationCount");
+    return this.analysisRecording.publicationCount(uri);
   }
 
 async semanticPublishedVersion(uri: string): Promise<number> {
-    throw new Error("Not implemented: workspace.semanticPublishedVersion");
+    return this.analysisRecording.latest(uri).version;
   }
 
 async editorProblemCode(): Promise<string> {
-    throw new Error("Not implemented: workspace.editorProblemCode");
+    const code = this.nativeProblem().code;
+    if (typeof code !== "string") throw new Error("The native diagnostic has no textual problem code.");
+    return code;
   }
 
 async entryVersionUnchanged(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.entryVersionUnchanged");
+    return this.diagnosticObservation.version === this.diagnosticObservation.initialVersion;
+  }
+
+  private async openImportedEditor(entryText: string, dependencyText: string | null): Promise<void> {
+    this.installedEditor = await InstalledExpecEditor.prepare();
+    this.diagnosticDocument = await this.installedEditor.diagnosticDocument('basket.expec', entryText, dependencyText);
+    this.diagnosticObservation = await this.diagnosticDocument.observation();
+  }
+  private checkedCompilation(uri: string) {
+    const compilation = this.analysisRecording.compilation(uri);
+    if (!compilation) throw new Error('No compiler report was published for ' + uri);
+    return compilation;
+  }
+  private semanticRange(uri: string) {
+    const origin = this.analysisRecording.semanticProblem(uri).at;
+    if (origin.kind !== 'source') throw new Error('The semantic problem has no source range.');
+    return origin.range;
   }
 }

@@ -1,5 +1,5 @@
 const fs = require('node:fs/promises');
-const { dirname } = require('node:path');
+const { dirname, join } = require('node:path');
 
 // The case observes the installed product through VS Code and its exported native client.
 exports.openDiagnosticDocument = async function openDiagnosticDocument(vscode, extensionId, setup) {
@@ -20,6 +20,7 @@ exports.openDiagnosticDocument = async function openDiagnosticDocument(vscode, e
   let initialVersion;
   let resultId;
   let watchedNotifications = 0;
+  const sentFileChanges = [];
   let dependencyRegistered = !setup.dependencyFile;
   if (setup.dependencyFile) {
     const dependencyUri = vscode.Uri.file(setup.dependencyFile).toString();
@@ -41,7 +42,10 @@ exports.openDiagnosticDocument = async function openDiagnosticDocument(vscode, e
       const sending = originalSend.call(this, type, ...params);
       if ((typeof type === 'string' ? type : type.method) !== 'workspace/didChangeWatchedFiles') return sending;
       return Promise.resolve(sending).then(() => {
-        if (params[0]?.changes?.some(change => vscode.Uri.parse(change.uri).toString() === dependencyUri)) watchedNotifications++;
+        const changes = params[0]?.changes ?? [];
+        sentFileChanges.push(...changes);
+        if (sentFileChanges.length > 10) sentFileChanges.splice(0, sentFileChanges.length - 10);
+        if (changes.some(change => vscode.Uri.parse(change.uri).toString() === dependencyUri)) watchedNotifications++;
       });
     };
     client.sendNotification = observedSend;
@@ -136,6 +140,7 @@ exports.openDiagnosticDocument = async function openDiagnosticDocument(vscode, e
     await until(() => opened.get(document) === document.version, 'The native document open was not synchronized.');
     initialVersion = document.version;
     await until(() => dependencyRegistered, 'The native dependency watcher was not registered for the owned file.');
+    if (setup.dependencyFile) await preparedWorkspaceWatch(vscode, setup.dependencyFile);
     await observe(false, 0);
     return {
       observation,
@@ -163,9 +168,10 @@ exports.openDiagnosticDocument = async function openDiagnosticDocument(vscode, e
         const afterEvent = eventNumber;
         const previousId = resultId;
         const previousNotifications = watchedNotifications;
-        if (text === null) await fs.unlink(setup.dependencyFile);
-        else await fs.writeFile(setup.dependencyFile, text);
-        await until(() => watchedNotifications > previousNotifications, 'The native client did not send the actual owned dependency file event.');
+        const dependency = vscode.Uri.file(setup.dependencyFile);
+        if (text === null) await vscode.workspace.fs.delete(dependency);
+        else await vscode.workspace.fs.writeFile(dependency, Buffer.from(text, 'utf8'));
+        await until(() => watchedNotifications > previousNotifications, () => 'The native client did not send the actual owned dependency file event. ' + JSON.stringify({ dependency: vscode.Uri.file(setup.dependencyFile).toString(), dependencyRegistered, previousNotifications, watchedNotifications, sentFileChanges }));
         return observe(true, afterEvent, previousId);
       },
       close,
@@ -196,5 +202,30 @@ async function until(predicate, explanation) {
   while (!predicate()) {
     if (Date.now() >= deadline) throw new Error(typeof explanation === 'function' ? explanation() : explanation);
     await new Promise(resolve => setTimeout(resolve, 10));
+  }
+}
+
+// GIVEN setup needs an operational native folder watch, not just the SDK's
+// registration acknowledgment. The probe never changes the authored dependency.
+async function preparedWorkspaceWatch(vscode, dependencyFile) {
+  const folder = vscode.Uri.file(dirname(dependencyFile));
+  const probe = vscode.Uri.file(join(dirname(dependencyFile), '.expec-native-watch-ready'));
+  const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, '.expec-native-watch-ready'));
+  let observed = false;
+  let complete;
+  const ready = new Promise(resolve => { complete = resolve; });
+  const receive = uri => { if (uri.toString() === probe.toString()) { observed = true; complete(); } };
+  const subscriptions = [watcher.onDidCreate(receive), watcher.onDidChange(receive)];
+  const deadline = Date.now() + 30_000;
+  try {
+    for (let attempt = 0; !observed; attempt++) {
+      await vscode.workspace.fs.writeFile(probe, Buffer.from(String(attempt)));
+      await Promise.race([ready, new Promise(resolve => setTimeout(resolve, 100))]);
+      if (!observed && Date.now() >= deadline) throw new Error('The owned workspace folder did not establish actual native file feedback.');
+    }
+  } finally {
+    for (const subscription of subscriptions) subscription.dispose();
+    watcher.dispose();
+    await fs.rm(probe.fsPath, { force: true });
   }
 }

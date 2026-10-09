@@ -159,12 +159,18 @@ export class LanguageServerAdapter {
     dispose(): void {
         if (this.disposed) return;
         this.disposed = true;
-        for (const subscription of this.subscriptions.splice(0)) subscription.dispose();
-        for (const uri of this.documents.keys()) this.analysis.closed(uri);
+        const failures: unknown[] = [];
+        const release = (operation: () => void) => {
+            try { operation(); } catch (error) { failures.push(error); }
+        };
+        for (const subscription of this.subscriptions.splice(0)) release(() => subscription.dispose());
+        for (const uri of this.documents.keys()) release(() => this.analysis.closed(uri));
         this.reports.clear();
-        for (const watch of this.watches.values()) watch.registration?.dispose();
+        for (const watch of this.watches.values()) release(() => watch.registration?.dispose());
         this.watches.clear();
         this.unsupportedWatches.clear();
+        for (const failure of failures.slice(1)) this.connection.console.error('Additional shutdown failure: ' + String(failure));
+        if (failures.length) throw failures[0];
     }
     private updateWatches(): void {
         if (this.disposed || !this.initialized) return;

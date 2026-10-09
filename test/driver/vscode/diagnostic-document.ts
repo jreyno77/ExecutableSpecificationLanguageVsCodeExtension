@@ -12,7 +12,7 @@ export class DiagnosticDocument {
   private opening: Promise<void> | undefined;
   private disposal: Promise<void> | undefined;
   constructor(private readonly getSession: () => Promise<VsCodeSession>, private readonly extensionId: string,
-    private readonly fileName: string, private readonly initialText: string, private readonly dependencyText?: string | null) {}
+    private readonly fileName: string, private readonly initialText: string, private readonly dependencyText: string | null | undefined, private readonly workspace: string) {}
 
   open(): Promise<void> { return this.opening ??= this.openOwnedDocument(); }
   private async openOwnedDocument(): Promise<void> {
@@ -20,7 +20,7 @@ export class DiagnosticDocument {
     if (!untitled && (basename(this.fileName) !== this.fileName || this.fileName === '.' || this.fileName === '..')) {
       throw new Error('Open a single test-owned file name.');
     }
-    this.directory = await ownTemporaryDirectory('expec-diagnostic-document-');
+    this.directory = await ownTemporaryDirectory('expec-diagnostic-document-', this.workspace);
     const file = untitled ? undefined : join(this.directory, this.fileName);
     if (file) await writeFile(file, this.initialText);
     const dependencyFile = this.dependencyText === undefined ? undefined : join(this.directory, 'book.expec');

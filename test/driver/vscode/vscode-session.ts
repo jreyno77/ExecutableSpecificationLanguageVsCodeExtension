@@ -45,7 +45,7 @@ export class VsCodeSession {
     this.server.on('error', error => { void this.poison(error).catch(() => undefined); });
   }
 
-  static async start(executable: string, extensionsDirectory: string): Promise<VsCodeSession> {
+  static async start(executable: string, extensionsDirectory: string, workspaceDirectory: string): Promise<VsCodeSession> {
     const session = new VsCodeSession(await ownTemporaryDirectory('expec-vscode-session-'));
     try {
       await within((async () => {
@@ -57,7 +57,7 @@ export class VsCodeSession {
         const address = session.server.address();
         if (!address || typeof address === 'string') throw new Error('The owned VS Code session has no loopback port.');
         session.launching = NativeLauncher.start(session.directory, {
-          command: 'session', executable, extensionsDirectory,
+          command: 'session', executable, extensionsDirectory, workspaceDirectory,
           userDataDirectory: join(session.directory, 'profile'), port: address.port, token: session.token,
         }, session.starting.signal);
         session.launcher = await session.launching;
