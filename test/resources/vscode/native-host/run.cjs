@@ -47,7 +47,7 @@ exports.run = async function run() {
           const document = await openDiagnosticDocument(vscode, frame.extensionId, frame);
           diagnosticDocuments.set(frame.documentId, document);
           value = await document.observation();
-        } else if (['diagnosticEdit', 'diagnosticObserve', 'diagnosticClose', 'diagnosticDispose'].includes(frame.operation)
+        } else if (['diagnosticEdit', 'diagnosticObserve', 'diagnosticClose', 'diagnosticDispose', 'diagnosticDependency'].includes(frame.operation)
           && typeof frame.documentId === 'string') {
           const document = diagnosticDocuments.get(frame.documentId);
           if (frame.operation === 'diagnosticDispose' && !document) value = null;
@@ -55,6 +55,7 @@ exports.run = async function run() {
             if (!document) throw new Error('The owned native document is unavailable.');
             if (frame.operation === 'diagnosticEdit' && Array.isArray(frame.texts) && frame.texts.length > 0
               && frame.texts.every(text => typeof text === 'string')) value = await document.edit(frame.texts);
+            else if (frame.operation === 'diagnosticDependency' && (frame.text === null || typeof frame.text === 'string')) value = await document.changeDependency(frame.text);
             else if (frame.operation === 'diagnosticObserve') value = await document.observation();
             else if (frame.operation === 'diagnosticClose') value = await document.close();
             else if (frame.operation === 'diagnosticDispose') {
@@ -105,7 +106,7 @@ if (require.main === module) {
       await runTests({
         vscodeExecutablePath: request.executable,
         extensionDevelopmentPath: __dirname, extensionTestsPath: __filename,
-        launchArgs: [...profile, '--disable-gpu', '--disable-telemetry'],
+        launchArgs: [...profile, request.workspaceDirectory, '--disable-gpu', '--disable-telemetry'],
         extensionTestsEnv: { EXPEC_NATIVE_REQUEST: requestPath },
       });
     } else throw new Error('Unsupported owned launcher command.');

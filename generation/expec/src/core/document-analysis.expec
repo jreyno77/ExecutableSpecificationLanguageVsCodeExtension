@@ -3,12 +3,29 @@ use SourceDocument from "./workspace.expec"
 // The language's existing SyntaxDiagnostic: category, explanation, primaryRange
 // and relatedRanges. Locations count Unicode scalars; no VS Code/LSP types live here.
 opaque type SyntaxProblem
+// The existing compiler Compilation, including problems, deferred requirements and
+// optional checked Specification. Preserve it rather than inventing another model.
+opaque type CompilerReport
+
+type DocumentReport {
+  syntax: List<SyntaxProblem>
+  compilation: CompilerReport?
+  sources: List<SourceDocument>
+  dependencies: List<Text>
+}
+
+interface DocumentSources {
+  public read
+  capability read(uri: Text) returns SourceDocument? {
+    promises "Return the current saved text with this exact URI, or absence when unavailable. Do not discover projects, install dependencies or substitute empty text. Unexpected acquisition errors surface. Core overrides this saved snapshot with an open document's unsaved text."
+  }
+}
 
 interface DocumentFeedback {
   public publish, clear
 
-  capability publish(source: SourceDocument, version: Number, problems: List<SyntaxProblem>) returns Nothing {
-    promises "Publish the problems for this exact immutable text snapshot and document version. An empty list replaces previous problems. Preserve the reader's explanations, categories and primary/related locations."
+  capability publish(source: SourceDocument, version: Number, report: DocumentReport) returns Nothing {
+    promises "Publish the report for this exact immutable snapshot and version. Preserve actual reader diagnostics and the complete compiler result, including nonlocated problems and deferred requirements. Compilation is absent for rejected entry syntax. Sources are the captured texts used for located findings; dependencies are exact source URIs requested, including unavailable imports. An empty diagnostic result replaces previous problems; absence of problems alone does not establish compilation success."
   }
 
   capability clear(uri: Text) returns Nothing {
@@ -21,24 +38,28 @@ component DocumentAnalysis {
   requires package "typescript" for build
   requires package "vitest" for test
 
-  construction(feedback: DocumentFeedback)
-  public opened, changed, closed
+  construction(feedback: DocumentFeedback, sources: DocumentSources)
+  public opened, changed, closed, sourceChanged
 
   capability opened(source: SourceDocument, version: Number) returns Nothing {
-    promises "Start an open document lifetime and check this exact supplied text using one retained LangiumReader. Publish the real reader problems, or an empty list for syntactically accepted source. Treat the URI as identity, including untitled and remote URIs. Do not read files, resolve imports, generate outputs or require a project connection. Versions are nonnegative integers; reject invalid versions with a RangeError before changing state."
+    promises "Start an open document lifetime from this exact supplied snapshot. Use one retained LangiumReader and Compiler; compose accepted source models through the existing SourceComposer. Resolve authored source locators relative to their owner URI and obtain only required source snapshots through DocumentSources. Absolute URIs remain usable; a relative locator without a hierarchical owner, including untitled, remains an unavailable-module finding without guessing a workspace or throwing a URL-base error. Open unsaved text overrides saved text. Cache parsing by exact text, including rejected text; never reuse a previous accepted model after invalid edits. Publish real syntax and compiler findings without generating, installing packages or requiring a project connection. No runtime package facts are invented; unavailable prerequisites remain explicit. Treat URIs as identity. Reject invalid noninteger or negative versions with RangeError before changing state."
   }
 
   capability changed(source: SourceDocument, version: Number) returns Nothing {
-    promises "Reject a noninteger or negative version with a RangeError before changing state. For an open document, check and publish only a strictly newer version. Ignore duplicate, older and unopened-document changes. Retain the exact snapshot and version for publication. Check that the same lifetime/version is still current before publishing after any reentrant callback. The native caller excludes callbacks from an earlier document lifetime; URI/version alone cannot distinguish those after reopening. Syntax acceptance makes no semantic validity claim. Reader or publication exceptions must surface rather than masquerade as an empty successful result."
+    promises "Reject a noninteger or negative version with a RangeError before changing state. For an open document, check and publish only a strictly newer version. Ignore duplicate, older and unopened-document changes. Retain the exact snapshot and version for publication. Update affected open dependents as well. Check that the same lifetime, version and dependency revision remain current before publishing after reentrant source or feedback callbacks. The native caller excludes callbacks from an earlier document lifetime; URI/version alone cannot distinguish those after reopening. Syntax acceptance makes no semantic validity claim; retain compiler problems and deferred requirements. Reader or publication exceptions must surface rather than masquerade as an empty successful result."
   }
 
   capability closed(uri: Text) returns Nothing {
-    promises "End this open lifetime and clear its diagnostics. Ignore later changes until the document is opened again; reopening may start with a lower version. Repeated close is harmless. Other documents remain unchanged."
+    promises "End this open lifetime and clear its diagnostics. Ignore later changes until the document is opened again; reopening may start with a lower version. Repeated close is harmless. Imported closed documents fall back to current saved text, and affected open dependents are rechecked. Unrelated documents remain unchanged."
+  }
+  capability sourceChanged(uri: Text) returns Nothing {
+    promises "Invalidate a requested saved source after creation, change or deletion and recheck affected open entries even when their editor version is unchanged. Ignore unrelated URIs and saved changes hidden by an authoritative open snapshot. Reuse unchanged parsed snapshots and read only the invalidated source plus newly required imports. Track missing imports too, and terminate cyclic import acquisition. Preserve other documents and previous reports; do not let reentrant older work replace current feedback."
   }
 }
 
 // These exercise real DocumentAnalysis and the real language reader with a recording
-// DocumentFeedback. Observations read published packets/clears; they do not parse text.
+// DocumentFeedback and an in-memory DocumentSources. Observations read real published
+// reports/clears; they do not parse text or recreate compiler decisions.
 // Reader checking is synchronous today; older queued callbacks must still be ignored.
 examples for DocumentAnalysis {
   fixture broken: SourceDocument = {
@@ -173,5 +194,163 @@ examples for DocumentAnalysis {
     then expectInvalidVersionRejected()
     then expectNoSyntaxProblems(corrected.uri, 1)
     then expectPublications(corrected.uri, 1)
+  }
+  // Semantic setup creates a fresh real analysis with saved-source snapshots. All
+  // observations below read its actual Compilation; hasCheckedSpecification tests value.
+  setup semanticAnalysis() returns Nothing
+  action saveSemanticSource(source: SourceDocument) returns Nothing
+  action removeSemanticSource(uri: Text) returns Nothing
+  action openSemanticSource(source: SourceDocument, version: Number) returns Nothing
+  action changeSemanticSource(source: SourceDocument, version: Number) returns Nothing
+  action closeSemanticSource(uri: Text) returns Nothing
+  observation semanticProblemCode(uri: Text) returns Text
+  observation semanticProblemCount(uri: Text) returns Number
+  observation semanticStartLine(uri: Text) returns Number
+  observation semanticStartColumn(uri: Text) returns Number
+  observation semanticEndColumn(uri: Text) returns Number
+  observation hasCheckedSpecification(uri: Text) returns Boolean
+  observation semanticDeferredCount(uri: Text) returns Number
+  observation semanticPublicationCount(uri: Text) returns Number
+  observation semanticPublishedVersion(uri: Text) returns Number
+
+  fixture basket: SourceDocument = {
+    uri: "file:///workspace/src/basket.expec",
+    text: "use Book from \"./book.expec\"\ntype Basket { book: Book }"
+  }
+  fixture book: SourceDocument = {
+    uri: "file:///workspace/src/book.expec",
+    text: "type Book { title: Text }"
+  }
+  fixture renamedBook: SourceDocument = {
+    uri: "file:///workspace/src/book.expec",
+    text: "type Magazine { title: Text }"
+  }
+
+  check expectSemanticProblem(uri: Text, code: Text, line: Number, column: Number, endColumn: Number) {
+    let actualCode = semanticProblemCode(uri)
+    let count = semanticProblemCount(uri)
+    let actualLine = semanticStartLine(uri)
+    let actualColumn = semanticStartColumn(uri)
+    let actualEnd = semanticEndColumn(uri)
+    let checked = hasCheckedSpecification(uri)
+    assert actualCode == code
+    assert count == 1
+    assert actualLine == line
+    assert actualColumn == column
+    assert actualEnd == endColumn
+    assert checked == false
+  }
+  check expectCheckedSource(uri: Text) {
+    let checked = hasCheckedSpecification(uri)
+    let problems = semanticProblemCount(uri)
+    let deferred = semanticDeferredCount(uri)
+    assert checked == true
+    assert problems == 0
+    assert deferred == 0
+  }
+  check expectSemanticPublications(uri: Text, count: Number, version: Number) {
+    let actualCount = semanticPublicationCount(uri)
+    let actualVersion = semanticPublishedVersion(uri)
+    assert actualCount == count
+    assert actualVersion == version
+  }
+
+  scenario "an unknown type is a semantic problem rather than invalid syntax" {
+    given semanticAnalysis()
+    when openSemanticSource({ uri: "untitled:Draft", text: "type Basket { book: Boook }" }, 1)
+    then expectSemanticProblem("untitled:Draft", "unresolved-reference", 1, 21, 26)
+    then expectNoSyntaxProblems("untitled:Draft", 1)
+  }
+  scenario "fixing an unsaved unknown type produces a checked specification" {
+    given semanticAnalysis()
+    when openSemanticSource({ uri: "untitled:Draft", text: "type Basket { book: Boook }" }, 1)
+    when changeSemanticSource({ uri: "untitled:Draft", text: "type Basket { book: Text }" }, 2)
+    then expectCheckedSource("untitled:Draft")
+    then expectSemanticPublications("untitled:Draft", 2, 2)
+  }
+  scenario "a value incompatible with its declared field type is located" {
+    given semanticAnalysis()
+    when openSemanticSource({ uri: "untitled:Draft", text: "type Book { copies: Number = \"many\" }" }, 1)
+    then expectSemanticProblem("untitled:Draft", "incompatible-type", 1, 30, 36)
+    then expectNoSyntaxProblems("untitled:Draft", 1)
+  }
+  scenario "a supplied import permits checking the open entry" {
+    given semanticAnalysis()
+    when saveSemanticSource(book)
+    when openSemanticSource(basket, 1)
+    then expectCheckedSource(basket.uri)
+  }
+  scenario "changing an imported declaration updates an unchanged open entry" {
+    given semanticAnalysis()
+    when saveSemanticSource(book)
+    when openSemanticSource(basket, 1)
+    when saveSemanticSource(renamedBook)
+    then expectSemanticProblem(basket.uri, "unresolved-reference", 1, 5, 9)
+    then expectSemanticPublications(basket.uri, 2, 1)
+  }
+  scenario "restoring an imported declaration clears the dependent problem" {
+    given semanticAnalysis()
+    when saveSemanticSource(book)
+    when openSemanticSource(basket, 1)
+    when saveSemanticSource(renamedBook)
+    when saveSemanticSource(book)
+    then expectCheckedSource(basket.uri)
+    then expectSemanticPublications(basket.uri, 3, 1)
+  }
+  scenario "a missing import remains explicit" {
+    given semanticAnalysis()
+    when openSemanticSource(basket, 1)
+    then expectSemanticProblem(basket.uri, "unavailable-module", 1, 5, 9)
+  }
+  scenario "creating a missing import checks the unchanged entry" {
+    given semanticAnalysis()
+    when openSemanticSource(basket, 1)
+    when saveSemanticSource(book)
+    then expectCheckedSource(basket.uri)
+    then expectSemanticPublications(basket.uri, 2, 1)
+  }
+  scenario "deleting an imported source invalidates the open entry" {
+    given semanticAnalysis()
+    when saveSemanticSource(book)
+    when openSemanticSource(basket, 1)
+    when removeSemanticSource(book.uri)
+    then expectSemanticProblem(basket.uri, "unavailable-module", 1, 5, 9)
+  }
+  scenario "unsaved imported text overrides saved changes" {
+    given semanticAnalysis()
+    when saveSemanticSource(book)
+    when openSemanticSource(basket, 1)
+    when openSemanticSource(renamedBook, 1)
+    when saveSemanticSource(book)
+    then expectSemanticProblem(basket.uri, "unresolved-reference", 1, 5, 9)
+    then expectSemanticPublications(basket.uri, 2, 1)
+  }
+  scenario "closing an imported document restores its current saved text" {
+    given semanticAnalysis()
+    when saveSemanticSource(book)
+    when openSemanticSource(basket, 1)
+    when openSemanticSource(renamedBook, 1)
+    when closeSemanticSource(book.uri)
+    then expectCheckedSource(basket.uri)
+  }
+  scenario "invalid imported text never reuses an older accepted model" {
+    given semanticAnalysis()
+    when saveSemanticSource(book)
+    when openSemanticSource(basket, 1)
+    when saveSemanticSource({ uri: book.uri, text: "type Book {" })
+    then expectSemanticProblem(basket.uri, "unavailable-module", 1, 5, 9)
+  }
+  scenario "unrelated saved files do not republish an open entry" {
+    given semanticAnalysis()
+    when saveSemanticSource(book)
+    when openSemanticSource(basket, 1)
+    when saveSemanticSource({ uri: "file:///workspace/other.expec", text: "type Other { value: Text }" })
+    then expectCheckedSource(basket.uri)
+    then expectSemanticPublications(basket.uri, 1, 1)
+  }
+  scenario "an unavailable runtime package remains an explicit located problem" {
+    given semanticAnalysis()
+    when openSemanticSource({ uri: "untitled:Draft", text: "component Store { requires package \"storage\" for runtime }" }, 1)
+    then expectSemanticProblem("untitled:Draft", "unavailable-package", 1, 36, 45)
   }
 }

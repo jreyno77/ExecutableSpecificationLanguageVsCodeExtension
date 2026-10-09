@@ -7,7 +7,7 @@ type DocumentObservation = { file: string; text: string; languageId: string };
 type DiagnosticPosition = { readonly line: number; readonly character: number };
 type DiagnosticRange = { readonly start: DiagnosticPosition; readonly end: DiagnosticPosition };
 export type DiagnosticObservation = {
-  readonly uri: string; readonly text: string; readonly version: number; readonly dirty: boolean;
+  readonly uri: string; readonly text: string; readonly version: number; readonly initialVersion: number; readonly resultId: string; readonly dirty: boolean;
   readonly savedText: string | null; readonly previousProblemCount: number; readonly closed: boolean;
   readonly diagnostics: readonly {
     readonly message: string; readonly severity: number; readonly range: DiagnosticRange;
@@ -17,7 +17,7 @@ export type DiagnosticObservation = {
 };
 export type DiagnosticMiddlewareObservation = { cancellationError: boolean; nextCalls: number; runtime: { node: string; vscode: string } };
 
-type Operation = 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose';
+type Operation = 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
 type Pending = { promise: Promise<unknown>; resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> };
 
 /** One owned native host, with only the observations needed by its test consumers. */
@@ -45,7 +45,7 @@ export class VsCodeSession {
     this.server.on('error', error => { void this.poison(error).catch(() => undefined); });
   }
 
-  static async start(executable: string, extensionsDirectory: string): Promise<VsCodeSession> {
+  static async start(executable: string, extensionsDirectory: string, workspaceDirectory: string): Promise<VsCodeSession> {
     const session = new VsCodeSession(await ownTemporaryDirectory('expec-vscode-session-'));
     try {
       await within((async () => {
@@ -57,7 +57,7 @@ export class VsCodeSession {
         const address = session.server.address();
         if (!address || typeof address === 'string') throw new Error('The owned VS Code session has no loopback port.');
         session.launching = NativeLauncher.start(session.directory, {
-          command: 'session', executable, extensionsDirectory,
+          command: 'session', executable, extensionsDirectory, workspaceDirectory,
           userDataDirectory: join(session.directory, 'profile'), port: address.port, token: session.token,
         }, session.starting.signal);
         session.launcher = await session.launching;
@@ -106,11 +106,14 @@ export class VsCodeSession {
     return value as DiagnosticMiddlewareObservation;
   }
 
-  openDiagnosticDocument(documentId: string, extensionId: string, source: { text: string; file?: string; untitled: boolean }): Promise<DiagnosticObservation> {
+  openDiagnosticDocument(documentId: string, extensionId: string, source: { text: string; file?: string; untitled: boolean; dependencyFile?: string }): Promise<DiagnosticObservation> {
     return this.diagnosticRequest('diagnosticOpen', { documentId, extensionId, ...source });
   }
   editDiagnosticDocument(documentId: string, texts: readonly string[]): Promise<DiagnosticObservation> {
     return this.diagnosticRequest('diagnosticEdit', { documentId, texts });
+  }
+  changeDiagnosticDependency(documentId: string, text: string | null): Promise<DiagnosticObservation> {
+    return this.diagnosticRequest('diagnosticDependency', { documentId, text });
   }
   observeDiagnosticDocument(documentId: string): Promise<DiagnosticObservation> {
     return this.diagnosticRequest('diagnosticObserve', { documentId });
@@ -242,6 +245,7 @@ function isDiagnosticObservation(value: unknown): value is DiagnosticObservation
   if (!value || typeof value !== 'object') return false;
   const packet = value as Partial<DiagnosticObservation>;
   return typeof packet.uri === 'string' && typeof packet.text === 'string' && Number.isInteger(packet.version)
+    && Number.isInteger(packet.initialVersion) && typeof packet.resultId === 'string' && packet.resultId !== ''
     && typeof packet.dirty === 'boolean' && (packet.savedText === null || typeof packet.savedText === 'string')
     && Number.isInteger(packet.previousProblemCount) && typeof packet.closed === 'boolean' && Array.isArray(packet.diagnostics)
     && packet.diagnostics.every(diagnostic => diagnostic && typeof diagnostic === 'object' && typeof diagnostic.message === 'string' && Number.isInteger(diagnostic.severity)
