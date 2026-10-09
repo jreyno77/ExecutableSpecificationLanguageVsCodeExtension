@@ -255,4 +255,88 @@ async openDocumentIsDirty(): Promise<boolean> {
     const problem = this.diagnosticObservation.diagnostics[0];
     if (!problem) throw new Error('The native editor has no syntax problem.');
     return problem;
-  }}
+  }
+async semanticAnalysis(): Promise<void> {
+    throw new Error("Not implemented: workspace.semanticAnalysis");
+  }
+
+async importedEditor(entryText: string, dependencyText: string): Promise<void> {
+    throw new Error("Not implemented: workspace.importedEditor");
+  }
+
+async missingImportedEditor(entryText: string): Promise<void> {
+    throw new Error("Not implemented: workspace.missingImportedEditor");
+  }
+
+async saveSemanticSource(source: SourceDocument): Promise<void> {
+    throw new Error("Not implemented: workspace.saveSemanticSource");
+  }
+
+async removeSemanticSource(uri: string): Promise<void> {
+    throw new Error("Not implemented: workspace.removeSemanticSource");
+  }
+
+async openSemanticSource(source: SourceDocument, version: number): Promise<void> {
+    throw new Error("Not implemented: workspace.openSemanticSource");
+  }
+
+async changeSemanticSource(source: SourceDocument, version: number): Promise<void> {
+    throw new Error("Not implemented: workspace.changeSemanticSource");
+  }
+
+async closeSemanticSource(uri: string): Promise<void> {
+    throw new Error("Not implemented: workspace.closeSemanticSource");
+  }
+
+async saveImportedText(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.saveImportedText");
+  }
+
+async deleteImportedFile(): Promise<void> {
+    throw new Error("Not implemented: workspace.deleteImportedFile");
+  }
+
+async semanticProblemCode(uri: string): Promise<string> {
+    throw new Error("Not implemented: workspace.semanticProblemCode");
+  }
+
+async semanticProblemCount(uri: string): Promise<number> {
+    throw new Error("Not implemented: workspace.semanticProblemCount");
+  }
+
+async semanticStartLine(uri: string): Promise<number> {
+    throw new Error("Not implemented: workspace.semanticStartLine");
+  }
+
+async semanticStartColumn(uri: string): Promise<number> {
+    throw new Error("Not implemented: workspace.semanticStartColumn");
+  }
+
+async semanticEndColumn(uri: string): Promise<number> {
+    throw new Error("Not implemented: workspace.semanticEndColumn");
+  }
+
+async hasCheckedSpecification(uri: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.hasCheckedSpecification");
+  }
+
+async semanticDeferredCount(uri: string): Promise<number> {
+    throw new Error("Not implemented: workspace.semanticDeferredCount");
+  }
+
+async semanticPublicationCount(uri: string): Promise<number> {
+    throw new Error("Not implemented: workspace.semanticPublicationCount");
+  }
+
+async semanticPublishedVersion(uri: string): Promise<number> {
+    throw new Error("Not implemented: workspace.semanticPublishedVersion");
+  }
+
+async editorProblemCode(): Promise<string> {
+    throw new Error("Not implemented: workspace.editorProblemCode");
+  }
+
+async entryVersionUnchanged(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.entryVersionUnchanged");
+  }
+}
