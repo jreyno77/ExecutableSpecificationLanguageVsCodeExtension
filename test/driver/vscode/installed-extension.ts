@@ -1,4 +1,5 @@
 import { afterAll, onTestFinished } from 'vitest';
+import { createHash } from 'node:crypto';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, isAbsolute, join, resolve } from 'node:path';
@@ -7,6 +8,7 @@ import { NativeCleanupError, NativeLauncher, inside, ownTemporaryDirectory, remo
 import { VsCodeSession, type DiagnosticMiddlewareObservation } from './vscode-session.js';
 import { DiagnosticDocument } from './diagnostic-document.js';
 import { ConnectionSidebarCase } from './connection-sidebar.js';
+import { NativePreviewCase } from './native-preview.js';
 
 const project = fileURLToPath(new URL('../../../', import.meta.url));
 const cachePath = join(tmpdir(), 'expec-vscode-electron-cache');
@@ -18,6 +20,7 @@ export class InstalledExpecEditor {
   private readonly activeOpens = new Set<Promise<string>>();
   private readonly diagnosticDocuments = new Set<DiagnosticDocument>();
   private readonly connectionSidebars = new Set<ConnectionSidebarCase>();
+  private readonly previewEditors = new Set<NativePreviewCase>();
   private session: Promise<VsCodeSession> | undefined;
   private activeSession: VsCodeSession | undefined;
   private disposal: Promise<void> | undefined;
@@ -39,6 +42,9 @@ export class InstalledExpecEditor {
       const receiptPath = join(directory, 'installation.json');
       const packagePath = join(directory, 'expec.vsix');
       await createVSIX({ cwd: project, packagePath, dependencies: false });
+      console.info('Owned native VSIX:', JSON.stringify({ path: packagePath,
+        sha256: createHash('sha256').update(await readFile(packagePath)).digest('hex'),
+        entrySha256: createHash('sha256').update(await readFile(join(project, manifest.main))).digest('hex') }));
       await (await NativeLauncher.start(directory, {
         command: 'install', packagePath, version: '1.100.0', cachePath, receiptPath,
         extensionsDirectory: join(directory, 'extensions'), userDataDirectory: join(directory, 'install-profile'),
@@ -119,6 +125,19 @@ export class InstalledExpecEditor {
     })();
   }
 
+  async previewEditor(initialText: string, configuration: string): Promise<NativePreviewCase> {
+    if (this.disposal) throw new Error('The installed syntax editor is disposing.');
+    const editor = new NativePreviewCase(() => this.nativeSession(), this.extensionId, initialText, configuration, this.workspace);
+    this.previewEditors.add(editor);
+    onTestFinished(async () => { await editor.dispose(); this.previewEditors.delete(editor); }, 40_000);
+    try { await editor.open(); return editor; }
+    catch (error) {
+      try { await editor.dispose(); }
+      catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Native preview setup failed: ' + String(error) + '; cleanup failed: ' + String(cleanupError), { cause: error }); }
+      this.previewEditors.delete(editor); throw error;
+    }
+  }
+
   private async openDocument(fileName: string, text: string): Promise<string> {
     if (basename(fileName) !== fileName || fileName === '.' || fileName === '..') throw new Error('Open a single test-owned file name.');
     const directory = await ownTemporaryDirectory('expec-syntax-document-', this.workspace);
@@ -145,7 +164,8 @@ export class InstalledExpecEditor {
     await within(Promise.allSettled([...this.activeOpens]), 70_000, 'Active native observations did not settle before disposal.');
     try {
       try {
-        const documents = await Promise.allSettled([...this.diagnosticDocuments].map(document => document.dispose()).concat([...this.connectionSidebars].map(sidebar => sidebar.dispose())));
+        const documents = await Promise.allSettled([...this.diagnosticDocuments].map(document => document.dispose())
+          .concat([...this.connectionSidebars].map(sidebar => sidebar.dispose()), [...this.previewEditors].map(editor => editor.dispose())));
         const failed = documents.find(result => result.status === 'rejected');
         if (failed?.status === 'rejected') throw failed.reason;
       } finally { await this.activeSession?.dispose(); }

@@ -1,0 +1,12 @@
+.expec-output-tabs { display: grid; gap: 0.75rem; min-width: 0; color: var(--vscode-foreground, #202124); font-family: var(--vscode-font-family, system-ui, sans-serif); }
+.expec-output-tabs [role="tabpanel"] { min-width: 0; }
+.expec-output-buttons, .expec-document-buttons, .expec-diagram-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.expec-output-tabs button, .expec-output-tabs input { font: inherit; color: inherit; border: 1px solid var(--vscode-input-border, #a4a7ac); border-radius: 0.2rem; background: var(--vscode-input-background, #fff); padding: 0.4rem 0.65rem; }
+.expec-output-tabs button { cursor: pointer; }
+.expec-output-tabs button[aria-selected="true"], .expec-output-tabs button[aria-pressed="true"] { border-color: var(--vscode-focusBorder, #005fb8); background: var(--vscode-button-background, #005fb8); color: var(--vscode-button-foreground, #fff); }
+.expec-output-tabs button:focus-visible, .expec-output-tabs input:focus-visible { outline: 2px solid var(--vscode-focusBorder, #005fb8); outline-offset: 2px; }
+.expec-output-tabs pre { overflow: auto; white-space: pre; padding: 0.75rem; background: var(--vscode-textCodeBlock-background, #f5f6f8); font-family: var(--vscode-editor-font-family, monospace); }
+.expec-output-tabs p:empty { display: none; }
+.expec-diagram-controls input { width: 5rem; }
+.expec-diagram-viewport { overflow: auto; width: 100%; height: min(65vh, 30rem); border: 1px solid var(--vscode-panel-border, #a4a7ac); background: white; }
+.expec-diagram-viewport img { display: block; max-width: none; max-height: none; }

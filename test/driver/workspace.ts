@@ -14,6 +14,8 @@ import { RecordingCore } from './recording-core.js';
 import { OutputTabsBrowser } from './output-tabs-browser.js';
 import { OutputTab } from "../../src/core/OutputTab.js";
 import { SourceDocument } from "../../src/core/SourceDocument.js";
+import { OutputPreviewsRecording } from './output-previews.js';
+import type { NativePreviewCase } from './vscode/native-preview.js';
 export class WorkspaceDriver {
   private sidebarCase!: ConnectionSidebarCase;
   private connectionRecording!: ConnectionRecording;
@@ -507,4 +509,332 @@ async sidebarUnsavedConfiguration(): Promise<string> {
     if (unsaved === undefined) throw new Error('The native sidebar has no unsaved configuration.');
     return unsaved;
   }
+
+async previewAuthoring(configuration: string): Promise<void> {
+    this.previewRecording = await OutputPreviewsRecording.create(configuration);
+  }
+
+async gatedPreviewAuthoring(configuration: string, id: string): Promise<void> {
+    this.previewRecording = await OutputPreviewsRecording.create(configuration, id);
+  }
+
+async undecodableTextOutput(): Promise<void> {
+    this.previewRecording = await OutputPreviewsRecording.create('{"formatVersion":1,"version":"0.1.0","build":{"entries":["src/library.expec"]},"outputs":[{"id":"typescript","options":{}}]}', undefined, 'text');
+  }
+
+async unsupportedBinaryOutput(): Promise<void> {
+    this.previewRecording = await OutputPreviewsRecording.create('{"formatVersion":1,"version":"0.1.0","build":{"entries":["src/library.expec"]},"outputs":[{"id":"binary","options":{}}]}', undefined, 'binary');
+  }
+
+async previewEditor(initialText: string, configuration: string): Promise<void> {
+    this.installedEditor = await InstalledExpecEditor.prepare();
+    this.nativePreview = await this.installedEditor.previewEditor(initialText, configuration);
+  }
+
+async openPreviewSource(source: SourceDocument, version: number): Promise<void> {
+    this.previewRecording.opened(source, version);
+  }
+
+async changePreviewSource(source: SourceDocument, version: number): Promise<void> {
+    this.previewRecording.edited(source, version);
+  }
+
+async changePreviewConfiguration(configuration: string): Promise<void> {
+    this.previewRecording.configure(configuration);
+  }
+
+async settleCurrentPreviews(): Promise<void> {
+    await this.previewRecording.settle();
+  }
+
+async awaitReadyOutput(id: string): Promise<void> {
+    await this.previewRecording.ready(id);
+  }
+
+async rememberPreviewOutput(id: string): Promise<void> {
+    this.previewRecording.remember(id);
+  }
+
+async armNextOutput(id: string): Promise<void> {
+    this.previewRecording.arm(id);
+  }
+
+async savePreviewImport(uri: string, text: string): Promise<void> {
+    this.previewRecording.savedImport(uri, text);
+  }
+
+async closePreviewSource(uri: string): Promise<void> {
+    this.previewRecording.closed(uri);
+  }
+
+async disposePreviews(): Promise<void> {
+    this.previewRecording.disposed();
+  }
+
+async awaitHeldOutput(id: string): Promise<void> {
+    await this.previewRecording.awaitHeld(id);
+  }
+
+async releaseHeldOutput(id: string): Promise<void> {
+    this.previewRecording.release(id);
+  }
+
+async drainPreviewWork(): Promise<void> {
+    await this.previewRecording.drain();
+  }
+
+async selectOutputDocument(path: string): Promise<void> {
+    await this.ui.selectDocument(path);
+  }
+
+async setDiagramZoom(percent: number): Promise<void> {
+    await this.ui.setZoom(percent);
+  }
+
+async resetDiagramZoom(): Promise<void> {
+    await this.ui.resetZoom();
+  }
+
+async scrollDiagram(horizontal: number, vertical: number): Promise<void> {
+    await this.ui.scrollDiagram(horizontal, vertical);
+  }
+
+async showOutputPreviews(): Promise<void> {
+    await this.nativePreview.show();
+  }
+
+async editPreviewWithoutSaving(text: string): Promise<void> {
+    await this.nativePreview.edit(text);
+  }
+
+async savePreviewConfiguration(text: string): Promise<void> {
+    await this.nativePreview.saveConfiguration(text);
+  }
+
+async selectPreviewOutput(id: string): Promise<void> {
+    await this.nativePreview.selectOutput(id);
+  }
+
+async selectPreviewDocument(path: string): Promise<void> {
+    await this.nativePreview.selectDocument(path);
+  }
+
+async closePreviewPanel(): Promise<void> {
+    await this.nativePreview.closePanel();
+  }
+
+async zoomPreviewDiagram(): Promise<void> {
+    await this.nativePreview.zoomDiagram();
+  }
+
+async scrollPreviewDiagram(): Promise<void> {
+    await this.nativePreview.scrollDiagram();
+  }
+
+async resetPreviewZoom(): Promise<void> {
+    await this.nativePreview.resetZoom();
+  }
+
+async previewOutputIds(): Promise<Array<string>> {
+    return this.previewRecording.current.tabs.map(tab => tab.id);
+  }
+
+async previewOutputLabels(): Promise<Array<string>> {
+    return this.previewRecording.current.tabs.map(tab => tab.label);
+  }
+
+async previewOutputStatus(id: string): Promise<string> {
+    return this.previewRecording.tab(id).status!;
+  }
+
+async rememberedPreviewOutputStatus(id: string): Promise<string> {
+    return this.previewRecording.earlier(id).status!;
+  }
+
+async rememberedPreviewDocumentMediaType(id: string, path: string): Promise<string> {
+    return this.previewRecording.document(id, path, true).mediaType;
+  }
+
+async rememberedPreviewDocumentContains(id: string, path: string, content: string): Promise<boolean> {
+    return this.previewRecording.document(id, path, true).content.includes(content);
+  }
+
+async previewDocumentPaths(id: string): Promise<Array<string>> {
+    return this.previewRecording.tab(id).documents!.map(document => document.path);
+  }
+
+async previewDocumentMediaType(id: string, path: string): Promise<string> {
+    return this.previewRecording.document(id, path).mediaType;
+  }
+
+async previewDocumentContains(id: string, path: string, content: string): Promise<boolean> {
+    return this.previewRecording.document(id, path).content.includes(content);
+  }
+
+async previewSvgHasLabel(id: string, path: string, label: string): Promise<boolean> {
+    return this.previewRecording.svgHasLabel(id, path, label);
+  }
+
+async previewExplanationContains(id: string, text: string): Promise<boolean> {
+    return this.previewRecording.tab(id).message?.includes(text) ?? false;
+  }
+
+async previewViewExplanation(): Promise<string> {
+    return this.previewRecording.current.message ?? '';
+  }
+
+async previewSourceUri(): Promise<string> {
+    return this.previewRecording.current.uri!;
+  }
+
+async previewSourceVersion(): Promise<number> {
+    return this.previewRecording.current.version!;
+  }
+
+async previewTargetPathsAndBytesUnchanged(): Promise<boolean> {
+    return this.previewRecording.preserved();
+  }
+
+async outputInvocationCount(id: string): Promise<number> {
+    return this.previewRecording.count(id);
+  }
+
+async outputMaximumConcurrentInvocations(id: string): Promise<number> {
+    return this.previewRecording.maximum(id);
+  }
+
+async postDisposalPublicationCount(): Promise<number> {
+    return this.previewRecording.afterDisposal();
+  }
+
+async selectedOutputId(): Promise<string> {
+    return this.ui.selectedId();
+  }
+
+async selectedOutputStatus(): Promise<string> {
+    return this.ui.status();
+  }
+
+async selectedOutputExplanation(): Promise<string> {
+    return this.ui.explanation();
+  }
+
+async selectedDocumentPaths(): Promise<Array<string>> {
+    return this.ui.documentPaths();
+  }
+
+async selectedDocumentPath(): Promise<string> {
+    return this.ui.documentPath();
+  }
+
+async diagramImageLoaded(): Promise<boolean> {
+    return this.ui.imageLoaded();
+  }
+
+async diagramZoomPercent(): Promise<number> {
+    return this.ui.zoom();
+  }
+
+async diagramDisplayedWidth(): Promise<number> {
+    return this.ui.displayedWidth();
+  }
+
+async diagramScrollLeft(): Promise<number> {
+    return this.ui.scrollLeft();
+  }
+
+async diagramScrollTop(): Promise<number> {
+    return this.ui.scrollTop();
+  }
+
+async nativePreviewOutputIds(): Promise<Array<string>> {
+    return this.nativePreview.outputIds();
+  }
+
+async nativePreviewSelectedId(id: string, path: string): Promise<string> {
+    return this.nativePreview.selectedId(id, path);
+  }
+
+async nativePreviewDocumentPath(id: string, path: string): Promise<string> {
+    return this.nativePreview.documentPath(id, path);
+  }
+
+async nativePreviewDocumentMediaType(id: string, path: string): Promise<string> {
+    return this.nativePreview.documentMediaType(id, path);
+  }
+
+async nativePreviewTextIncludes(id: string, path: string, text: string): Promise<boolean> {
+    return this.nativePreview.textIncludes(id, path, text);
+  }
+
+async nativePreviewObservedStatus(id: string, path: string): Promise<string> {
+    return this.nativePreview.observedStatus(id, path);
+  }
+
+async nativePreviewBeforeEditStatus(): Promise<string> {
+    return this.nativePreview.beforeEditStatus();
+  }
+
+async nativePreviewBeforeConfigurationIds(): Promise<Array<string>> {
+    return this.nativePreview.beforeConfigurationIds();
+  }
+
+async nativePreviewClosedTextIncludes(text: string): Promise<boolean> {
+    return this.nativePreview.closedTextIncludes(text);
+  }
+
+async nativePreviewZoomHistory(): Promise<Array<number>> {
+    return this.nativePreview.zoomHistory();
+  }
+
+async nativePreviewDocumentCount(): Promise<number> {
+    return this.nativePreview.documentCount();
+  }
+
+async nativePreviewStatus(): Promise<string> {
+    return this.nativePreview.status();
+  }
+
+async nativePreviewExplanation(): Promise<string> {
+    return this.nativePreview.explanation();
+  }
+
+async nativePreviewImageDecoded(id: string, path: string): Promise<boolean> {
+    return this.nativePreview.imageDecoded(id, path);
+  }
+
+async nativePreviewSvgContainsLabel(id: string, path: string, text: string): Promise<boolean> {
+    return this.nativePreview.svgContainsLabel(id, path, text);
+  }
+
+async nativePreviewZoomPercent(): Promise<number> {
+    return this.nativePreview.zoomPercent();
+  }
+
+async nativePreviewDiagramOverflow(): Promise<boolean> {
+    return this.nativePreview.diagramOverflow();
+  }
+
+async nativePreviewDiagramScrolled(): Promise<boolean> {
+    return this.nativePreview.diagramScrolled();
+  }
+
+async nativePreviewSavedText(): Promise<string> {
+    return this.nativePreview.savedText();
+  }
+
+async nativePreviewOpenText(): Promise<string> {
+    return this.nativePreview.openText();
+  }
+
+async nativePreviewSourceDirty(): Promise<boolean> {
+    return this.nativePreview.sourceDirty();
+  }
+
+async nativePreviewFilesUnchanged(): Promise<boolean> {
+    return this.nativePreview.filesUnchanged();
+  }
+
+    private previewRecording!: OutputPreviewsRecording;
+    private nativePreview!: NativePreviewCase;
 }

@@ -6,10 +6,10 @@ import { OutputTab } from "../../src/core/OutputTab.js";
 export class Workspace {
   constructor(private readonly driver: WorkspaceDriver) {}
   readonly document: SourceDocument = { ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book { title: Text }" };
-  readonly tabs: Array<OutputTab> = [{ ["id"]: "uml", ["label"]: "UML", ["content"]: "Book: { title: Text }" }, { ["id"]: "typescript", ["label"]: "TypeScript", ["content"]: "export interface Book { title: string }" }, { ["id"]: "markdown", ["label"]: "Markdown", ["content"]: "# Book" }];
-  readonly previews: Array<OutputTab> = [{ ["id"]: "uml", ["label"]: "UML", ["content"]: "Book: { title: Text }" }, { ["id"]: "typescript", ["label"]: "TypeScript", ["content"]: "export interface Book { title: string }" }, { ["id"]: "markdown", ["label"]: "Markdown", ["content"]: "# Book" }];
+  readonly tabs: Array<OutputTab> = [{ ["id"]: "uml", ["label"]: "UML", ["status"]: "ready", ["documents"]: [{ ["path"]: "structure.d2", ["mediaType"]: "text/vnd.d2", ["content"]: "Book: { title: Text }" }] }, { ["id"]: "typescript", ["label"]: "TypeScript", ["status"]: "ready", ["documents"]: [{ ["path"]: "Book.ts", ["mediaType"]: "text/typescript", ["content"]: "export interface Book { title: string }" }] }, { ["id"]: "markdown", ["label"]: "Markdown", ["status"]: "ready", ["documents"]: [{ ["path"]: "Book.md", ["mediaType"]: "text/markdown", ["content"]: "# Book" }] }];
+  readonly previews: Array<OutputTab> = [{ ["id"]: "uml", ["label"]: "UML", ["status"]: "ready", ["documents"]: [{ ["path"]: "structure.d2", ["mediaType"]: "text/vnd.d2", ["content"]: "Book: { title: Text }" }] }, { ["id"]: "typescript", ["label"]: "TypeScript", ["status"]: "ready", ["documents"]: [{ ["path"]: "Book.ts", ["mediaType"]: "text/typescript", ["content"]: "export interface Book { title: string }" }] }, { ["id"]: "markdown", ["label"]: "Markdown", ["status"]: "ready", ["documents"]: [{ ["path"]: "Book.md", ["mediaType"]: "text/markdown", ["content"]: "# Book" }] }];
   readonly editedDocument: SourceDocument = { ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book {\n  title: Text\n  copies: Number\n}" };
-  readonly previewTabs: Array<OutputTab> = [{ ["id"]: "markdown", ["label"]: "Markdown", ["content"]: "# Edited Book" }];
+  readonly previewTabs: Array<OutputTab> = [{ ["id"]: "markdown", ["label"]: "Markdown", ["status"]: "ready", ["documents"]: [{ ["path"]: "Book.md", ["mediaType"]: "text/markdown", ["content"]: "# Edited Book" }] }];
   async connectedOutputs(previews: Array<OutputTab>, generateOnSave: boolean): Promise<void> {
     return await this.driver.connectedOutputs(previews, generateOnSave);
   }
@@ -707,4 +707,537 @@ readonly configuredSettings: string = "{\"formatVersion\":1,\"version\":\"1.2.3\
 readonly configuredShop: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"shop\"},\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[]}";
 
 readonly configuredLibrary: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"library\"},\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[]}";
+
+async previewAuthoring(configuration: string): Promise<void> {
+    return await this.driver.previewAuthoring(configuration);
+  }
+
+async gatedPreviewAuthoring(configuration: string, id: string): Promise<void> {
+    return await this.driver.gatedPreviewAuthoring(configuration, id);
+  }
+
+async undecodableTextOutput(): Promise<void> {
+    return await this.driver.undecodableTextOutput();
+  }
+
+async unsupportedBinaryOutput(): Promise<void> {
+    return await this.driver.unsupportedBinaryOutput();
+  }
+
+async previewEditor(initialText: string, configuration: string): Promise<void> {
+    return await this.driver.previewEditor(initialText, configuration);
+  }
+
+async openPreviewSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.openPreviewSource(source, version);
+  }
+
+async changePreviewSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.changePreviewSource(source, version);
+  }
+
+async changePreviewConfiguration(configuration: string): Promise<void> {
+    return await this.driver.changePreviewConfiguration(configuration);
+  }
+
+async settleCurrentPreviews(): Promise<void> {
+    return await this.driver.settleCurrentPreviews();
+  }
+
+async awaitReadyOutput(id: string): Promise<void> {
+    return await this.driver.awaitReadyOutput(id);
+  }
+
+async rememberPreviewOutput(id: string): Promise<void> {
+    return await this.driver.rememberPreviewOutput(id);
+  }
+
+async armNextOutput(id: string): Promise<void> {
+    return await this.driver.armNextOutput(id);
+  }
+
+async savePreviewImport(uri: string, text: string): Promise<void> {
+    return await this.driver.savePreviewImport(uri, text);
+  }
+
+async closePreviewSource(uri: string): Promise<void> {
+    return await this.driver.closePreviewSource(uri);
+  }
+
+async disposePreviews(): Promise<void> {
+    return await this.driver.disposePreviews();
+  }
+
+async awaitHeldOutput(id: string): Promise<void> {
+    return await this.driver.awaitHeldOutput(id);
+  }
+
+async releaseHeldOutput(id: string): Promise<void> {
+    return await this.driver.releaseHeldOutput(id);
+  }
+
+async drainPreviewWork(): Promise<void> {
+    return await this.driver.drainPreviewWork();
+  }
+
+async selectOutputDocument(path: string): Promise<void> {
+    return await this.driver.selectOutputDocument(path);
+  }
+
+async setDiagramZoom(percent: number): Promise<void> {
+    return await this.driver.setDiagramZoom(percent);
+  }
+
+async resetDiagramZoom(): Promise<void> {
+    return await this.driver.resetDiagramZoom();
+  }
+
+async scrollDiagram(horizontal: number, vertical: number): Promise<void> {
+    return await this.driver.scrollDiagram(horizontal, vertical);
+  }
+
+async showOutputPreviews(): Promise<void> {
+    return await this.driver.showOutputPreviews();
+  }
+
+async editPreviewWithoutSaving(text: string): Promise<void> {
+    return await this.driver.editPreviewWithoutSaving(text);
+  }
+
+async savePreviewConfiguration(text: string): Promise<void> {
+    return await this.driver.savePreviewConfiguration(text);
+  }
+
+async selectPreviewOutput(id: string): Promise<void> {
+    return await this.driver.selectPreviewOutput(id);
+  }
+
+async selectPreviewDocument(path: string): Promise<void> {
+    return await this.driver.selectPreviewDocument(path);
+  }
+
+async closePreviewPanel(): Promise<void> {
+    return await this.driver.closePreviewPanel();
+  }
+
+async zoomPreviewDiagram(): Promise<void> {
+    return await this.driver.zoomPreviewDiagram();
+  }
+
+async scrollPreviewDiagram(): Promise<void> {
+    return await this.driver.scrollPreviewDiagram();
+  }
+
+async resetPreviewZoom(): Promise<void> {
+    return await this.driver.resetPreviewZoom();
+  }
+
+async previewOutputIds(): Promise<Array<string>> {
+    return await this.driver.previewOutputIds();
+  }
+
+async previewOutputLabels(): Promise<Array<string>> {
+    return await this.driver.previewOutputLabels();
+  }
+
+async previewOutputStatus(id: string): Promise<string> {
+    return await this.driver.previewOutputStatus(id);
+  }
+
+async rememberedPreviewOutputStatus(id: string): Promise<string> {
+    return await this.driver.rememberedPreviewOutputStatus(id);
+  }
+
+async rememberedPreviewDocumentMediaType(id: string, path: string): Promise<string> {
+    return await this.driver.rememberedPreviewDocumentMediaType(id, path);
+  }
+
+async rememberedPreviewDocumentContains(id: string, path: string, content: string): Promise<boolean> {
+    return await this.driver.rememberedPreviewDocumentContains(id, path, content);
+  }
+
+async previewDocumentPaths(id: string): Promise<Array<string>> {
+    return await this.driver.previewDocumentPaths(id);
+  }
+
+async previewDocumentMediaType(id: string, path: string): Promise<string> {
+    return await this.driver.previewDocumentMediaType(id, path);
+  }
+
+async previewDocumentContains(id: string, path: string, content: string): Promise<boolean> {
+    return await this.driver.previewDocumentContains(id, path, content);
+  }
+
+async previewSvgHasLabel(id: string, path: string, label: string): Promise<boolean> {
+    return await this.driver.previewSvgHasLabel(id, path, label);
+  }
+
+async previewExplanationContains(id: string, text: string): Promise<boolean> {
+    return await this.driver.previewExplanationContains(id, text);
+  }
+
+async previewViewExplanation(): Promise<string> {
+    return await this.driver.previewViewExplanation();
+  }
+
+async previewSourceUri(): Promise<string> {
+    return await this.driver.previewSourceUri();
+  }
+
+async previewSourceVersion(): Promise<number> {
+    return await this.driver.previewSourceVersion();
+  }
+
+async previewTargetPathsAndBytesUnchanged(): Promise<boolean> {
+    return await this.driver.previewTargetPathsAndBytesUnchanged();
+  }
+
+async outputInvocationCount(id: string): Promise<number> {
+    return await this.driver.outputInvocationCount(id);
+  }
+
+async outputMaximumConcurrentInvocations(id: string): Promise<number> {
+    return await this.driver.outputMaximumConcurrentInvocations(id);
+  }
+
+async postDisposalPublicationCount(): Promise<number> {
+    return await this.driver.postDisposalPublicationCount();
+  }
+
+async selectedOutputId(): Promise<string> {
+    return await this.driver.selectedOutputId();
+  }
+
+async selectedOutputStatus(): Promise<string> {
+    return await this.driver.selectedOutputStatus();
+  }
+
+async selectedOutputExplanation(): Promise<string> {
+    return await this.driver.selectedOutputExplanation();
+  }
+
+async selectedDocumentPaths(): Promise<Array<string>> {
+    return await this.driver.selectedDocumentPaths();
+  }
+
+async selectedDocumentPath(): Promise<string> {
+    return await this.driver.selectedDocumentPath();
+  }
+
+async diagramImageLoaded(): Promise<boolean> {
+    return await this.driver.diagramImageLoaded();
+  }
+
+async diagramZoomPercent(): Promise<number> {
+    return await this.driver.diagramZoomPercent();
+  }
+
+async diagramDisplayedWidth(): Promise<number> {
+    return await this.driver.diagramDisplayedWidth();
+  }
+
+async diagramScrollLeft(): Promise<number> {
+    return await this.driver.diagramScrollLeft();
+  }
+
+async diagramScrollTop(): Promise<number> {
+    return await this.driver.diagramScrollTop();
+  }
+
+async nativePreviewOutputIds(): Promise<Array<string>> {
+    return await this.driver.nativePreviewOutputIds();
+  }
+
+async nativePreviewSelectedId(id: string, path: string): Promise<string> {
+    return await this.driver.nativePreviewSelectedId(id, path);
+  }
+
+async nativePreviewDocumentPath(id: string, path: string): Promise<string> {
+    return await this.driver.nativePreviewDocumentPath(id, path);
+  }
+
+async nativePreviewDocumentMediaType(id: string, path: string): Promise<string> {
+    return await this.driver.nativePreviewDocumentMediaType(id, path);
+  }
+
+async nativePreviewTextIncludes(id: string, path: string, text: string): Promise<boolean> {
+    return await this.driver.nativePreviewTextIncludes(id, path, text);
+  }
+
+async nativePreviewObservedStatus(id: string, path: string): Promise<string> {
+    return await this.driver.nativePreviewObservedStatus(id, path);
+  }
+
+async nativePreviewBeforeEditStatus(): Promise<string> {
+    return await this.driver.nativePreviewBeforeEditStatus();
+  }
+
+async nativePreviewBeforeConfigurationIds(): Promise<Array<string>> {
+    return await this.driver.nativePreviewBeforeConfigurationIds();
+  }
+
+async nativePreviewClosedTextIncludes(text: string): Promise<boolean> {
+    return await this.driver.nativePreviewClosedTextIncludes(text);
+  }
+
+async nativePreviewZoomHistory(): Promise<Array<number>> {
+    return await this.driver.nativePreviewZoomHistory();
+  }
+
+async nativePreviewDocumentCount(): Promise<number> {
+    return await this.driver.nativePreviewDocumentCount();
+  }
+
+async nativePreviewStatus(): Promise<string> {
+    return await this.driver.nativePreviewStatus();
+  }
+
+async nativePreviewExplanation(): Promise<string> {
+    return await this.driver.nativePreviewExplanation();
+  }
+
+async nativePreviewImageDecoded(id: string, path: string): Promise<boolean> {
+    return await this.driver.nativePreviewImageDecoded(id, path);
+  }
+
+async nativePreviewSvgContainsLabel(id: string, path: string, text: string): Promise<boolean> {
+    return await this.driver.nativePreviewSvgContainsLabel(id, path, text);
+  }
+
+async nativePreviewZoomPercent(): Promise<number> {
+    return await this.driver.nativePreviewZoomPercent();
+  }
+
+async nativePreviewDiagramOverflow(): Promise<boolean> {
+    return await this.driver.nativePreviewDiagramOverflow();
+  }
+
+async nativePreviewDiagramScrolled(): Promise<boolean> {
+    return await this.driver.nativePreviewDiagramScrolled();
+  }
+
+async nativePreviewSavedText(): Promise<string> {
+    return await this.driver.nativePreviewSavedText();
+  }
+
+async nativePreviewOpenText(): Promise<string> {
+    return await this.driver.nativePreviewOpenText();
+  }
+
+async nativePreviewSourceDirty(): Promise<boolean> {
+    return await this.driver.nativePreviewSourceDirty();
+  }
+
+async nativePreviewFilesUnchanged(): Promise<boolean> {
+    return await this.driver.nativePreviewFilesUnchanged();
+  }
+
+async expectConfiguredOutputs(ids: Array<string>, labels: Array<string>): Promise<void> {
+    const actualIds = await this.driver.previewOutputIds();
+    const actualLabels = await this.driver.previewOutputLabels();
+    expectData(actualIds, ids);
+    expectData(actualLabels, labels);
+  }
+
+async expectPreviewStatus(id: string, status: string): Promise<void> {
+    const actual = await this.driver.previewOutputStatus(id);
+    expectData(actual, status);
+  }
+
+async expectPreviewDocument(id: string, path: string, mediaType: string, content: string): Promise<void> {
+    const actualMediaType = await this.driver.previewDocumentMediaType(id, path);
+    const contains = await this.driver.previewDocumentContains(id, path, content);
+    expectData(actualMediaType, mediaType);
+    expectData(contains, true);
+  }
+
+async expectEarlierReadyDocument(id: string, path: string, mediaType: string, content: string): Promise<void> {
+    const earlierStatus = await this.driver.rememberedPreviewOutputStatus(id);
+    const earlierMediaType = await this.driver.rememberedPreviewDocumentMediaType(id, path);
+    const earlierContains = await this.driver.rememberedPreviewDocumentContains(id, path, content);
+    expectData(earlierStatus, "ready");
+    expectData(earlierMediaType, mediaType);
+    expectData(earlierContains, true);
+  }
+
+async expectPreviewSvgLabel(id: string, path: string, label: string): Promise<void> {
+    const actualMediaType = await this.driver.previewDocumentMediaType(id, path);
+    const hasLabel = await this.driver.previewSvgHasLabel(id, path, label);
+    expectData(actualMediaType, "image/svg+xml");
+    expectData(hasLabel, true);
+  }
+
+async expectPreviewExplanation(id: string, text: string): Promise<void> {
+    const contains = await this.driver.previewExplanationContains(id, text);
+    expectData(contains, true);
+  }
+
+async expectNoPreviewDocuments(id: string): Promise<void> {
+    const paths = await this.driver.previewDocumentPaths(id);
+    expectData(paths, this.emptyPaths);
+  }
+
+async expectCurrentPreviewSource(uri: string, version: number): Promise<void> {
+    const actualUri = await this.driver.previewSourceUri();
+    const actualVersion = await this.driver.previewSourceVersion();
+    expectData(actualUri, uri);
+    expectData(actualVersion, version);
+  }
+
+async expectTargetsPreserved(): Promise<void> {
+    const unchanged = await this.driver.previewTargetPathsAndBytesUnchanged();
+    expectData(unchanged, true);
+  }
+
+async expectBoundedOutputWork(id: string, invocations: number): Promise<void> {
+    const actualInvocations = await this.driver.outputInvocationCount(id);
+    const actualMaximum = await this.driver.outputMaximumConcurrentInvocations(id);
+    expectData(actualInvocations, invocations);
+    expectData(actualMaximum, 1);
+  }
+
+async expectNoPublicationAfterDisposal(): Promise<void> {
+    const actual = await this.driver.postDisposalPublicationCount();
+    expectData(actual, 0);
+  }
+
+async expectNoSelectedPreview(): Promise<void> {
+    const ids = await this.driver.previewOutputIds();
+    const explanation = await this.driver.previewViewExplanation();
+    expectData(ids, this.emptyPaths);
+    expect(!comparisonEqual(explanation, "")).toBe(true);
+  }
+
+async expectSelectedOutput(id: string): Promise<void> {
+    const actual = await this.driver.selectedOutputId();
+    expectData(actual, id);
+  }
+
+async expectOutputStatus(status: string, explanation: string): Promise<void> {
+    const actualStatus = await this.driver.selectedOutputStatus();
+    const actualExplanation = await this.driver.selectedOutputExplanation();
+    const documents = await this.driver.selectedDocumentPaths();
+    expectData(actualStatus, status);
+    expectData(actualExplanation, explanation);
+    expectData(documents, this.emptyDocumentPaths);
+  }
+
+async expectSelectedDocument(path: string, paths: Array<string>): Promise<void> {
+    const actual = await this.driver.selectedDocumentPath();
+    const actualPaths = await this.driver.selectedDocumentPaths();
+    expectData(actual, path);
+    expectData(actualPaths, paths);
+  }
+
+async expectLoadedDiagram(percent: number, width: number): Promise<void> {
+    const loaded = await this.driver.diagramImageLoaded();
+    const actualPercent = await this.driver.diagramZoomPercent();
+    const actualWidth = await this.driver.diagramDisplayedWidth();
+    expectData(loaded, true);
+    expectData(actualPercent, percent);
+    expectData(actualWidth, width);
+  }
+
+async expectDiagramScroll(horizontal: number, vertical: number): Promise<void> {
+    const actualHorizontal = await this.driver.diagramScrollLeft();
+    const actualVertical = await this.driver.diagramScrollTop();
+    expectData(actualHorizontal, horizontal);
+    expectData(actualVertical, vertical);
+  }
+
+async expectNativePreviewOutputs(ids: Array<string>): Promise<void> {
+    const actual = await this.driver.nativePreviewOutputIds();
+    expectData(actual, ids);
+  }
+
+async expectNativePreviewText(id: string, path: string, mediaType: string, text: string): Promise<void> {
+    const selected = await this.driver.nativePreviewSelectedId(id, path);
+    const actualPath = await this.driver.nativePreviewDocumentPath(id, path);
+    const actualMediaType = await this.driver.nativePreviewDocumentMediaType(id, path);
+    const includesText = await this.driver.nativePreviewTextIncludes(id, path, text);
+    const status = await this.driver.nativePreviewObservedStatus(id, path);
+    expectData(selected, id);
+    expectData(actualPath, path);
+    expectData(actualMediaType, mediaType);
+    expectData(includesText, true);
+    expectData(status, "ready");
+  }
+
+async expectNativePreviewBlocked(): Promise<void> {
+    const status = await this.driver.nativePreviewStatus();
+    const explanation = await this.driver.nativePreviewExplanation();
+    const previous = await this.driver.nativePreviewBeforeEditStatus();
+    const documents = await this.driver.nativePreviewDocumentCount();
+    expectData(previous, "ready");
+    expectData(documents, 0);
+    expectData(status, "blocked");
+    expect(!comparisonEqual(explanation, "")).toBe(true);
+  }
+
+async expectNativePreviewDiagram(id: string, path: string, label: string): Promise<void> {
+    const decoded = await this.driver.nativePreviewImageDecoded(id, path);
+    const actualLabel = await this.driver.nativePreviewSvgContainsLabel(id, path, label);
+    const mediaType = await this.driver.nativePreviewDocumentMediaType(id, path);
+    expectData(decoded, true);
+    expectData(actualLabel, true);
+    expectData(mediaType, "image/svg+xml");
+  }
+
+async expectNativePreviewUnsaved(saved: string, open: string): Promise<void> {
+    const actualSaved = await this.driver.nativePreviewSavedText();
+    const actualOpen = await this.driver.nativePreviewOpenText();
+    const dirty = await this.driver.nativePreviewSourceDirty();
+    const unchanged = await this.driver.nativePreviewFilesUnchanged();
+    expectData(actualSaved, saved);
+    expectData(actualOpen, open);
+    expectData(dirty, true);
+    expectData(unchanged, true);
+  }
+
+async expectNativePreviewZoom(percent: number): Promise<void> {
+    const actual = await this.driver.nativePreviewZoomPercent();
+    expectData(actual, percent);
+  }
+
+async expectNativePreviewScrollable(): Promise<void> {
+    const overflow = await this.driver.nativePreviewDiagramOverflow();
+    const scrolled = await this.driver.nativePreviewDiagramScrolled();
+    expectData(overflow, true);
+    expectData(scrolled, true);
+  }
+
+async expectNativePreviewPriorOutputs(ids: Array<string>): Promise<void> {
+    const actual = await this.driver.nativePreviewBeforeConfigurationIds();
+    expectData(actual, ids);
+  }
+
+async expectClosedPreviewText(text: string): Promise<void> {
+    const actual = await this.driver.nativePreviewClosedTextIncludes(text);
+    expectData(actual, true);
+  }
+
+async expectNativePreviewZoomHistory(history: Array<number>): Promise<void> {
+    const actual = await this.driver.nativePreviewZoomHistory();
+    expectData(actual, history);
+  }
+
+readonly emptyPaths: Array<string> = [];
+
+readonly threeOutputs: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"uml\",\"options\":{\"directory\":\"draft/uml\",\"views\":[\"structure\"]}},{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\"}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}";
+
+readonly textOutputs: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\"}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}";
+
+readonly typeScriptOnly: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\"}}]}";
+
+readonly emptyDocumentPaths: Array<string> = [];
+
+readonly diagrams: Array<OutputTab> = [{ ["id"]: "uml", ["label"]: "UML", ["status"]: "ready", ["documents"]: [{ ["path"]: "structure.d2", ["mediaType"]: "text/vnd.d2", ["content"]: "Book: { title: Text }" }, { ["path"]: "structure.svg", ["mediaType"]: "image/svg+xml", ["content"]: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1800\" height=\"1200\" viewBox=\"0 0 1800 1200\"><rect width=\"1800\" height=\"1200\" fill=\"white\"/><text x=\"40\" y=\"60\" font-size=\"20\">Book</text></svg>" }] }];
+
+readonly revisedDiagrams: Array<OutputTab> = [{ ["id"]: "uml", ["label"]: "UML", ["status"]: "ready", ["documents"]: [{ ["path"]: "notes.d2", ["mediaType"]: "text/vnd.d2", ["content"]: "Novel: { title: Number }" }, { ["path"]: "structure.svg", ["mediaType"]: "image/svg+xml", ["content"]: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1800\" height=\"1200\" viewBox=\"0 0 1800 1200\"><rect width=\"1800\" height=\"1200\" fill=\"white\"/><text x=\"40\" y=\"60\" font-size=\"20\">Novel</text></svg>" }] }];
+
+readonly configuredPreviews: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"uml\",\"options\":{\"directory\":\"draft/uml\",\"views\":[\"structure\"]}},{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\"}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}";
+
+readonly revisedPreviews: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"revised/docs\"}}]}";
+
+readonly largeBookSource: string = "type Book { title: Text }\ntype Shelf1 { book: Book }\ntype Shelf2 { book: Book }\ntype Shelf3 { book: Book }\ntype Shelf4 { book: Book }\ntype Shelf5 { book: Book }\ntype Shelf6 { book: Book }\ntype Shelf7 { book: Book }\ntype Shelf8 { book: Book }\ntype Shelf9 { book: Book }\ntype Shelf10 { book: Book }\ntype Shelf11 { book: Book }\ntype Shelf12 { book: Book }\ntype Shelf13 { book: Book }\ntype Shelf14 { book: Book }\ntype Shelf15 { book: Book }\ntype Shelf16 { book: Book }\ntype Shelf17 { book: Book }\ntype Shelf18 { book: Book }\ntype Shelf19 { book: Book }\ntype Shelf20 { book: Book }";
 }

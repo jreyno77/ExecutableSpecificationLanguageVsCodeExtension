@@ -25,6 +25,24 @@ An unknown type such as `type Basket { book: Boook }` receives a located semanti
 Open **.expec Project Connection** in the Explorer and use **Choose Project** to select a local directory. Its status follows saved configuration changes and directory disappearance or restoration automatically. Save or revert unsaved configuration edits before choosing another project. `expec.configurationFile` selects the workspace manifest and defaults to `expec.json`; multiple workspace folders require a folder choice.
 
 A connected status verifies the directory is available. Compilation, dependencies and generated outputs have their own checks. Creating a new manifest sets `src/main.expec` as its initial build entry; configure your actual source entry before compilation.
+## Output previews
+
+Run **.expec: Show Output Previews** from the Command Palette. Add the desired outputs to your saved `expec.json`, for example:
+
+```json
+{
+  "formatVersion": 1,
+  "version": "0.1.0",
+  "build": { "entries": ["src/library.expec"] },
+  "outputs": [
+    { "id": "uml", "options": { "directory": "draft/uml" } },
+    { "id": "typescript", "options": { "directory": "draft/types" } },
+    { "id": "markdown", "options": { "directory": "draft/docs" } }
+  ]
+}
+```
+
+Select an output tab and then a document. Previews follow the selected `.expec` editor's unsaved text and saved output configuration. Each output shows its own progress or explanation. Diagrams start at their natural size, with scrolling, zoom and reset controls. Previewing leaves project files untouched; generated-file updates have a separate save policy.
 ## Develop from the specification
 
 Core owns application behavior; `src/vscode` and `src/ui` adapt native host events and presentation into core. Authored contracts and scenarios live in `generation/expec/src/`, whose folder layout maps to the connected project's `src/`. Scenarios generate acceptance tests, DSL and driver seams under `test/`; diagrams go to `generation/uml`.

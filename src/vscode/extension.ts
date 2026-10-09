@@ -4,11 +4,13 @@ import { resolve } from 'node:path';
 import { LanguageClient, TransportKind } from 'vscode-languageclient/node';
 import { EditorLanguageSupport } from './EditorLanguageSupport.js';
 import { ConnectionSidebar } from './ConnectionSidebar.js';
+import { OutputPreviewHost } from './OutputPreviewHost.js';
 import type { ConnectionState } from '../core/ConnectionState.js';
 
 let client: LanguageClient | undefined;
 let support: EditorLanguageSupport | undefined;
 let sidebar: ConnectionSidebar | undefined;
+let previews: OutputPreviewHost | undefined;
 let stopping: Promise<void> | undefined;
 
 export function activate(context: ExtensionContext): LanguageClient & {
@@ -17,10 +19,12 @@ export function activate(context: ExtensionContext): LanguageClient & {
   client = new LanguageClient('expec', '.expec', {
     module: context.asAbsolutePath('dist/native/server.cjs'), transport: TransportKind.ipc,
   }, { documentSelector: [{ language: 'expec', scheme: 'file' }, { language: 'expec', scheme: 'untitled' }] });
+  previews = new OutputPreviewHost(context, client);
+  previews.start();
   support = new EditorLanguageSupport(context, client);
   support.start();
-  sidebar = new ConnectionSidebar(context);
-  context.subscriptions.push(sidebar);
+  sidebar = new ConnectionSidebar(context, previews);
+  context.subscriptions.push(sidebar, previews);
   const folders = workspace.workspaceFolders ?? [];
   const folder = folders.length === 1 ? folders[0] : undefined;
   if (folder?.uri.scheme === 'file') {
@@ -33,6 +37,7 @@ export function activate(context: ExtensionContext): LanguageClient & {
 export function deactivate(): Promise<void> {
   const failures: unknown[] = [];
   try { sidebar?.dispose(); } catch (error) { failures.push(error); }
+  try { previews?.dispose(); } catch (error) { failures.push(error); }
   try { support?.dispose(); } catch (error) { failures.push(error); }
   const stopped = client ? stopping ??= client.stop() : Promise.resolve();
   return stopped.then(() => {

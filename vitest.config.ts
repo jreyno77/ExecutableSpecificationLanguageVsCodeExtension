@@ -6,7 +6,7 @@ const ui = ['test/acceptance/OutputTabs.test.ts', 'test/unit/ui/**/*.test.{ts,ts
 export default defineConfig({
   test: { projects: [
     { test: { name: 'syntax', include: ['test/acceptance/native-editor.test.ts'], testTimeout: 90_000, maxWorkers: 1 } },
-    { test: { name: 'core', include: ['test/{unit,acceptance}/**/*.test.{ts,tsx}'], exclude: [sidebarUnit, 'test/acceptance/ConnectionSidebar.test.ts', ...ui, 'test/acceptance/workspace.test.ts', 'test/acceptance/EditorLanguageSupport.test.ts', 'test/acceptance/native-editor.test.ts', 'test/unit/vscode/diagnostic-middleware.test.ts'] } },
+    { test: { name: 'core', include: ['test/{unit,acceptance}/**/*.test.{ts,tsx}'], exclude: ['test/acceptance/OutputPreviewHost.test.ts', sidebarUnit, 'test/acceptance/ConnectionSidebar.test.ts', ...ui, 'test/acceptance/workspace.test.ts', 'test/acceptance/EditorLanguageSupport.test.ts', 'test/acceptance/native-editor.test.ts', 'test/unit/vscode/diagnostic-middleware.test.ts'] } },
     { resolve: { alias: { vscode: fileURLToPath(new URL('./test/resources/vscode/recorded-sidebar-api.ts', import.meta.url)) } }, test: { name: 'connection-sidebar', include: [sidebarUnit] } },
     { test: { name: 'ui', include: ui, globalSetup: ['test/driver/output-tabs-setup.ts'] } },
   ] },

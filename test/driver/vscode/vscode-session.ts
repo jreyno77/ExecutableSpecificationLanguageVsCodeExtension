@@ -1,6 +1,8 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createServer, type Server, type Socket } from 'node:net';
+import { lstat, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { Browser } from 'playwright';
 import { NativeCleanupError, NativeLauncher, ownTemporaryDirectory, removeOwnedDirectory, within } from './native-process.js';
 
 type DocumentObservation = { file: string; text: string; languageId: string };
@@ -18,8 +20,9 @@ export type DiagnosticObservation = {
 export type DiagnosticMiddlewareObservation = { cancellationError: boolean; nextCalls: number; runtime: { node: string; vscode: string } };
 
 export type SidebarObservation = { readonly status: string; readonly project: string; readonly explanation: string; readonly saved?: string; readonly unsaved?: string };
+export type PreviewEditorObservation = { readonly uri: string; readonly version: number; readonly text: string; readonly dirty: boolean; readonly savedText: string };
 
-type Operation = 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
+type Operation = 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
 type Pending = { promise: Promise<unknown>; resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> };
 
 /** One owned native host, with only the observations needed by its test consumers. */
@@ -39,6 +42,7 @@ export class VsCodeSession {
   private closing = false;
   private cleanup: Promise<void> | undefined;
   private disposal: Promise<void> | undefined;
+  private browser: Promise<Browser> | undefined;
 
   private constructor(private readonly directory: string) {
     this.ready = new Promise((resolveReady, reject) => { this.readyResolve = resolveReady; this.readyReject = reject; });
@@ -84,6 +88,46 @@ export class VsCodeSession {
       throw error;
     }
     return value as DocumentObservation;
+  }
+
+  webviewBrowser(): Promise<Browser> {
+    return this.browser ??= (async () => {
+      const portFile = join(this.directory, 'profile', 'DevToolsActivePort');
+      const info = await lstat(portFile);
+      if (!info.isFile() || info.isSymbolicLink()) throw new Error('The owned DevTools endpoint must be an ordinary profile file.');
+      const [port, path] = (await readFile(portFile, 'utf8')).trim().split(/\r?\n/);
+      if (!port || !/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535 || !path?.startsWith('/devtools/browser/')) {
+        throw new Error('The owned VS Code profile has no valid DevTools endpoint.');
+      }
+      const endpoint = `ws://127.0.0.1:${port}${path}`;
+      const response = await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(5_000) });
+      const actual = await response.json() as { webSocketDebuggerUrl?: string };
+      if (!response.ok || actual.webSocketDebuggerUrl !== endpoint) throw new Error('DevTools does not match the endpoint recorded by the owned profile.');
+      const { chromium } = await import('playwright');
+      const browser = await chromium.connectOverCDP(endpoint, { timeout: 5_000 });
+      if (this.closing) { await browser.close(); throw new Error('The owned VS Code session is closed.'); }
+      return browser;
+    })();
+  }
+
+  openPreviewEditor(previewId: string, extensionId: string, setup: { file: string; configurationFile: string; resetFile: string }): Promise<PreviewEditorObservation> {
+    return this.previewRequest('previewOpen', { previewId, extensionId, ...setup });
+  }
+  showPreviewEditor(previewId: string): Promise<PreviewEditorObservation> { return this.previewRequest('previewShow', { previewId }); }
+  editPreviewEditor(previewId: string, text: string): Promise<PreviewEditorObservation> { return this.previewRequest('previewEdit', { previewId, text }); }
+  savePreviewConfiguration(previewId: string, text: string): Promise<PreviewEditorObservation> { return this.previewRequest('previewSaveConfiguration', { previewId, text }); }
+  observePreviewEditor(previewId: string): Promise<PreviewEditorObservation> { return this.previewRequest('previewObserve', { previewId }); }
+  closePreviewPanel(previewId: string): Promise<PreviewEditorObservation> { return this.previewRequest('previewClosePanel', { previewId }); }
+  async disposePreviewEditor(previewId: string): Promise<void> {
+    const value = await this.request('previewDispose', { previewId });
+    if (value !== null) throw new Error('The native preview disposal returned an invalid receipt.');
+  }
+  private async previewRequest(operation: Operation, values: Record<string, unknown>): Promise<PreviewEditorObservation> {
+    const value = await this.request(operation, values);
+    if (!value || typeof value !== 'object' || !('uri' in value) || typeof value.uri !== 'string' || !('version' in value) || !Number.isInteger(value.version)
+      || !('text' in value) || typeof value.text !== 'string' || !('dirty' in value) || typeof value.dirty !== 'boolean'
+      || !('savedText' in value) || typeof value.savedText !== 'string') throw new Error('The native host returned an invalid preview editor observation.');
+    return value as PreviewEditorObservation;
   }
 
   async extensionPath(id: string): Promise<string | null> {
@@ -259,10 +303,15 @@ export class VsCodeSession {
   }
 
   private async closeNetwork(): Promise<void> {
-    for (const socket of this.sockets) socket.destroy();
-    if (this.server.listening) await within(new Promise<void>((resolveClose, reject) => {
-      this.server.close(error => error ? reject(error) : resolveClose());
-    }), 2_000, 'The owned loopback server did not close.');
+    const errors: unknown[] = [];
+    try { await (await this.browser?.catch(() => undefined))?.close(); } catch (error) { errors.push(error); }
+    for (const socket of this.sockets) { try { socket.destroy(); } catch (error) { errors.push(error); } }
+    if (this.server.listening) {
+      try { await within(new Promise<void>((resolveClose, reject) => {
+        this.server.close(error => error ? reject(error) : resolveClose());
+      }), 2_000, 'The owned loopback server did not close.'); } catch (error) { errors.push(error); }
+    }
+    if (errors.length) throw new AggregateError(errors, 'Owned native browser/transport cleanup failed.', { cause: errors[0] });
   }
 }
 function isDiagnosticObservation(value: unknown): value is DiagnosticObservation {

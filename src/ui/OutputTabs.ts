@@ -24,7 +24,7 @@ export class OutputTabs {
     private disposed = false;
     /**
      * Unverified implementation obligation.
-     * Present exactly these tabs, in order, using their IDs, labels and content. A new presentation replaces the previous set. Selecting a tab shows its supplied content; presentation never compiles or generates outputs.
+     * Present exactly the supplied output IDs/labels/order, statuses, explanations and ordered documents. Replace the previous presentation. Preserve selected output ID and document path while retained; otherwise choose the first current item. Show pending, blocked or refused explanations without old documents; ready with no documents visibly says No authored documents. Select documents by their actual paths within one output tab. Display supported text media literally, including TypeScript, Markdown, D2 and JSON. Display image/svg+xml as an inert image from its supplied UTF-8 content, never injected markup or a target-file path. Use a scroll viewport with default 100 percent scale, author-controlled zoom and reset to 100 percent; do not shrink wide images to fit. Dispose replaced image resources and bind image events to the actual content's current node. Unsupported presentation media shows a clear explanation and retains its path/type. Selection and image navigation never compile, generate, write, fetch external resources or implement report freshness.
      */
     present(tabs: Array<OutputTab>): void {
         if (this.disposed) throw new Error('OutputTabs has been disposed.');
@@ -41,7 +41,7 @@ constructor(hostElementId: string) {
 
 /**
      * Unverified implementation obligation.
-     * Unmount this view and release its handlers. Keep the supplied host element in the page. Repeated disposal is harmless; present after disposal reports a clear error.
+     * Unmount this view and release its handlers and owned image resources. Keep the supplied host element in the page. Repeated disposal is harmless; present after disposal reports a clear error.
      */
 dispose(): void {
         if (this.disposed) return;
