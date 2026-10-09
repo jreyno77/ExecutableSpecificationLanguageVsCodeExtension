@@ -9,7 +9,9 @@
       "src/core/workspace.expec",
       "src/ui/output-tabs.expec",
       "src/vscode/editor-adapter.expec",
-      "src/vscode/language-support.expec"
+      "src/vscode/language-support.expec",
+      "src/core/document-analysis.expec",
+      "src/vscode/live-diagnostics.expec"
     ]
   },
   "outputs": [
@@ -24,6 +26,34 @@
             "declaration": ["VsCodeDocument"],
             "name": "TextDocument",
             "from": "vscode"
+          },
+          {
+            "declaration": [
+              "SyntaxProblem"
+            ],
+            "from": "executable-specification-language",
+            "name": "SyntaxDiagnostic"
+          },
+          {
+            "declaration": [
+              "LanguageServerConnection"
+            ],
+            "from": "vscode-languageserver/node",
+            "name": "Connection"
+          },
+          {
+            "declaration": [
+              "VsCodeExtensionContext"
+            ],
+            "from": "vscode",
+            "name": "ExtensionContext"
+          },
+          {
+            "declaration": [
+              "NativeLanguageClient"
+            ],
+            "name": "LanguageClient",
+            "from": "vscode-languageclient/node"
           }
         ]
       }
@@ -151,7 +181,8 @@
       "name": "npm:executable-specification-language",
       "version": "0.1.0",
       "phases": [
-        "build"
+        "build",
+        "runtime"
       ]
     },
     {
@@ -185,6 +216,30 @@
       "phases": [
         "test"
       ]
+    },
+    {
+      "alias": "language-client",
+      "version": "10.1.2",
+      "phases": [
+        "runtime"
+      ],
+      "name": "npm:vscode-languageclient"
+    },
+    {
+      "alias": "language-server",
+      "version": "10.1.2",
+      "phases": [
+        "runtime"
+      ],
+      "name": "npm:vscode-languageserver"
+    },
+    {
+      "alias": "language-server-document",
+      "version": "1.0.15",
+      "phases": [
+        "runtime"
+      ],
+      "name": "npm:vscode-languageserver-textdocument"
     }
   ]
 }
