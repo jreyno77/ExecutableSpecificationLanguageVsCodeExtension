@@ -83,6 +83,7 @@ examples for GenerationHost {
   observation nativeGenerationExplanation() returns Text
   observation nativeGenerationFileIncludes(path: Text, text: Text) returns Boolean
   observation nativeGenerationTargetTreeUnchanged() returns Boolean
+// Read actual saved SVG text/tspan labels; do not inspect D2 source or infer from authored input.
   observation nativeGenerationDiagramIncludes(text: Text) returns Boolean
   observation nativeGenerationDirtyTextIncludes(text: Text) returns Boolean
   observation nativeGenerationLaunchExplanationIncludes(text: Text) returns Boolean
@@ -137,6 +138,7 @@ examples for GenerationHost {
     then expectNativeGenerationFile("src/Shelf.ts", "copies: string;")
     then expectNativeGenerationFile("docs/Library.md", "title")
     then expectNativeGenerationDiagram("Library")
+    then expectNativeGenerationDiagram("title()")
   }
   scenario "typing alone starts no installed generation" {
     given generationEditor(nativeGenerationLibrary, nativeGenerationShelf, true)
