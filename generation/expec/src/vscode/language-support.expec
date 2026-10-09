@@ -8,6 +8,13 @@
 // The project generator need not export this separate language-produced syntax asset.
 // The extension copies it unchanged; it authors no grammar, keyword table or token regex.
 // Plain and quoted names have lexical entity.name.expec scopes, not semantic type claims.
+// EXT-14 native CI supplies the already packaged extension VSIX to this owned installer.
+// Copy that archive into the owned installation tree without repackaging or changing its bytes.
+// Check and log the actual SHA-256 of the supplied archive and its owned copy before installation.
+// Check that both still have that same digest after the installed native checks finish.
+// CI verifies its final packaged VSIX digest against that installed digest before artifact upload.
+// A normal local run without a supplied archive may package the project into its owned tree.
+// That local fallback is explicit setup; it does not prove the identity of a separate CI artifact.
 // The editor observes the actual VSIX installed in an isolated VS Code host.
 // The real TextMate/Oniguruma engine reads that same packaged grammar before these actions.
 // Each example owns its mutable documents and token state; scopes come from the real engine.
