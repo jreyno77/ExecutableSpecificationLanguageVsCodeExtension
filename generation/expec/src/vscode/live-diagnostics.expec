@@ -52,12 +52,19 @@ component EditorLanguageSupport {
 
 // Real installed VSIX and language server. The driver edits actual native documents,
 // observes native diagnostics/events, and closes owned documents/listeners per case.
-// Keep one reusable host; fresh test-owned workspace and document lifetime per case.
+// Keep one reusable host; use a fresh test-owned workspace and document URI per case.
 // Each edit waits, within a deadline, for actual native pull completion/application for
 // that captured document identity/version, through the exported native client feature API
 // and real editor diagnostic events. A changed editor.version or an already empty
 // collection is not completion evidence. editQuickly submits both edits before waiting.
-// Closing starts from established feedback and waits for native close cleanup.
+// Closing starts from established feedback and observes actual editor tab closure plus
+// native diagnostic collection cleanup. Discard unsaved edits through the standard editor
+// command. Do not manually clear diagnostics, send a fake protocol close, or delete the
+// file to force closure. VS Code may retain a saved-file TextDocument in its buffer cache
+// after the editor tab closes; buffer eviction/isClosed/LSP DidClose is not this UI boundary.
+// Actual LSP close events still end the core lifetime when native buffer disposal occurs.
+// Each case closes its owned tab and removes its listeners/files; native buffer cache
+// ownership belongs to VS Code and ends with the shared host, rather than a test invention.
 // The untitled setup supplies initial text, not a saved disk file.
 // These are proposed acceptance steps, not existing executable results.
 examples for EditorLanguageSupport {
