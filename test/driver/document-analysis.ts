@@ -1,18 +1,32 @@
 import { DocumentAnalysis } from '../../src/core/DocumentAnalysis.js';
 import type { SourceDocument } from '../../src/core/SourceDocument.js';
-import type { SyntaxDiagnostic } from 'executable-specification-language';
+import type { SyntaxDiagnostic, Compilation, Diagnostic } from 'executable-specification-language';
+import type { DocumentReport } from '../../src/core/DocumentReport.js';
 
-type Publication = { source: SourceDocument; version: number; problems: SyntaxDiagnostic[] };
+type Publication = { source: SourceDocument; version: number; problems: SyntaxDiagnostic[]; report: DocumentReport };
 
 /** Observes the real core's feedback without parsing or classifying source text. */
 export class DocumentAnalysisRecording {
   private readonly publications: Publication[] = [];
   private readonly clears: string[] = [];
   private invalidVersion = false;
+  private readonly savedSources = new Map<string, SourceDocument>();
   private readonly analysis = new DocumentAnalysis({
-    publish: (source, version, problems) => { this.publications.push({ source, version, problems }); },
+    publish: (source, version, report) => { this.publications.push({ source, version, report, problems: report.syntax }); },
     clear: uri => { this.clears.push(uri); },
-  });
+  }, { read: uri => this.savedSources.get(uri) });
+
+  saved(source: SourceDocument): void {
+    this.savedSources.set(source.uri, { uri: source.uri, text: source.text });
+    this.analysis.sourceChanged(source.uri);
+  }
+  removed(uri: string): void { this.savedSources.delete(uri); this.analysis.sourceChanged(uri); }
+  compilation(uri: string): Compilation | undefined { return this.latest(uri).report.compilation; }
+  semanticProblem(uri: string): Diagnostic {
+    const problem = this.compilation(uri)?.problems[0];
+    if (!problem) throw new Error('No semantic problem was published for ' + uri);
+    return problem;
+  }
 
   opened(source: SourceDocument, version: number): void { this.analysis.opened(source, version); }
   changed(source: SourceDocument, version: number): void { this.analysis.changed(source, version); }

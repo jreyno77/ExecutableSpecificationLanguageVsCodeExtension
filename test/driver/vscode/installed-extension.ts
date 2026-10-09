@@ -84,9 +84,9 @@ export class InstalledExpecEditor {
     return (await this.nativeSession()).missingDocumentDiagnostics(this.extensionId);
   }
 
-  async diagnosticDocument(fileName: string, initialText: string): Promise<DiagnosticDocument> {
+  async diagnosticDocument(fileName: string, initialText: string, dependencyText?: string | null): Promise<DiagnosticDocument> {
     if (this.disposal) throw new Error('The installed syntax editor is disposing.');
-    const document = new DiagnosticDocument(() => this.nativeSession(), this.extensionId, fileName, initialText);
+    const document = new DiagnosticDocument(() => this.nativeSession(), this.extensionId, fileName, initialText, dependencyText);
     this.diagnosticDocuments.add(document);
     onTestFinished(async () => {
       await document.dispose(); this.diagnosticDocuments.delete(document);

@@ -1,4 +1,5 @@
 const fs = require('node:fs/promises');
+const { dirname } = require('node:path');
 
 // The case observes the installed product through VS Code and its exported native client.
 exports.openDiagnosticDocument = async function openDiagnosticDocument(vscode, extensionId, setup) {
@@ -16,6 +17,36 @@ exports.openDiagnosticDocument = async function openDiagnosticDocument(vscode, e
   let tabClosed = false;
   let disposed = false;
   let previousProblemCount = 0;
+  let initialVersion;
+  let resultId;
+  let watchedNotifications = 0;
+  let dependencyRegistered = !setup.dependencyFile;
+  if (setup.dependencyFile) {
+    const dependencyUri = vscode.Uri.file(setup.dependencyFile).toString();
+    const parentUri = vscode.Uri.file(dirname(setup.dependencyFile)).toString().replace(/[/]$/, '');
+    const watcher = client.getFeature('workspace/didChangeWatchedFiles');
+    const originalRegister = watcher.register;
+    const observedRegister = function(data) {
+      originalRegister.call(this, data);
+      if (data.registerOptions?.watchers?.some(item => {
+        const pattern = item.globPattern;
+        const base = typeof pattern?.baseUri === 'string' ? pattern.baseUri : pattern?.baseUri?.uri;
+        return base?.replace(/[/]$/, '') === parentUri && pattern.pattern === 'book.expec';
+      })) dependencyRegistered = true;
+    };
+    watcher.register = observedRegister;
+    listeners.push({ dispose() { if (watcher.register === observedRegister) watcher.register = originalRegister; } });
+    const originalSend = client.sendNotification;
+    const observedSend = function(type, ...params) {
+      const sending = originalSend.call(this, type, ...params);
+      if ((typeof type === 'string' ? type : type.method) !== 'workspace/didChangeWatchedFiles') return sending;
+      return Promise.resolve(sending).then(() => {
+        if (params[0]?.changes?.some(change => vscode.Uri.parse(change.uri).toString() === dependencyUri)) watchedNotifications++;
+      });
+    };
+    client.sendNotification = observedSend;
+    listeners.push({ dispose() { if (client.sendNotification === observedSend) client.sendNotification = originalSend; } });
+  }
   let eventNumber = 0;
   let applied = [];
   listeners.push(client.getFeature('textDocument/didOpen').onNotificationSent(event => {
@@ -44,20 +75,27 @@ exports.openDiagnosticDocument = async function openDiagnosticDocument(vscode, e
     await until(() => (actual = client.getFeature('textDocument/diagnostic').getProvider(document)), 'The native diagnostic provider was not registered.');
     return actual.diagnostics;
   }
-  async function observe(requireApplication, afterEvent) {
+  async function observe(requireApplication, afterEvent, previousId) {
     const snapshot = document;
     const version = snapshot.version;
     const diagnosticsProvider = await provider();
-    const cancellation = new vscode.CancellationTokenSource();
+    const deadline = Date.now() + 30_000;
     let report;
-    try { report = await diagnosticsProvider.provideDiagnostics(snapshot, undefined, cancellation.token); }
-    finally { cancellation.dispose(); }
-    if (snapshot !== document || snapshot.isClosed || snapshot.version !== version) throw new Error('The diagnostic observation became obsolete.');
-    if (!report || report.kind !== 'full' || report.resultId !== String(version)) {
-      throw new Error('The native diagnostic report did not describe the captured document version.');
-    }
+    do {
+      const cancellation = new vscode.CancellationTokenSource();
+      try { report = await diagnosticsProvider.provideDiagnostics(snapshot, undefined, cancellation.token); }
+      finally { cancellation.dispose(); }
+      if (snapshot !== document || snapshot.isClosed || snapshot.version !== version) throw new Error('The diagnostic observation became obsolete.');
+      if (!report || report.kind !== 'full' || typeof report.resultId !== 'string' || report.resultId === '') {
+        throw new Error('The native diagnostic report has no current opaque analysis identity.');
+      }
+      if (previousId === undefined || report.resultId !== previousId) break;
+      if (Date.now() >= deadline) throw new Error('The native diagnostic report did not advance after the real document or dependency notification.');
+      await new Promise(resolve => setTimeout(resolve, 10));
+    } while (true);
+    resultId = report.resultId;
     const expected = report.items.map(diagnosticPacket);
-    if (requireApplication) {
+    if (requireApplication || expected.length > 0) {
       await until(() => applied.some(event => event.number > afterEvent && event.version === version
         && sameDiagnostics(event.diagnostics, expected)) && sameDiagnostics(currentDiagnostics(), expected),
       'The current native diagnostic report was not applied to the editor collection.');
@@ -65,7 +103,7 @@ exports.openDiagnosticDocument = async function openDiagnosticDocument(vscode, e
     return observation();
   }
   async function observation() {
-    return { uri: document.uri.toString(), text: document.getText(), version: document.version, dirty: document.isDirty,
+    return { uri: document.uri.toString(), text: document.getText(), version: document.version, initialVersion, resultId, dirty: document.isDirty,
       savedText: document.uri.scheme === 'file' ? await fs.readFile(document.uri.fsPath, 'utf8') : null,
       previousProblemCount, diagnostics: currentDiagnostics(), closed: tabClosed };
   }
@@ -96,13 +134,16 @@ exports.openDiagnosticDocument = async function openDiagnosticDocument(vscode, e
       : await vscode.workspace.openTextDocument(vscode.Uri.file(setup.file));
     await vscode.window.showTextDocument(document);
     await until(() => opened.get(document) === document.version, 'The native document open was not synchronized.');
-    await observe(false, eventNumber);
+    initialVersion = document.version;
+    await until(() => dependencyRegistered, 'The native dependency watcher was not registered for the owned file.');
+    await observe(false, 0);
     return {
       observation,
       async edit(texts) {
         if (disposed || tabClosed || document.isClosed) throw new Error('The owned native document is closed.');
         previousProblemCount = currentDiagnostics().length;
         const afterEvent = eventNumber;
+        const previousId = resultId;
         applied = [];
         for (const text of texts) {
           const edit = new vscode.WorkspaceEdit();
@@ -114,7 +155,18 @@ exports.openDiagnosticDocument = async function openDiagnosticDocument(vscode, e
         }
         const version = document.version;
         await until(() => changed.get(document) === version, 'The latest native document edit was not synchronized.');
-        return observe(true, afterEvent);
+        return observe(true, afterEvent, previousId);
+      },
+      async changeDependency(text) {
+        if (!setup.dependencyFile || disposed || tabClosed) throw new Error('No live test-owned dependency file.');
+        previousProblemCount = currentDiagnostics().length;
+        const afterEvent = eventNumber;
+        const previousId = resultId;
+        const previousNotifications = watchedNotifications;
+        if (text === null) await fs.unlink(setup.dependencyFile);
+        else await fs.writeFile(setup.dependencyFile, text);
+        await until(() => watchedNotifications > previousNotifications, 'The native client did not send the actual owned dependency file event.');
+        return observe(true, afterEvent, previousId);
       },
       close,
       async dispose() {

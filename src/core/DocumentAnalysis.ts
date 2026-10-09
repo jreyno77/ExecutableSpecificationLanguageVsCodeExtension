@@ -1,3 +1,10 @@
+import { Compiler, LangiumModel, SourceComposer, type ModuleModel, type ReadResult } from 'executable-specification-language';
+import type { DocumentReport } from './DocumentReport.js';
+
+type OpenDocument = { source: SourceDocument; version: number; revision: number; dependencies: Set<string>; pending?: Set<string> };
+type ParsedSource = { source: SourceDocument; result: ReadResult; model?: ModuleModel };
+const obsoleteAnalysis = Symbol('obsolete document analysis');
+
 import { LangiumReader } from 'executable-specification-language';
 import type { DocumentFeedback } from "./DocumentFeedback.js";
 import type { SourceDocument } from "./SourceDocument.js";
@@ -14,10 +21,16 @@ import type { DocumentSources } from "./DocumentSources.js";
  */
 export class DocumentAnalysis {
     private readonly reader = new LangiumReader();
-    private readonly documents = new Map<string, { source: SourceDocument; version: number }>();
+    private readonly compiler = new Compiler();
+    private readonly composer = new SourceComposer((owner, authored) => this.locate(owner, authored));
+    private readonly documents = new Map<string, OpenDocument>();
+    private readonly parsed = new Map<string, ParsedSource>();
+    private readonly saved = new Map<string, SourceDocument | undefined>();
+    private readonly sources: DocumentSources;
     private readonly feedback: DocumentFeedback;
     constructor(feedback: DocumentFeedback, sources: DocumentSources) {
         this.feedback = feedback;
+        this.sources = sources;
     }
     /**
      * Unverified implementation obligation.
@@ -25,7 +38,7 @@ export class DocumentAnalysis {
      */
     opened(source: SourceDocument, version: number): void {
         this.validateVersion(version);
-        this.check(source, version);
+        this.update(source, version);
     }
     /**
      * Unverified implementation obligation.
@@ -35,24 +48,134 @@ export class DocumentAnalysis {
         this.validateVersion(version);
         const current = this.documents.get(source.uri);
         if (!current || version <= current.version) return;
-        this.check(source, version);
+        this.update(source, version);
     }
     /**
      * Unverified implementation obligation.
      * End this open lifetime and clear its diagnostics. Ignore later changes until the document is opened again; reopening may start with a lower version. Repeated close is harmless. Imported closed documents fall back to current saved text, and affected open dependents are rechecked. Unrelated documents remain unchanged.
      */
     closed(uri: string): void {
-        if (this.documents.delete(uri)) this.feedback.clear(uri);
+        if (!this.documents.delete(uri)) return;
+        this.saved.delete(uri);
+        const affected = this.affected(uri);
+        this.feedback.clear(uri);
+        this.run(affected);
     }
     private validateVersion(version: number): void {
         if (!Number.isInteger(version) || version < 0) throw new RangeError('Document versions must be nonnegative integers.');
     }
-    private check(source: SourceDocument, version: number): void {
-        const current = { source: Object.freeze({ uri: source.uri, text: source.text }), version };
+    private update(source: SourceDocument, version: number): void {
+        const current: OpenDocument = {
+            source: this.capture(source), version, revision: 0,
+            dependencies: this.documents.get(source.uri)?.dependencies ?? new Set(),
+        };
         this.documents.set(current.source.uri, current);
-        const result = this.reader.read({ sourceId: current.source.uri, text: current.source.text });
-        if (this.documents.get(current.source.uri) !== current) return;
-        this.feedback.publish(current.source, version, result.status === 'rejected' ? [...result.diagnostics] : []);
+        this.run(this.affected(current.source.uri, current));
+    }
+    private affected(uri: string, own?: OpenDocument): Array<{ document: OpenDocument; revision: number }> {
+        return [...this.documents.values()]
+            .filter(document => document === own || document.dependencies.has(uri) || document.pending?.has(uri))
+            .map(document => ({ document, revision: ++document.revision }));
+    }
+    private run(affected: Array<{ document: OpenDocument; revision: number }>): void {
+        try {
+            for (const { document, revision } of affected) {
+                if (this.current(document, revision)) this.check(document, revision);
+            }
+        } finally { this.prune(); }
+    }
+    private prune(): void {
+        const retained = new Set(this.documents.keys());
+        for (const document of this.documents.values()) {
+            for (const uri of document.dependencies) retained.add(uri);
+            for (const uri of document.pending ?? []) retained.add(uri);
+        }
+        for (const uri of this.saved.keys()) if (!retained.has(uri)) this.saved.delete(uri);
+        for (const uri of this.parsed.keys()) if (!retained.has(uri)) this.parsed.delete(uri);
+    }
+    private current(document: OpenDocument, revision: number): boolean {
+        return this.documents.get(document.source.uri) === document && document.revision === revision;
+    }
+    private capture(source: SourceDocument): SourceDocument {
+        return Object.freeze({ uri: source.uri, text: source.text });
+    }
+    private locate(owner: string, authored: string): string | undefined {
+        try { return new URL(authored, owner).href; }
+        catch (error) { if (error instanceof TypeError) return undefined; throw error; }
+    }
+    private parse(source: SourceDocument, current: () => void): ParsedSource {
+        const cached = this.parsed.get(source.uri);
+        if (cached?.source.text === source.text) return cached;
+        const captured = this.capture(source);
+        const result = this.reader.read({ sourceId: captured.uri, text: captured.text });
+        current();
+        const parsed: ParsedSource = { source: captured, result,
+            ...(result.status === 'accepted' ? { model: new LangiumModel(captured.uri, result.document) } : {}) };
+        this.parsed.set(captured.uri, parsed);
+        return parsed;
+    }
+    private imported(model: ModuleModel): Set<string> {
+        const authored = [
+            ...model.nodes('use').map(node => model.node(node.locator, 'string-literal').value),
+            ...model.nodes('include').map(node => model.node(node.locator, 'string-literal').value),
+            ...model.nodes('examples-attachment').map(node => model.node(node.locator, 'string-literal').value),
+            ...model.nodes('reference').flatMap(node => node.lookup?.kind === 'module' ? [node.lookup.locator] : []),
+        ];
+        return new Set(authored.flatMap(locator => {
+            const uri = this.locate(model.locator, locator);
+            return uri === undefined ? [] : [uri];
+        }));
+    }
+    private savedSource(uri: string, current: () => void): SourceDocument | undefined {
+        const open = this.documents.get(uri);
+        if (open) return open.source;
+        if (this.saved.has(uri)) return this.saved.get(uri);
+        const source = this.sources.read(uri);
+        current();
+        if (source !== undefined && source.uri !== uri) throw new TypeError('DocumentSources returned a different source URI.');
+        const captured = source === undefined ? undefined : this.capture(source);
+        this.saved.set(uri, captured);
+        return captured;
+    }
+    private check(document: OpenDocument, revision: number): void {
+        const dependencies = new Set<string>();
+        document.pending = dependencies;
+        const current = () => { if (!this.current(document, revision)) throw obsoleteAnalysis; };
+        try {
+            const entry = this.parse(document.source, current);
+            const captures = new Map<string, ParsedSource>([[entry.source.uri, entry]]);
+            const visit = (parsed: ParsedSource): void => {
+                if (!parsed.model) return;
+                for (const uri of this.imported(parsed.model)) {
+                    dependencies.add(uri);
+                    if (captures.has(uri)) continue;
+                    const source = this.savedSource(uri, current);
+                    if (source === undefined) continue;
+                    const imported = this.parse(source, current);
+                    captures.set(uri, imported);
+                    visit(imported);
+                }
+            };
+            visit(entry);
+            current();
+            const models = [...captures.values()].flatMap(parsed => parsed.model ? [parsed.model] : []);
+            const compilation = entry.model ? this.compiler.compile({ resolution:
+                this.composer.compose(entry.model, { modules: models.slice(1), packages: [] }) }) : undefined;
+            current();
+            const report: DocumentReport = {
+                syntax: [...captures.values()].flatMap(parsed => parsed.result.status === 'rejected' ? [...parsed.result.diagnostics] : []),
+                ...(compilation === undefined ? {} : { compilation }),
+                sources: [...captures.values()].map(parsed => parsed.source), dependencies: [...dependencies],
+            };
+            Object.freeze(report.syntax);
+            Object.freeze(report.sources);
+            Object.freeze(report.dependencies);
+            Object.freeze(report);
+            document.dependencies = dependencies;
+            document.pending = undefined;
+            this.feedback.publish(document.source, document.version, report);
+        } catch (error) { if (error !== obsoleteAnalysis) throw error; }
+        finally { if (document.pending === dependencies) document.pending = undefined; }
     }
 
 /**
@@ -60,6 +183,10 @@ export class DocumentAnalysis {
      * Invalidate a requested saved source after creation, change or deletion and recheck affected open entries even when their editor version is unchanged. Ignore unrelated URIs and saved changes hidden by an authoritative open snapshot. Reuse unchanged parsed snapshots and read only the invalidated source plus newly required imports. Track missing imports too, and terminate cyclic import acquisition. Preserve other documents and previous reports; do not let reentrant older work replace current feedback.
      */
 sourceChanged(uri: string): void {
-        throw new Error("Not implemented: DocumentAnalysis.sourceChanged");
+        if (this.documents.has(uri)) return;
+        const affected = this.affected(uri);
+        if (!affected.length) return;
+        this.saved.delete(uri);
+        this.run(affected);
     }
 }
