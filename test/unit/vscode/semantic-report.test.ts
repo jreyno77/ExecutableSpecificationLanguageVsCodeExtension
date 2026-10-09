@@ -1,8 +1,10 @@
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Connection, Disposable, DocumentDiagnosticReport } from 'vscode-languageserver/node';
 import { LanguageServerAdapter } from '../../../src/vscode/LanguageServerAdapter.js';
 import type { DocumentSources } from '../../../src/core/DocumentSources.js';
 import type { DocumentReport } from '../../../src/core/DocumentReport.js';
+import type { PreviewPublication } from '../../../src/core/PreviewPublication.js';
 import type { SourceDocument } from '../../../src/core/SourceDocument.js';
 
 // A narrow native-connection recorder: the real adapter registers and invokes these
@@ -10,6 +12,7 @@ import type { SourceDocument } from '../../../src/core/SourceDocument.js';
 function recordedServer(sources: DocumentSources = { read: () => undefined }) {
   const callbacks = new Map<string, (params: any) => any>();
   const released: string[] = [], warnings: string[] = [], errors: string[] = [];
+  const publications: PreviewPublication[] = [], publicationListeners = new Set<() => void>();
   const registrations: Array<{ options: unknown; complete: (registration: Disposable) => void }> = [];
   const listen = (name: string) => (callback: (params: any) => any) => {
     callbacks.set(name, callback);
@@ -17,6 +20,8 @@ function recordedServer(sources: DocumentSources = { read: () => undefined }) {
   };
   const connection = {
     onInitialize: listen('initialize'), onInitialized: listen('initialized'),
+    onNotification: (method: string, callback: (params: any) => void) => listen(method)(callback),
+    sendNotification: (_method: string, value: PreviewPublication) => { publications.push(value); for (const receive of [...publicationListeners]) receive(); return Promise.resolve(); },
     onDidChangeWatchedFiles: listen('watched'),
     onDidOpenTextDocument: listen('opened'), onDidChangeTextDocument: listen('changed'),
     onDidCloseTextDocument: listen('closed'), onWillSaveTextDocument: listen('willSave'),
@@ -33,7 +38,9 @@ function recordedServer(sources: DocumentSources = { read: () => undefined }) {
   } } });
   callbacks.get('initialized')!({});
   return {
-    adapter, warnings, errors, released, registrations,
+    adapter, warnings, errors, released, registrations, publications,
+    notification: (method: string, value: unknown) => { const receive = callbacks.get(method); if (!receive) throw Error('No registered notification ' + method); receive(value); },
+    waitPreview: (matches: (publication: PreviewPublication) => boolean) => new Promise<void>(resolve => { const receive = () => { if (publications.some(matches)) { publicationListeners.delete(receive); resolve(); } }; publicationListeners.add(receive); receive(); }),
     pull: (uri: string) => callbacks.get('diagnostics')!({ textDocument: { uri } }) as Extract<DocumentDiagnosticReport, { kind: 'full' }>,
     open: (source: SourceDocument) => callbacks.get('opened')!({ textDocument: { ...source, version: 1, languageId: 'expec' } }),
   };
@@ -160,7 +167,35 @@ describe('native semantic feedback at its protocol boundary', () => {
     expect(server.pull(source.uri).items).toEqual([]);
     expect(server.pull(source.uri).resultId).toBeUndefined();
     expect(releases).toBe(1);
-    expect(new Set(server.released)).toEqual(new Set(['initialize', 'initialized', 'watched', 'diagnostics', 'opened', 'changed', 'closed', 'willSave', 'willSaveWaitUntil', 'saved']));
+    expect(new Set(server.released)).toEqual(new Set(['initialize', 'initialized', 'watched', 'diagnostics', 'opened', 'changed', 'closed', 'willSave', 'willSaveWaitUntil', 'saved', 'expec/previewConfiguration', 'expec/previewSelection']));
     expect(() => server.adapter.dispose()).not.toThrow();
+  });
+});
+
+describe('native preview adaptation', () => {
+  it('forwards actual open analysis into plain renderer feedback without replacing diagnostics', async () => {
+    const server = recordedServer();
+    const source = { uri: 'file:///workspace/book.expec', text: 'type Book { title: Text }' };
+    server.notification('expec/previewConfiguration', { configuration: { file: resolve('expec.json'), writable: true, text: JSON.stringify({ formatVersion: 1, version: '0.1.0', build: { entries: ['book.expec'] }, outputs: [{ id: 'markdown', options: { directory: 'draft/docs' } }] }) } });
+    server.notification('expec/previewSelection', { uri: source.uri });
+    server.open(source);
+    await server.waitPreview(publication => Boolean(publication.uri === source.uri && publication.tabs[0] && publication.tabs[0].status !== 'pending'));
+    const actual = server.publications.at(-1)!;
+    expect(actual.tabs[0]!.status, JSON.stringify(actual)).toBe('ready');
+    expect(actual.uri).toBe(source.uri);
+    expect(actual.version).toBe(1);
+    expect(actual.tabs.map(tab => tab.id)).toEqual(['markdown']);
+    expect(actual.tabs[0]!.documents![0]!.path).toBe('draft/docs/Book.md');
+    expect(actual.tabs[0]!.documents![0]!.content).toContain('type Book');
+    expect(JSON.parse(JSON.stringify(actual))).toEqual(actual);
+    expect(actual).not.toHaveProperty('compilation');
+    expect(actual).not.toHaveProperty('specification');
+    expect(server.pull(source.uri).items).toEqual([]);
+    server.adapter.clear(source.uri);
+    expect(server.publications.at(-1)!.tabs).toEqual([]);
+    const count = server.publications.length;
+    server.adapter.dispose();
+    server.adapter.publish(source, 2, emptyReport([source]));
+    expect(server.publications).toHaveLength(count);
   });
 });

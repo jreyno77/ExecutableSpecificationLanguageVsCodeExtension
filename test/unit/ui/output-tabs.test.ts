@@ -22,7 +22,7 @@ test('a disposed view refuses further presentation', async () => {
 test('an empty host already claimed by a view cannot be claimed twice', async () => {
   const view = await OutputTabsBrowser.open();
   await expect(view.construct('output-host')).rejects.toThrow('existing empty host: output-host');
-  await view.present([{ id: 'uml', label: 'UML', content: 'Book' }]);
+  await view.present([{ id: 'uml', label: 'UML', status: 'ready', documents: [{ path: 'Book.d2', mediaType: 'text/vnd.d2', content: 'Book' }] }]);
   expect(await view.content()).toBe('Book');
 });
 
@@ -30,6 +30,6 @@ test('disposing releases the host for another view', async () => {
   const view = await OutputTabsBrowser.open();
   await view.dispose();
   await view.construct('output-host');
-  await view.present([{ id: 'markdown', label: 'Notes', content: '# Book' }]);
+  await view.present([{ id: 'markdown', label: 'Notes', status: 'ready', documents: [{ path: 'Book.md', mediaType: 'text/markdown', content: '# Book' }] }]);
   expect(await view.content()).toBe('# Book');
 });

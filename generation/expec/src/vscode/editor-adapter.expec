@@ -42,7 +42,7 @@ examples for EditorAdapter {
     text: "type Draft {"
   }
   fixture previewTabs: List<OutputTab> = [
-    { id: "markdown", label: "Markdown", content: "# Edited Book" }
+    { id: "markdown", label: "Markdown", status: "ready", documents: [{ path: "Book.md", mediaType: "text/markdown", content: "# Edited Book" }] }
   ]
 
   setup editorCoreReturns(tabs: List<OutputTab>) returns Nothing

@@ -13,7 +13,9 @@
       "src/core/document-analysis.expec",
       "src/vscode/live-diagnostics.expec",
       "src/core/project-connection.expec",
-      "src/vscode/project-connection.expec"
+      "src/vscode/project-connection.expec",
+      "src/core/output-previews.expec",
+      "src/vscode/output-previews.expec"
     ]
   },
   "outputs": [
@@ -60,9 +62,18 @@
             "from": "vscode-languageclient/node"
           },
           {
-            "declaration": ["CompilerReport"],
+            "declaration": [
+              "CompilerReport"
+            ],
             "from": "executable-specification-language",
             "name": "Compilation"
+          },
+          {
+            "declaration": [
+              "RegisteredOutput"
+            ],
+            "from": "executable-specification-language",
+            "name": "OutputRegistration"
           }
         ]
       }

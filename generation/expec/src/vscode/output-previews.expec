@@ -1,0 +1,210 @@
+use PreviewPublication, PreviewConfigurationFeedback from "../core/output-previews.expec"
+use ConnectionConfiguration from "../core/project-connection.expec"
+use OutputTabs from "../ui/output-tabs.expec"
+use VsCodeExtensionContext, NativeLanguageClient from "./live-diagnostics.expec"
+
+// Host/resource and protocol adaptation only; core supplies complete current display state.
+component OutputPreviewHost {
+  requires package "language-client" for runtime
+  requires package "vscode-types" for build
+  requires package "node-types" for build
+  requires package "typescript" for build
+  requires package "vite" for build
+  requires package "vscode-test-electron" for test
+  requires package "playwright" for test
+  depends on OutputTabs
+
+  construction(context: VsCodeExtensionContext, client: NativeLanguageClient)
+  public start, configurationChanged, present, dispose
+
+  capability start() returns Nothing {
+    promises "Register Show Output Previews (expec.showOutputPreviews), the client notification handler and native editor-selection events once. Starting or activating the adapter registers the command without opening a panel. Invoking Show Output Previews creates or reveals one ordinary VS Code webview panel containing the packaged React OutputTabs application. Its browser bootstrap mounts OutputTabs and uses the existing Vite/React build to bundle React and ReactDOM locally, not external runtime imports. Package the resulting script/style assets under dist/webview in the VSIX. Preserve the real shipped UML renderer SDK worker and WASM runtime, including its module-relative resources and paths, so packaged native server rendering works without a checkout or external runtime download. Browser asset build and native renderer resource packaging precede implementation testing. Follow the current expec editor URI, including untitled; focusing the panel retains the last authored selection. Forward selection to server core without reading or compiling documents. Subscribe before client startup and replay latest selected URI and saved configuration when the same client becomes running, including restart. The existing native client and diagnostic feature APIs remain intact. Register owned resources in the supplied context; host lifetime guards only prevent disposed callbacks, not another business revision engine."
+  }
+  capability configurationChanged(configuration: ConnectionConfiguration?) returns Nothing {
+    promises "Forward this captured saved configuration snapshot, or selection absence, to server core through the native client. Buffer the latest snapshot until the client is running. Do not parse or validate it, infer target readiness, capture project code, install packages or generate. Dirty configuration behavior is supplied by ConnectionSidebar and remains saved-text behavior."
+  }
+  capability present(publication: PreviewPublication) returns Nothing {
+    promises "Adapt one current plain core presentation to the webview message channel. Cache only the latest full presentation for ready replay, panel recreation and temporarily hidden panels; postMessage success is dispatch only, not proof of rendering. Never transport Specification, compiler models, functions or private ownership data. Set webview HTML once per lifetime, mount the bundled React application before ready, and replay to that exact live panel. Resolve only packaged local script/style assets with asWebviewUri and restrict localResourceRoots to their folder. Enable scripts only; disable forms and command URIs. Use a CSP beginning default-src none with only the bundled scripts/styles and required inert data images allowed. Literal text is never HTML and SVG is never injected inline or fetched from target paths. Present the core source context and whole-view explanation as well as its ordered tabs."
+  }
+  capability dispose() returns Nothing {
+    promises "Dispose every owned panel, command and event/message subscription, attempt all cleanup even if one resource fails, and prevent later dispatch or selection/configuration events. Panel closure releases its webview only and does not stop language analysis; reopening receives the latest current presentation. The native entry point owns the supplied client and its one awaited stop."
+  }
+}
+
+// Install the actual packaged VSIX once in the shared owned VS Code host. Each case
+// owns source/configuration/target files and a panel; edits use real native document
+// APIs. The driver observes the actual marked product webview frame over loopback
+// CDP using existing Playwright, never postMessage return values or an input copy.
+// selectPreviewDocument records actual visited DOM values and decoded image evidence,
+// keyed by actual output ID/path for the current source; final checks can read all
+// three visited outputs. Edit/configuration/close actions record actual prior DOM
+// states before transitioning. No values come from an input copy or fixture parse.
+// It discards owned dirty editors, closes its panel and restores/removes owned files.
+// Saved-byte equality is paired with OUT-24's independent no-target-access evidence.
+examples for OutputPreviewHost {
+  fixture configuredPreviews: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"uml\",\"options\":{\"directory\":\"draft/uml\",\"views\":[\"structure\"]}},{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\"}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}"
+  fixture revisedPreviews: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"revised/docs\"}}]}"
+  fixture largeBookSource: Text = "type Book { title: Text }\ntype Shelf1 { book: Book }\ntype Shelf2 { book: Book }\ntype Shelf3 { book: Book }\ntype Shelf4 { book: Book }\ntype Shelf5 { book: Book }\ntype Shelf6 { book: Book }\ntype Shelf7 { book: Book }\ntype Shelf8 { book: Book }\ntype Shelf9 { book: Book }\ntype Shelf10 { book: Book }\ntype Shelf11 { book: Book }\ntype Shelf12 { book: Book }\ntype Shelf13 { book: Book }\ntype Shelf14 { book: Book }\ntype Shelf15 { book: Book }\ntype Shelf16 { book: Book }\ntype Shelf17 { book: Book }\ntype Shelf18 { book: Book }\ntype Shelf19 { book: Book }\ntype Shelf20 { book: Book }"
+
+  setup previewEditor(initialText: Text, configuration: Text) returns Nothing
+  action showOutputPreviews() returns Nothing
+  action editPreviewWithoutSaving(text: Text) returns Nothing
+  action savePreviewConfiguration(text: Text) returns Nothing
+  action selectPreviewOutput(id: Text) returns Nothing
+  action selectPreviewDocument(path: Text) returns Nothing
+  action closePreviewPanel() returns Nothing
+  action zoomPreviewDiagram() returns Nothing
+  action scrollPreviewDiagram() returns Nothing
+  action resetPreviewZoom() returns Nothing
+  observation nativePreviewOutputIds() returns List<Text>
+  observation nativePreviewSelectedId(id: Text, path: Text) returns Text
+  observation nativePreviewDocumentPath(id: Text, path: Text) returns Text
+  observation nativePreviewDocumentMediaType(id: Text, path: Text) returns Text
+  observation nativePreviewTextIncludes(id: Text, path: Text, text: Text) returns Boolean
+  observation nativePreviewObservedStatus(id: Text, path: Text) returns Text
+  observation nativePreviewBeforeEditStatus() returns Text
+  observation nativePreviewBeforeConfigurationIds() returns List<Text>
+  observation nativePreviewClosedTextIncludes(text: Text) returns Boolean
+  observation nativePreviewZoomHistory() returns List<Number>
+  observation nativePreviewDocumentCount() returns Number
+  observation nativePreviewStatus() returns Text
+  observation nativePreviewExplanation() returns Text
+  observation nativePreviewImageDecoded(id: Text, path: Text) returns Boolean
+  observation nativePreviewSvgContainsLabel(id: Text, path: Text, text: Text) returns Boolean
+  observation nativePreviewZoomPercent() returns Number
+  observation nativePreviewDiagramOverflow() returns Boolean
+  observation nativePreviewDiagramScrolled() returns Boolean
+  observation nativePreviewSavedText() returns Text
+  observation nativePreviewOpenText() returns Text
+  observation nativePreviewSourceDirty() returns Boolean
+  observation nativePreviewFilesUnchanged() returns Boolean
+
+  check expectNativePreviewOutputs(ids: List<Text>) {
+    let actual = nativePreviewOutputIds()
+    assert actual == ids
+  }
+  check expectNativePreviewText(id: Text, path: Text, mediaType: Text, text: Text) {
+    let selected = nativePreviewSelectedId(id, path)
+    let actualPath = nativePreviewDocumentPath(id, path)
+    let actualMediaType = nativePreviewDocumentMediaType(id, path)
+    let includesText = nativePreviewTextIncludes(id, path, text)
+    let status = nativePreviewObservedStatus(id, path)
+    assert selected == id
+    assert actualPath == path
+    assert actualMediaType == mediaType
+    assert includesText == true
+    assert status == "ready"
+  }
+  check expectNativePreviewBlocked() {
+    let status = nativePreviewStatus()
+    let explanation = nativePreviewExplanation()
+    let previous = nativePreviewBeforeEditStatus()
+    let documents = nativePreviewDocumentCount()
+    assert previous == "ready"
+    assert documents == 0
+    assert status == "blocked"
+    assert explanation != ""
+  }
+  check expectNativePreviewDiagram(id: Text, path: Text, label: Text) {
+    let decoded = nativePreviewImageDecoded(id, path)
+    let actualLabel = nativePreviewSvgContainsLabel(id, path, label)
+    let mediaType = nativePreviewDocumentMediaType(id, path)
+    assert decoded == true
+    assert actualLabel == true
+    assert mediaType == "image/svg+xml"
+  }
+  check expectNativePreviewUnsaved(saved: Text, open: Text) {
+    let actualSaved = nativePreviewSavedText()
+    let actualOpen = nativePreviewOpenText()
+    let dirty = nativePreviewSourceDirty()
+    let unchanged = nativePreviewFilesUnchanged()
+    assert actualSaved == saved
+    assert actualOpen == open
+    assert dirty == true
+    assert unchanged == true
+  }
+  check expectNativePreviewZoom(percent: Number) {
+    let actual = nativePreviewZoomPercent()
+    assert actual == percent
+  }
+  check expectNativePreviewScrollable() {
+    let overflow = nativePreviewDiagramOverflow()
+    let scrolled = nativePreviewDiagramScrolled()
+    assert overflow == true
+    assert scrolled == true
+  }
+
+  check expectNativePreviewPriorOutputs(ids: List<Text>) {
+    let actual = nativePreviewBeforeConfigurationIds()
+    assert actual == ids
+  }
+  check expectClosedPreviewText(text: Text) {
+    let actual = nativePreviewClosedTextIncludes(text)
+    assert actual == true
+  }
+  check expectNativePreviewZoomHistory(history: List<Number>) {
+    let actual = nativePreviewZoomHistory()
+    assert actual == history
+  }
+
+  scenario "read actual configured outputs from an unsaved edit without writing generated files" {
+    given previewEditor("type Book { title: Text }", configuredPreviews)
+    when showOutputPreviews()
+    when editPreviewWithoutSaving("type Book { title: Number }")
+    when selectPreviewOutput("typescript")
+    when selectPreviewDocument("draft/types/Book.ts")
+    when selectPreviewOutput("markdown")
+    when selectPreviewDocument("draft/docs/Book.md")
+    when selectPreviewOutput("uml")
+    when selectPreviewDocument("draft/uml/structure.svg")
+    then expectNativePreviewOutputs(["uml", "typescript", "markdown"])
+    then expectNativePreviewText("typescript", "draft/types/Book.ts", "text/typescript", "title: number;")
+    then expectNativePreviewText("markdown", "draft/docs/Book.md", "text/markdown", "type Book")
+    then expectNativePreviewDiagram("uml", "draft/uml/structure.svg", "Book")
+    then expectNativePreviewUnsaved("type Book { title: Text }", "type Book { title: Number }")
+  }
+  scenario "a rejected unsaved edit withdraws former successful documents" {
+    given previewEditor("type Book { title: Text }", configuredPreviews)
+    when showOutputPreviews()
+    when selectPreviewOutput("typescript")
+    when selectPreviewDocument("draft/types/Book.ts")
+    when editPreviewWithoutSaving("type Book {")
+    then expectNativePreviewBlocked()
+  }
+  scenario "closing and reopening a preview replays the latest authored state" {
+    given previewEditor("type Book { title: Text }", configuredPreviews)
+    when showOutputPreviews()
+    when selectPreviewOutput("typescript")
+    when selectPreviewDocument("draft/types/Book.ts")
+    when closePreviewPanel()
+    when editPreviewWithoutSaving("type Book { title: Number }")
+    when showOutputPreviews()
+    when selectPreviewOutput("typescript")
+    when selectPreviewDocument("draft/types/Book.ts")
+    then expectClosedPreviewText("title: string;")
+    then expectNativePreviewText("typescript", "draft/types/Book.ts", "text/typescript", "title: number;")
+  }
+  scenario "saving output configuration changes the open preview without refresh" {
+    given previewEditor("type Book { title: Text }", configuredPreviews)
+    when showOutputPreviews()
+    when savePreviewConfiguration(revisedPreviews)
+    when selectPreviewOutput("markdown")
+    when selectPreviewDocument("revised/docs/Book.md")
+    then expectNativePreviewPriorOutputs(["uml", "typescript", "markdown"])
+    then expectNativePreviewOutputs(["markdown"])
+    then expectNativePreviewText("markdown", "revised/docs/Book.md", "text/markdown", "type Book")
+  }
+  scenario "read a large real diagram at normal scale and navigate its viewport" {
+    given previewEditor(largeBookSource, configuredPreviews)
+    when showOutputPreviews()
+    when selectPreviewOutput("uml")
+    when selectPreviewDocument("draft/uml/structure.svg")
+    when zoomPreviewDiagram()
+    when scrollPreviewDiagram()
+    when resetPreviewZoom()
+    then expectNativePreviewDiagram("uml", "draft/uml/structure.svg", "Book")
+    then expectNativePreviewScrollable()
+    then expectNativePreviewZoomHistory([100, 125, 100])
+    then expectNativePreviewZoom(100)
+  }
+}

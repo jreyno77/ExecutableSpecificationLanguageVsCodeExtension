@@ -8,6 +8,8 @@ exports.run = async function run() {
   const diagnosticDocuments = new Map();
   const { openConnectionSidebar } = require('./connection-sidebar.cjs');
   const connectionSidebars = new Map();
+  const { openPreviewEditor } = require('./preview-editor.cjs');
+  const previewEditors = new Map();
   const request = JSON.parse(await fs.readFile(process.env.EXPEC_NATIVE_REQUEST, 'utf8'));
   const socket = net.createConnection({ host: '127.0.0.1', port: request.port });
   await new Promise((resolveRun, rejectRun) => {
@@ -83,7 +85,28 @@ exports.run = async function run() {
               await sidebar.dispose(); connectionSidebars.delete(frame.sidebarId); value = null;
             } else throw new Error('Invalid native sidebar operation.');
           }
+        } else if (frame.operation === 'previewOpen' && typeof frame.previewId === 'string' && typeof frame.extensionId === 'string'
+          && typeof frame.file === 'string' && typeof frame.configurationFile === 'string' && typeof frame.resetFile === 'string') {
+          if (previewEditors.has(frame.previewId)) throw new Error('The owned native preview case already exists.');
+          const editor = await openPreviewEditor(vscode, frame.extensionId, frame);
+          previewEditors.set(frame.previewId, editor); value = await editor.observation();
+        } else if (['previewShow', 'previewEdit', 'previewSaveConfiguration', 'previewObserve', 'previewClosePanel', 'previewDispose'].includes(frame.operation)
+          && typeof frame.previewId === 'string') {
+          const editor = previewEditors.get(frame.previewId);
+          if (frame.operation === 'previewDispose' && !editor) value = null;
+          else {
+            if (!editor) throw new Error('The owned native preview case is unavailable.');
+            if (frame.operation === 'previewShow') value = await editor.show();
+            else if (frame.operation === 'previewEdit' && typeof frame.text === 'string') value = await editor.edit(frame.text);
+            else if (frame.operation === 'previewSaveConfiguration' && typeof frame.text === 'string') value = await editor.saveConfiguration(frame.text);
+            else if (frame.operation === 'previewObserve') value = await editor.observation();
+            else if (frame.operation === 'previewClosePanel') value = await editor.closePanel();
+            else if (frame.operation === 'previewDispose') { await editor.dispose(); previewEditors.delete(frame.previewId); value = null; }
+            else throw new Error('Invalid native preview operation.');
+          }
         } else if (frame.operation === 'shutdown') {
+          for (const editor of previewEditors.values()) await editor.dispose();
+          previewEditors.clear();
           for (const document of diagnosticDocuments.values()) await document.dispose();
           diagnosticDocuments.clear();
           for (const sidebar of connectionSidebars.values()) await sidebar.dispose();
@@ -129,7 +152,7 @@ if (require.main === module) {
       await runTests({
         vscodeExecutablePath: request.executable,
         extensionDevelopmentPath: __dirname, extensionTestsPath: __filename,
-        launchArgs: [...profile, request.workspaceDirectory, '--disable-gpu', '--disable-telemetry'],
+        launchArgs: [...profile, request.workspaceDirectory, '--disable-gpu', '--disable-telemetry', '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0'],
         extensionTestsEnv: { EXPEC_NATIVE_REQUEST: requestPath },
       });
     } else throw new Error('Unsupported owned launcher command.');

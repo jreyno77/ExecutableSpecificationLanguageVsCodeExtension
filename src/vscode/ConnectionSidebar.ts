@@ -5,6 +5,8 @@ import type { ConnectionController } from "../core/ConnectionController.js";
 import type { ExtensionContext } from "vscode";
 import type { ConnectionState } from "../core/ConnectionState.js";
 import type { ConnectionConfiguration } from "../core/ConnectionConfiguration.js";
+import type { PreviewConfigurationFeedback } from "../core/PreviewConfigurationFeedback.js";
+
 
 
 
@@ -40,7 +42,8 @@ export class ConnectionSidebar {
     private hostFailure?: string;
     private loading: Promise<void> = Promise.resolve();
 
-    constructor(context: ExtensionContext) {
+    constructor(context: ExtensionContext, previews: PreviewConfigurationFeedback) {
+        this.previews = previews;
         this.resources.push(
             vscode.window.registerTreeDataProvider('expec.connection', this),
             vscode.commands.registerCommand('expec.chooseProject', (directory?: vscode.Uri) => this.choose(directory)),
@@ -62,35 +65,24 @@ export class ConnectionSidebar {
     }
     /**
      * Unverified implementation obligation.
-     * Register the native .expec Project Connection view and Choose Project command once. Adapt this same instance to the standard TreeDataProvider APIs; native activation exposes that actual registered provider as connectionTreeProvider alongside the same native LanguageClient, for standard provider consumers. Existing client identity and methods remain intact; no extra core business query or reconstructed test rows. Start core ConnectionController for the supplied absolute local manifest filename, feeding actual saved text or absence and whether the document can be written. Display checking until core verifies the connection. Picking a folder sends its absolute fsPath to core; cancel does nothing. Switching filename disposes the previous controller and watches before following the new configuration; obsolete callbacks cannot affect the view or save a file. Settings expec.configurationFile defaults to expec.json relative to the selected workspace folder; a single folder can be selected automatically, multiple folders require a workspace choice. Empty/remote workspaces show an explanation and do not claim a connection. Opening the view or invoking the command activates the extension; opening an expec document still activates existing language support.
+     * Register the native .expec Project Connection view and Choose Project command once. Adapt this same instance to the standard TreeDataProvider APIs; native activation exposes that actual registered provider as connectionTreeProvider alongside the same native LanguageClient, for standard provider consumers. Existing client identity and methods remain intact; no extra core business query or reconstructed test rows. Start core ConnectionController for the supplied absolute local manifest filename, feeding actual saved text or absence and whether the document can be written. Display checking until core verifies the connection. Picking a folder sends its absolute fsPath to core; cancel does nothing. Switching filename disposes the previous controller and watches before following the new configuration; obsolete callbacks cannot affect the view or save a file. Settings expec.configurationFile defaults to expec.json relative to the selected workspace folder; a single folder can be selected automatically, multiple folders require a workspace choice. Empty/remote workspaces show an explanation and do not claim a connection. Opening the view or invoking the command activates the extension; opening an expec document still activates existing language support. Forward the actual selected saved ConnectionConfiguration snapshot to the supplied preview feedback whenever it changes, independently of target verification. Withdraw the prior selection with absence before switching manifests. Do not parse it again or wait for connected status to permit authored previews.
      */
     start(configurationFile: string): void {
         if (this.disposed) return;
         if (!isAbsolute(configurationFile)) throw new TypeError('Provide an absolute local configuration filename.');
         const filename = resolve(configurationFile);
         if (this.filename === filename && this.controller) return;
-        this.release(this.watches);
-        this.watches = [];
-        this.controller?.dispose();
-        const lifetime = ++this.lifetime;
-        this.reading++;
-        this.watching++;
-        this.writing++;
+        const lifetime = this.withdrawConfiguration();
+        if (!this.live(lifetime)) return;
         this.filename = filename;
         this.folder ??= vscode.workspace.workspaceFolders?.find(folder => folder.uri.scheme === 'file'
             && !relative(folder.uri.fsPath, filename).startsWith('..'));
-        this.saved = undefined;
-        this.choicePending = false;
-        this.state = undefined;
-        this.canonical = undefined;
-        this.watchTarget = undefined;
-        this.watchSignature = '';
-        this.hostFailure = undefined;
         this.controller = new Controller({
             present: state => { if (this.live(lifetime)) this.present(state); },
             saveConfiguration: (previous, text) => { if (this.live(lifetime)) this.saveConfiguration(previous, text); },
         });
         this.changes.fire(undefined);
+        if (!this.live(lifetime)) return;
         this.loading = this.updateWatches().then(() => this.live(lifetime) ? this.readSaved() : undefined).catch(error => this.hostProblem(error, lifetime));
     }
     /**
@@ -109,7 +101,7 @@ export class ConnectionSidebar {
     }
     /**
      * Unverified implementation obligation.
-     * Fulfill this exact current core save request using VS Code file/document APIs. Recheck the selected filename, current saved text and dirty-editor state immediately before applying; refuse stale requests or dirty documents without overwriting user edits. Save only the manifest selected by the author, preserve all other settings as supplied by core, and never write connected-project source. Confirm success to core with actual saved text, or report the failure using core.saveFailed with the exact previous snapshot. A requested write or picker result alone never proves success. Missing manifests can be created only by this explicit Choose Project action. Do not create projects, install packages, compile or generate outputs.
+     * Fulfill this exact current core save request using VS Code file/document APIs. Recheck the selected filename, current saved text and dirty-editor state immediately before applying; refuse stale requests or dirty documents without overwriting user edits. Save only the manifest selected by the author, preserve all other settings as supplied by core, and never write connected-project source. Confirm success to core with actual saved text, or report the failure using core.saveFailed with the exact previous snapshot. A requested write or picker result alone never proves success. Missing manifests can be created only by this explicit Choose Project action. Do not create projects, install packages, compile or generate outputs. Forward successful actual saved confirmation to the same preview feedback; dirty edits continue using saved bytes, not unsaved configuration text.
      */
     saveConfiguration(previous: ConnectionConfiguration, text: string): void {
         if (this.disposed || previous.file !== this.filename || !this.controller) return;
@@ -117,7 +109,7 @@ export class ConnectionSidebar {
     }
     /**
      * Unverified implementation obligation.
-     * Stop core and dispose every owned view, command, event subscription and watcher. Repeated disposal is harmless; pending reads, picks and saves cannot publish or initiate writes after disposal. Cleanup must attempt all owned resources even when one throws.
+     * Stop core and dispose every owned view, command, event subscription and watcher. Repeated disposal is harmless; pending reads, picks and saves cannot publish or initiate writes after disposal. Cleanup must attempt all owned resources even when one throws. Withdraw the selected preview configuration through the supplied feedback before releasing this native lifetime.
      */
     dispose(): void {
         if (this.disposed) return;
@@ -132,7 +124,8 @@ export class ConnectionSidebar {
         this.resources.length = 0;
         this.controller = undefined;
         this.state = undefined;
-        this.release(resources);
+        this.saved = undefined;
+        this.release([{ dispose: () => this.previews.configurationChanged(undefined) }, ...resources]);
     }
     getChildren(element?: ConnectionState): ConnectionState[] {
         if (this.disposed || element) return [];
@@ -180,10 +173,15 @@ export class ConnectionSidebar {
             if (!this.live(lifetime) || reading !== this.reading || controller !== this.controller) return;
             const writable = !this.dirty() && vscode.workspace.fs.isWritableFileSystem('file') !== false;
             const snapshot = Object.freeze({ file: filename, ...(text === undefined ? {} : { text }), writable });
+            const previous = this.saved;
             this.saved = snapshot;
             this.choicePending = false;
             this.hostFailure = undefined;
             controller.configurationChanged(snapshot);
+            if (this.live(lifetime) && reading === this.reading && controller === this.controller
+                && (!previous || previous.file !== snapshot.file || previous.text !== snapshot.text || previous.writable !== snapshot.writable)) {
+                this.previews.configurationChanged(snapshot);
+            }
         } catch (error) { if (reading === this.reading) this.hostProblem(error, lifetime); }
     }
 
@@ -220,17 +218,11 @@ export class ConnectionSidebar {
         if (this.disposed) return;
         const folders = vscode.workspace.workspaceFolders ?? [];
         if (this.folder && !folders.some(folder => folder.uri.toString() === this.folder!.uri.toString())) {
-            this.controller?.dispose();
-            this.controller = undefined;
-            this.filename = undefined;
-            this.state = undefined;
-            this.saved = undefined;
-            this.choicePending = false;
-            this.lifetime++;
-            this.release(this.watches);
-            this.watches = [];
             this.folder = undefined;
+            const lifetime = this.withdrawConfiguration();
+            if (!this.live(lifetime)) return;
             this.changes.fire(undefined);
+            if (!this.live(lifetime)) return;
         }
         this.folder ??= folders.length === 1 && folders[0]?.uri.scheme === 'file' ? folders[0] : undefined;
         if (!this.folder) return;
@@ -350,5 +342,29 @@ export class ConnectionSidebar {
         const errors: unknown[] = [];
         for (const resource of resources) try { resource.dispose(); } catch (error) { errors.push(error); }
         if (errors.length) throw new AggregateError(errors, 'Could not release all connection sidebar resources.');
+    }
+
+    private readonly previews: PreviewConfigurationFeedback;
+
+    private withdrawConfiguration(): number {
+        const lifetime = ++this.lifetime;
+        this.reading++;
+        this.watching++;
+        this.writing++;
+        const controller = this.controller;
+        const resources: vscode.Disposable[] = controller ? [controller, ...this.watches] : [...this.watches];
+        this.controller = undefined;
+        this.watches = [];
+        this.filename = undefined;
+        this.saved = undefined;
+        this.choicePending = false;
+        this.state = undefined;
+        this.canonical = undefined;
+        this.watchTarget = undefined;
+        this.watchSignature = '';
+        this.hostFailure = undefined;
+        if (controller) resources.unshift({ dispose: () => this.previews.configurationChanged(undefined) });
+        this.release(resources);
+        return lifetime;
     }
 }

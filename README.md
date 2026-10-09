@@ -25,6 +25,24 @@ An unknown type such as `type Basket { book: Boook }` receives a located semanti
 Open **.expec Project Connection** in the Explorer and use **Choose Project** to select a local directory. Its status follows saved configuration changes and directory disappearance or restoration automatically. Save or revert unsaved configuration edits before choosing another project. `expec.configurationFile` selects the workspace manifest and defaults to `expec.json`; multiple workspace folders require a folder choice.
 
 A connected status verifies the directory is available. Compilation, dependencies and generated outputs have their own checks. Creating a new manifest sets `src/main.expec` as its initial build entry; configure your actual source entry before compilation.
+## Output previews
+
+Run **.expec: Show Output Previews** from the Command Palette. Add the desired outputs to your saved `expec.json`, for example:
+
+```json
+{
+  "formatVersion": 1,
+  "version": "0.1.0",
+  "build": { "entries": ["src/library.expec"] },
+  "outputs": [
+    { "id": "uml", "options": { "directory": "draft/uml" } },
+    { "id": "typescript", "options": { "directory": "draft/types" } },
+    { "id": "markdown", "options": { "directory": "draft/docs" } }
+  ]
+}
+```
+
+Select an output tab and then a document. Previews follow the selected `.expec` editor's unsaved text and saved output configuration. Each output shows its own progress or explanation. Diagrams start at their natural size, with scrolling, zoom and reset controls. Previewing leaves project files untouched; generated-file updates have a separate save policy.
 ## Develop from the specification
 
 Core owns application behavior; `src/vscode` and `src/ui` adapt native host events and presentation into core. Authored contracts and scenarios live in `generation/expec/src/`, whose folder layout maps to the connected project's `src/`. Scenarios generate acceptance tests, DSL and driver seams under `test/`; diagrams go to `generation/uml`.
@@ -51,6 +69,6 @@ PR CI selects affected components on Windows and Ubuntu; main runs the full exte
 
 ## Captured language build
 
-`generation/tooling/executable-specification-language-2fb9c5d.tgz` is a normally source-built development capture. It includes the existing foundation plus the reviewed EOF-location, completed-bookkeeping recovery and first-open declaration corrections from language PRs #95, #97 and #98. Its SHA256 is `979534504328e42e8472246b5a8046b153c7467f829808fb0c532627e7b7fb19`; `npm ci` also verifies lockfile integrity. This capture is not an official release; exact-merge package delivery remains a separate gate.
+`generation/tooling/executable-specification-language-e69ff4a.tgz` is a development capture from exact merged language commit `e69ff4a28355785572a019a649093615dffcdb03`, built in a clean source checkout with ordinary `npm ci`, `npm run build` and `npm pack`. It includes OUT-24 draft-output preview, OUT-25 literal diagram keys, PROJECT-40 numeric-array scope proof, PROJECT-41 confirmed read-only acquisition, and output-owned authored acceptance fixture regeneration (PR #104). The exact source build passed; official exact-main package release remains queued. Its SHA256 is `fdea39cae56914f680a245611d1301554160a1512e8722c0e67778ce890467bf`; `npm ci` also verifies lockfile integrity. This is a development capture, not an official release.
 
 TypeScript preserves JSX for Vite's React plugin. Automatic-runtime declaration capture remains [language issue60](https://github.com/jreyno77/ExecutableSpecificationLanguage/issues/60); native freshness and writer guards remain enabled.
