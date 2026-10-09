@@ -9,6 +9,7 @@ import { VsCodeSession, type DiagnosticMiddlewareObservation } from './vscode-se
 import { DiagnosticDocument } from './diagnostic-document.js';
 import { ConnectionSidebarCase } from './connection-sidebar.js';
 import { NativePreviewCase } from './native-preview.js';
+import { NativeGenerationCase } from './native-generation.js';
 
 const project = fileURLToPath(new URL('../../../', import.meta.url));
 const cachePath = join(tmpdir(), 'expec-vscode-electron-cache');
@@ -21,6 +22,7 @@ export class InstalledExpecEditor {
   private readonly diagnosticDocuments = new Set<DiagnosticDocument>();
   private readonly connectionSidebars = new Set<ConnectionSidebarCase>();
   private readonly previewEditors = new Set<NativePreviewCase>();
+  private readonly generationEditors = new Set<NativeGenerationCase>();
   private session: Promise<VsCodeSession> | undefined;
   private activeSession: VsCodeSession | undefined;
   private disposal: Promise<void> | undefined;
@@ -138,6 +140,18 @@ export class InstalledExpecEditor {
     }
   }
 
+  async generationEditor(source: string, otherEntry: string, enabled: boolean, outputs = false, missingRuntime = false): Promise<NativeGenerationCase> {
+    if (this.disposal) throw new Error('The installed editor is disposing.');
+    const editor = new NativeGenerationCase(() => this.nativeSession(), this.extensionId, source, otherEntry, enabled, outputs, missingRuntime, this.workspace);
+    this.generationEditors.add(editor);
+    onTestFinished(async () => { await editor.dispose(); this.generationEditors.delete(editor); }, 70_000);
+    try { await editor.open(); return editor; }
+    catch (error) {
+      try { await editor.dispose(); } catch (cleanup) { throw new AggregateError([error, cleanup], 'Native generation setup and cleanup failed', { cause: error }); }
+      this.generationEditors.delete(editor); throw error;
+    }
+  }
+
   private async openDocument(fileName: string, text: string): Promise<string> {
     if (basename(fileName) !== fileName || fileName === '.' || fileName === '..') throw new Error('Open a single test-owned file name.');
     const directory = await ownTemporaryDirectory('expec-syntax-document-', this.workspace);
@@ -165,7 +179,7 @@ export class InstalledExpecEditor {
     try {
       try {
         const documents = await Promise.allSettled([...this.diagnosticDocuments].map(document => document.dispose())
-          .concat([...this.connectionSidebars].map(sidebar => sidebar.dispose()), [...this.previewEditors].map(editor => editor.dispose())));
+          .concat([...this.connectionSidebars].map(sidebar => sidebar.dispose()), [...this.previewEditors].map(editor => editor.dispose()), [...this.generationEditors].map(editor => editor.dispose())));
         const failed = documents.find(result => result.status === 'rejected');
         if (failed?.status === 'rejected') throw failed.reason;
       } finally { await this.activeSession?.dispose(); }

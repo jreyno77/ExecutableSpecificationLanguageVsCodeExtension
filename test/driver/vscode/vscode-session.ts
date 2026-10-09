@@ -22,7 +22,15 @@ export type DiagnosticMiddlewareObservation = { cancellationError: boolean; next
 export type SidebarObservation = { readonly status: string; readonly project: string; readonly explanation: string; readonly saved?: string; readonly unsaved?: string };
 export type PreviewEditorObservation = { readonly uri: string; readonly version: number; readonly text: string; readonly dirty: boolean; readonly savedText: string };
 
-type Operation = 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
+export type GenerationEditorObservation = {
+  uri: string; version: number; text: string; dirty: boolean; savedText: string; configurationFile: string;
+  dirtyBuffers: { uri: string; text: string; version: number; dirty: boolean }[];
+  outputDocuments: { uri: string; text: string }[];
+};
+export type GenerationEditorSetup = { file: string; other: string; directory: string; workspace: string; configurationFile: string;
+  resetFile: string; nodeExecutable: string; enabled: boolean };
+
+type Operation = 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
 type Pending = { promise: Promise<unknown>; resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> };
 
 /** One owned native host, with only the observations needed by its test consumers. */
@@ -108,6 +116,32 @@ export class VsCodeSession {
       if (this.closing) { await browser.close(); throw new Error('The owned VS Code session is closed.'); }
       return browser;
     })();
+  }
+
+  openGenerationEditor(generationId: string, extensionId: string, setup: GenerationEditorSetup): Promise<GenerationEditorObservation> {
+    return this.generationRequest('generationOpen', { generationId, extensionId, ...setup });
+  }
+  changeGenerationEditor(generationId: string, kind: string, values: Record<string, unknown> = {}): Promise<GenerationEditorObservation> {
+    return this.generationRequest('generationAction', { generationId, kind, ...values });
+  }
+  observeGenerationEditor(generationId: string): Promise<GenerationEditorObservation> {
+    return this.generationRequest('generationObserve', { generationId });
+  }
+  async disposeGenerationEditor(generationId: string): Promise<void> {
+    const value = await this.request('generationDispose', { generationId });
+    if (value !== null) throw new Error('The native generation disposal returned an invalid receipt.');
+  }
+  private async generationRequest(operation: Operation, values: Record<string, unknown>): Promise<GenerationEditorObservation> {
+    const value = await this.request(operation, values);
+    if (!value || typeof value !== 'object') throw new Error('The native generation observation is absent.');
+    const actual = value as Partial<GenerationEditorObservation>;
+    if (typeof actual.uri !== 'string' || !Number.isInteger(actual.version) || typeof actual.text !== 'string'
+      || typeof actual.dirty !== 'boolean' || typeof actual.savedText !== 'string' || typeof actual.configurationFile !== 'string'
+      || !Array.isArray(actual.dirtyBuffers) || !actual.dirtyBuffers.every(buffer => buffer && typeof buffer.uri === 'string'
+        && typeof buffer.text === 'string' && Number.isInteger(buffer.version) && typeof buffer.dirty === 'boolean')
+      || !Array.isArray(actual.outputDocuments) || !actual.outputDocuments.every(document => document
+        && typeof document.uri === 'string' && typeof document.text === 'string')) throw new Error('The native generation observation is malformed.');
+    return actual as GenerationEditorObservation;
   }
 
   openPreviewEditor(previewId: string, extensionId: string, setup: { file: string; configurationFile: string; resetFile: string }): Promise<PreviewEditorObservation> {
