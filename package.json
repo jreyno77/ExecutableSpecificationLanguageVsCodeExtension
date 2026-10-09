@@ -7,7 +7,7 @@
     "spec:check": "expec check --config generation/expec/expec.json",
     "generate": "expec build --config generation/expec/expec.json",
     "typecheck": "tsc --noEmit",
-    "build": "npm run typecheck && vite build && vite build --config vite.native.config.ts",
+    "build": "npm run typecheck && vite build && vite build --config vite.webview.config.ts && vite build --config vite.native.config.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:collect": "vitest list --staticParse=false",
@@ -56,7 +56,8 @@
   "files": [
     "README.md",
     "src/vscode/syntax/expec.tmLanguage.json",
-    "dist/native"
+    "dist/native",
+    "dist/webview"
   ],
   "contributes": {
     "languages": [
@@ -84,6 +85,11 @@
         "title": "Choose Project",
         "category": ".expec",
         "icon": "$(plug)"
+      },
+      {
+        "command": "expec.showOutputPreviews",
+        "title": "Show Output Previews",
+        "category": ".expec"
       }
     ],
     "views": {

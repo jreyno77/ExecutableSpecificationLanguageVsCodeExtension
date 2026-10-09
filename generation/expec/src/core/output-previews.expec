@@ -266,7 +266,7 @@ examples for OutputPreviews {
   }
 
   scenario "a configured output without a preview does not hide another output" {
-    given previewAuthoring("{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"java\",\"options\":{\"directory\":\"draft/java\"}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}")
+    given previewAuthoring("{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"java\",\"options\":{\"directory\":\"draft/java\",\"package\":\"example.library\"}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}")
     when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
     when settleCurrentPreviews()
     then expectPreviewStatus("java", "refused")
