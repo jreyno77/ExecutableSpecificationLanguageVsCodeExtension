@@ -1,0 +1,171 @@
+use DocumentOutline from "../core/document-outline.expec"
+
+// Existing native LSP ports, not a second language or outline model.
+opaque type OutlineTextDocument
+opaque type OutlineDocumentSymbol
+
+component SourceOutlineAdapter {
+  requires package "language-server" for runtime
+  requires package "language-server-document" for runtime
+  requires package "typescript" for build
+  requires package "vitest" for test
+  requires package "vscode-test-electron" for test
+  depends on DocumentOutline
+
+  construction(outline: DocumentOutline)
+  public symbols
+
+  capability symbols(document: OutlineTextDocument) returns List<OutlineDocumentSymbol> {
+    promises "Ask the one supplied DocumentOutline for this exact native document URI/version. Without a current reply whose captured URI and text exactly match document.getText(), return an empty list. Convert the reply's whole and authored-name scalar offsets to zero-based UTF-16 LSP range and selectionRange against that same captured text, retaining decoded names, source order and nested children. Require finite integer offsets, valid scalar boundaries and whole-range containment of the nonempty name selection; reject an invalid reply rather than clamp, widen or guess. Use native DocumentSymbol values only: component maps to Module, concept to Object, class to Class, interface to Interface, record-type-declaration to Struct, alias-type-declaration and opaque-type-declaration to Class, field to Field, function to Function and capability to Method. This mapping describes presentation, not a new type system. Never parse, resolve, compile, read files, generate, select targets or rebuild the tree in this adapter."
+    promises "Native DocumentSymbol names must contain nonwhitespace text. Omit a symbol with an empty or whitespace-only decoded name and its whole subtree, retaining other valid siblings in order. Never fabricate a display name or promote its children beneath a different parent. Core retains the actual decoded language facts."
+  }
+}
+
+// Installed cases use the real registered native document-symbol provider and
+// returned hierarchical DocumentSymbol values, not a driver-created outline.
+// Keep one reusable owned VS Code host and fresh case-owned files/documents/listeners.
+// Await actual current native analysis completion and its opaque report identity
+// before each request; editor version or an empty list alone is not completion.
+// Capture actual provider replies by request number. Absence may have zero symbols,
+// but a missing request/callback is a driver error. Paths are one-based sibling
+// positions. Range observations use real provider ranges, displayed one-based UTF-16.
+// Compare the complete owned workspace bytes after requests. Close owned tabs and
+// revert matching dirty buffers; do not claim native buffer eviction.
+// The two adapter cases use real DocumentAnalysis, DocumentOutline and standard LSP
+// TextDocuments in-process, with no VS Code process or parser in the driver.
+examples for SourceOutlineAdapter {
+  setup outlineEditor(fileName: Text, initialText: Text) returns Nothing
+  action editOutlineWithoutSaving(text: Text) returns Nothing
+  action requestEditorOutline() returns Nothing
+  setup outlineAdapterDocument(uri: Text, text: Text, version: Number) returns Nothing
+  action changeOutlineAdapterDocument(text: Text, version: Number) returns Nothing
+  action requestOutlineAdapter(version: Number) returns Nothing
+  observation nativeOutlineRootCount(request: Number) returns Number
+  observation nativeOutlineDeclarationCount(request: Number) returns Number
+  observation nativeOutlineName(request: Number, path: List<Number>) returns Text
+  observation nativeOutlineKind(request: Number, path: List<Number>) returns Text
+  observation nativeOutlineChildCount(request: Number, path: List<Number>) returns Number
+  observation nativeOutlineStartLine(request: Number, path: List<Number>) returns Number
+  observation nativeOutlineStartColumn(request: Number, path: List<Number>) returns Number
+  observation nativeOutlineEndLine(request: Number, path: List<Number>) returns Number
+  observation nativeOutlineEndColumn(request: Number, path: List<Number>) returns Number
+  observation nativeOutlineNameLine(request: Number, path: List<Number>) returns Number
+  observation nativeOutlineNameColumn(request: Number, path: List<Number>) returns Number
+  observation nativeOutlineNameEndColumn(request: Number, path: List<Number>) returns Number
+  observation nativeOutlineRangesContainNames(request: Number) returns Boolean
+  observation nativeOutlineSavedText() returns Text
+  observation nativeOutlineOpenText() returns Text
+  observation nativeOutlineOpenIsDirty() returns Boolean
+  observation nativeOutlineWorkspaceUnchanged() returns Boolean
+
+  check expectNativeOutlineSize(request: Number, roots: Number, declarations: Number) {
+    let actualRoots = nativeOutlineRootCount(request)
+    let actualDeclarations = nativeOutlineDeclarationCount(request)
+    assert actualRoots == roots
+    assert actualDeclarations == declarations
+  }
+  check expectNativeOutlineDeclaration(request: Number, path: List<Number>, name: Text, kind: Text, children: Number) {
+    let actualName = nativeOutlineName(request, path)
+    let actualKind = nativeOutlineKind(request, path)
+    let actualChildren = nativeOutlineChildCount(request, path)
+    assert actualName == name
+    assert actualKind == kind
+    assert actualChildren == children
+  }
+  check expectNativeOutlineWholeRange(request: Number, path: List<Number>, line: Number, column: Number, endLine: Number, endColumn: Number) {
+    let actualLine = nativeOutlineStartLine(request, path)
+    let actualColumn = nativeOutlineStartColumn(request, path)
+    let actualEndLine = nativeOutlineEndLine(request, path)
+    let actualEndColumn = nativeOutlineEndColumn(request, path)
+    assert actualLine == line
+    assert actualColumn == column
+    assert actualEndLine == endLine
+    assert actualEndColumn == endColumn
+  }
+  check expectNativeOutlineNameRange(request: Number, path: List<Number>, line: Number, column: Number, endColumn: Number) {
+    let actualLine = nativeOutlineNameLine(request, path)
+    let actualColumn = nativeOutlineNameColumn(request, path)
+    let actualEndColumn = nativeOutlineNameEndColumn(request, path)
+    assert actualLine == line
+    assert actualColumn == column
+    assert actualEndColumn == endColumn
+  }
+  check expectContainedNativeOutlineNames(request: Number) {
+    let contained = nativeOutlineRangesContainNames(request)
+    assert contained == true
+  }
+  check expectUnsavedOutlineText(current: Text, saved: Text) {
+    let actualCurrent = nativeOutlineOpenText()
+    let actualSaved = nativeOutlineSavedText()
+    let dirty = nativeOutlineOpenIsDirty()
+    assert actualCurrent == current
+    assert actualSaved == saved
+    assert dirty == true
+  }
+  check expectNoOutlineProjectWrites() {
+    let unchanged = nativeOutlineWorkspaceUnchanged()
+    assert unchanged == true
+  }
+
+  scenario "the native outline shows Library and one public count capability" {
+    given outlineEditor("library.expec", "component Library {\n  public count\n  capability count() returns Number\n}")
+    when requestEditorOutline()
+    then expectNativeOutlineSize(1, 1, 2)
+    then expectNativeOutlineDeclaration(1, [1], "Library", "Module", 1)
+    then expectNativeOutlineDeclaration(1, [1, 1], "count", "Method", 0)
+    then expectNativeOutlineWholeRange(1, [1], 1, 1, 4, 2)
+    then expectNativeOutlineNameRange(1, [1], 1, 11, 18)
+    then expectNativeOutlineNameRange(1, [1, 1], 3, 14, 19)
+    then expectContainedNativeOutlineNames(1)
+    then expectNoOutlineProjectWrites()
+  }
+  scenario "unsaved declarations update the native outline and rejected text withdraws it" {
+    given outlineEditor("book.expec", "type Book { title: Text }")
+    when requestEditorOutline()
+    when editOutlineWithoutSaving("type Magazine { title: Text }")
+    when requestEditorOutline()
+    when editOutlineWithoutSaving("type Magazine {")
+    when requestEditorOutline()
+    then expectNativeOutlineSize(1, 1, 2)
+    then expectNativeOutlineDeclaration(1, [1], "Book", "Struct", 1)
+    then expectNativeOutlineSize(2, 1, 2)
+    then expectNativeOutlineDeclaration(2, [1], "Magazine", "Struct", 1)
+    then expectNativeOutlineNameRange(2, [1], 1, 6, 14)
+    then expectNativeOutlineSize(3, 0, 0)
+    then expectUnsavedOutlineText("type Magazine {", "type Book { title: Text }")
+    then expectNoOutlineProjectWrites()
+  }
+  scenario "the native outline preserves decoded quoted names and real UTF-16 selections" {
+    given outlineEditor("unicode.expec", "type `📚Book` {\n  `résumé`: Text\n}")
+    when requestEditorOutline()
+    then expectNativeOutlineSize(1, 1, 2)
+    then expectNativeOutlineDeclaration(1, [1], "📚Book", "Struct", 1)
+    then expectNativeOutlineDeclaration(1, [1, 1], "résumé", "Field", 0)
+    then expectNativeOutlineWholeRange(1, [1], 1, 1, 3, 2)
+    then expectNativeOutlineNameRange(1, [1], 1, 6, 14)
+    then expectNativeOutlineNameRange(1, [1, 1], 2, 3, 11)
+    then expectContainedNativeOutlineNames(1)
+    then expectNoOutlineProjectWrites()
+  }
+  scenario "the standard adapter converts CRLF and astral scalar ranges without narrowing them" {
+    given outlineAdapterDocument("file:///workspace/unicode.expec", "type `📚Book` {\r\n  `résumé`: Text\r\n}", 1)
+    when requestOutlineAdapter(1)
+    then expectNativeOutlineSize(1, 1, 2)
+    then expectNativeOutlineWholeRange(1, [1], 1, 1, 3, 2)
+    then expectNativeOutlineNameRange(1, [1], 1, 6, 14)
+    then expectNativeOutlineNameRange(1, [1, 1], 2, 3, 11)
+    then expectContainedNativeOutlineNames(1)
+  }
+  scenario "an older native TextDocument snapshot cannot use a newer core outline" {
+    given outlineAdapterDocument("file:///workspace/book.expec", "type Book { title: Text }", 1)
+    when requestOutlineAdapter(1)
+    when changeOutlineAdapterDocument("type Magazine { title: Text }", 2)
+    when requestOutlineAdapter(1)
+    when requestOutlineAdapter(2)
+    then expectNativeOutlineSize(1, 1, 2)
+    then expectNativeOutlineDeclaration(1, [1], "Book", "Struct", 1)
+    then expectNativeOutlineSize(2, 0, 0)
+    then expectNativeOutlineSize(3, 1, 2)
+    then expectNativeOutlineDeclaration(3, [1], "Magazine", "Struct", 1)
+  }
+}

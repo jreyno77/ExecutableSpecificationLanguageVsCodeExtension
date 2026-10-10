@@ -1,0 +1,266 @@
+use SourceDocument from "./workspace.expec"
+use DocumentReport from "./document-analysis.expec"
+
+// Plain core facts. All offsets are zero-based Unicode scalars, end exclusive,
+// in SourceOutline.source. The authored name range is contained in the whole range.
+type SourceOutlineSymbol {
+  name: Text
+  kind: Text
+  startOffset: Number
+  endOffset: Number
+  nameStartOffset: Number
+  nameEndOffset: Number
+  children: List<SourceOutlineSymbol>
+}
+type SourceOutline {
+  source: SourceDocument
+  symbols: List<SourceOutlineSymbol>
+}
+
+component DocumentOutline {
+  requires package "expec" for runtime
+  requires package "typescript" for build
+  requires package "vitest" for test
+
+  construction()
+  public published, closed, symbols, dispose
+
+  capability published(source: SourceDocument, version: Number, report: DocumentReport) returns Nothing {
+    promises "Receive current immutable DocumentAnalysis publications from the same live analysis, including replacements at the same editor version after dependency changes. Reject noninteger or negative versions with RangeError before changing state. Prepare the current document's ordered declaration tree once from that report's public Inspection and exact captured source. This is authored structure, not a checked Specification or a claim that every reference resolves. Independent compiler problems or deferred requirements do not suppress supported declarations. Rejected entry syntax or missing exact captured text withdraws the old outline. Never parse, resolve, compile, discover files, read saved text or substitute an older accepted report here."
+    promises "Include only source-authored component, concept, class, interface, record-type-declaration, alias-type-declaration, opaque-type-declaration, field, function and capability items belonging to this exact source URI. Names are the public decoded names; kind is exactly the listed language kind. Use each item's actual finite source origin and nameOrigin, requiring the nonempty name selection to be contained in the whole declaration and both ranges to fit the captured text. Preserve source order and actual public parent/children containment. Omit local wrappers while retaining their supported declarations beneath the nearest supported enclosing declaration. Do not emit import/public references, parameters, helpers, examples, scenario/interaction support, external or builtin nodes; do not promote declarations from excluded example/helper bodies. Do not infer nesting from spelling, references or dependencies. Imported declarations never become this document's outline."
+    promises "Each emitted child's whole range must also be contained in its emitted parent's whole range. Omit an invalid supported declaration and its subtree rather than invent ranges or promote its children into a different parent."
+  }
+  capability closed(uri: Text) returns Nothing {
+    promises "Forget this exact document's outline when DocumentAnalysis ends its lifetime. Repeated close is harmless and other documents remain usable. A later current publication after reopening starts a new lifetime and may have a lower version."
+  }
+  capability symbols(uri: Text, version: Number) returns SourceOutline? {
+    promises "Reject a noninteger or negative version with RangeError before changing state. Return the prepared outline only for the exact retained URI/version and current captured text. A current accepted document with no supported declarations has an empty symbols list. Missing, stale, rejected, closed or disposed publications return absence. The reply includes the exact captured source used for all whole/name scalar ranges. A request performs no Inspection walk, parsing, checking, acquisition, generation or project scan. Caller mutation cannot change retained state or other earlier/current replies; use immutable values or independent copies. This operation never writes files or changes editor selection."
+  }
+  capability dispose() returns Nothing {
+    promises "End this outline lifetime, clear retained trees and ignore later publications. All queries return absence; repeated disposal is harmless."
+  }
+}
+
+// Assemble real DocumentAnalysis and DocumentOutline with in-memory saved sources.
+// Forward actual current publish/clear callbacks. Each request records its actual
+// reply; a missing request record is an error, not absence. Paths below select
+// one-based sibling positions in that reply's real tree, never expected names.
+// Range observations convert actual scalar offsets against reply.source.text into
+// one-based scalar lines/columns. Work counters instrument real supplied API calls.
+examples for DocumentOutline {
+  fixture outlineLibrary: SourceDocument = {
+    uri: "file:///workspace/library.expec",
+    text: "component Library {\n  public count\n  capability count() returns Number\n}"
+  }
+  fixture outlineKinds: SourceDocument = {
+    uri: "file:///workspace/kinds.expec",
+    text: "component Library {\n  local type Book {\n    title: Text\n  }\n  public count\n  capability count() returns Number\n}\nconcept Named {}\nclass Shelf {}\ninterface Catalog {}\ntype Name = Text\nopaque type Handle\nfunction describe(value: Text) returns Text\nexamples for describe {}"
+  }
+  fixture outlineBook: SourceDocument = {
+    uri: "file:///workspace/book.expec",
+    text: "type Book { title: Text }"
+  }
+  fixture outlineUnicode: SourceDocument = {
+    uri: "file:///workspace/unicode.expec",
+    text: "type `📚Book` {\n  `résumé`: Text\n}"
+  }
+
+  setup documentOutline() returns Nothing
+  action saveOutlineSource(source: SourceDocument) returns Nothing
+  action openOutlineSource(source: SourceDocument, version: Number) returns Nothing
+  action changeOutlineSource(source: SourceDocument, version: Number) returns Nothing
+  action closeOutlineSource(uri: Text) returns Nothing
+  action disposeDocumentOutline() returns Nothing
+  action requestDocumentOutline(uri: Text, version: Number) returns Nothing
+  action rememberOutlineWork() returns Nothing
+  // Attempt real reply mutations of source, root name and nested child list;
+  // frozen-value TypeErrors are allowed, unexpected errors must surface.
+  action attemptOutlineReplyMutation(request: Number) returns Nothing
+  observation hasDocumentOutline(request: Number) returns Boolean
+  observation outlineSourceUri(request: Number) returns Text
+  observation outlineSourceText(request: Number) returns Text
+  observation outlineRootCount(request: Number) returns Number
+  observation outlineDeclarationCount(request: Number) returns Number
+  observation outlineName(request: Number, path: List<Number>) returns Text
+  observation outlineKind(request: Number, path: List<Number>) returns Text
+  observation outlineChildCount(request: Number, path: List<Number>) returns Number
+  observation outlineStartLine(request: Number, path: List<Number>) returns Number
+  observation outlineStartColumn(request: Number, path: List<Number>) returns Number
+  observation outlineEndLine(request: Number, path: List<Number>) returns Number
+  observation outlineEndColumn(request: Number, path: List<Number>) returns Number
+  observation outlineNameLine(request: Number, path: List<Number>) returns Number
+  observation outlineNameColumn(request: Number, path: List<Number>) returns Number
+  observation outlineNameEndColumn(request: Number, path: List<Number>) returns Number
+  observation outlineWorkUnchanged() returns Boolean
+  observation outlineHasProblem(uri: Text, code: Text) returns Boolean
+
+  check expectDocumentOutline(request: Number, source: SourceDocument, roots: Number, declarations: Number) {
+    let present = hasDocumentOutline(request)
+    let uri = outlineSourceUri(request)
+    let text = outlineSourceText(request)
+    let actualRoots = outlineRootCount(request)
+    let actualDeclarations = outlineDeclarationCount(request)
+    assert present == true
+    assert uri == source.uri
+    assert text == source.text
+    assert actualRoots == roots
+    assert actualDeclarations == declarations
+  }
+  check expectOutlineDeclaration(request: Number, path: List<Number>, name: Text, kind: Text, children: Number) {
+    let actualName = outlineName(request, path)
+    let actualKind = outlineKind(request, path)
+    let actualChildren = outlineChildCount(request, path)
+    assert actualName == name
+    assert actualKind == kind
+    assert actualChildren == children
+  }
+  check expectOutlineWholeRange(request: Number, path: List<Number>, line: Number, column: Number, endLine: Number, endColumn: Number) {
+    let actualLine = outlineStartLine(request, path)
+    let actualColumn = outlineStartColumn(request, path)
+    let actualEndLine = outlineEndLine(request, path)
+    let actualEndColumn = outlineEndColumn(request, path)
+    assert actualLine == line
+    assert actualColumn == column
+    assert actualEndLine == endLine
+    assert actualEndColumn == endColumn
+  }
+  check expectOutlineNameRange(request: Number, path: List<Number>, line: Number, column: Number, endColumn: Number) {
+    let actualLine = outlineNameLine(request, path)
+    let actualColumn = outlineNameColumn(request, path)
+    let actualEndColumn = outlineNameEndColumn(request, path)
+    assert actualLine == line
+    assert actualColumn == column
+    assert actualEndColumn == endColumn
+  }
+  check expectNoDocumentOutline(request: Number) {
+    let present = hasDocumentOutline(request)
+    assert present == false
+  }
+  check expectNoOutlineAnalysis() {
+    let unchanged = outlineWorkUnchanged()
+    assert unchanged == true
+  }
+  check expectOutlineProblem(uri: Text, code: Text) {
+    let present = outlineHasProblem(uri, code)
+    assert present == true
+  }
+
+  scenario "public count appears once beneath its Library declaration" {
+    given documentOutline()
+    when openOutlineSource(outlineLibrary, 1)
+    when requestDocumentOutline(outlineLibrary.uri, 1)
+    then expectDocumentOutline(1, outlineLibrary, 1, 2)
+    then expectOutlineDeclaration(1, [1], "Library", "component", 1)
+    then expectOutlineDeclaration(1, [1, 1], "count", "capability", 0)
+    then expectOutlineWholeRange(1, [1], 1, 1, 4, 2)
+    then expectOutlineNameRange(1, [1], 1, 11, 18)
+    then expectOutlineWholeRange(1, [1, 1], 3, 3, 3, 36)
+    then expectOutlineNameRange(1, [1, 1], 3, 14, 19)
+  }
+  scenario "authored kinds and nested local types retain source order without wrapper entries" {
+    given documentOutline()
+    when openOutlineSource(outlineKinds, 1)
+    when requestDocumentOutline(outlineKinds.uri, 1)
+    then expectDocumentOutline(1, outlineKinds, 7, 10)
+    then expectOutlineDeclaration(1, [1], "Library", "component", 2)
+    then expectOutlineDeclaration(1, [1, 1], "Book", "record-type-declaration", 1)
+    then expectOutlineDeclaration(1, [1, 1, 1], "title", "field", 0)
+    then expectOutlineDeclaration(1, [1, 2], "count", "capability", 0)
+    then expectOutlineDeclaration(1, [2], "Named", "concept", 0)
+    then expectOutlineDeclaration(1, [3], "Shelf", "class", 0)
+    then expectOutlineDeclaration(1, [4], "Catalog", "interface", 0)
+    then expectOutlineDeclaration(1, [5], "Name", "alias-type-declaration", 0)
+    then expectOutlineDeclaration(1, [6], "Handle", "opaque-type-declaration", 0)
+    then expectOutlineDeclaration(1, [7], "describe", "function", 0)
+    then expectOutlineWholeRange(1, [1, 1], 2, 9, 4, 4)
+    then expectOutlineNameRange(1, [1, 1], 2, 14, 18)
+  }
+  scenario "quoted Unicode names are decoded while selections retain their actual tokens" {
+    given documentOutline()
+    when openOutlineSource(outlineUnicode, 1)
+    when requestDocumentOutline(outlineUnicode.uri, 1)
+    then expectDocumentOutline(1, outlineUnicode, 1, 2)
+    then expectOutlineDeclaration(1, [1], "📚Book", "record-type-declaration", 1)
+    then expectOutlineDeclaration(1, [1, 1], "résumé", "field", 0)
+    then expectOutlineWholeRange(1, [1], 1, 1, 3, 2)
+    then expectOutlineNameRange(1, [1], 1, 6, 13)
+    then expectOutlineWholeRange(1, [1, 1], 2, 3, 2, 17)
+    then expectOutlineNameRange(1, [1, 1], 2, 3, 11)
+  }
+  scenario "an unsaved declaration edit replaces the outline and rejects an old requested version" {
+    given documentOutline()
+    when openOutlineSource(outlineBook, 1)
+    when requestDocumentOutline(outlineBook.uri, 1)
+    when changeOutlineSource({ uri: outlineBook.uri, text: "type Magazine { title: Text }" }, 2)
+    when requestDocumentOutline(outlineBook.uri, 1)
+    when requestDocumentOutline(outlineBook.uri, 2)
+    then expectDocumentOutline(1, outlineBook, 1, 2)
+    then expectOutlineDeclaration(1, [1], "Book", "record-type-declaration", 1)
+    then expectNoDocumentOutline(2)
+    then expectDocumentOutline(3, { uri: outlineBook.uri, text: "type Magazine { title: Text }" }, 1, 2)
+    then expectOutlineDeclaration(3, [1], "Magazine", "record-type-declaration", 1)
+    then expectOutlineNameRange(3, [1], 1, 6, 14)
+  }
+  scenario "independent semantic errors retain current declarations without importing another module's tree" {
+    given documentOutline()
+    when saveOutlineSource(outlineBook)
+    when openOutlineSource({ uri: "file:///workspace/basket.expec", text: "use Book from \"./book.expec\"\ntype Basket { book: Book\n  missing: Unknown }" }, 1)
+    when requestDocumentOutline("file:///workspace/basket.expec", 1)
+    when requestDocumentOutline(outlineBook.uri, 1)
+    then expectOutlineProblem("file:///workspace/basket.expec", "unresolved-reference")
+    then expectDocumentOutline(1, { uri: "file:///workspace/basket.expec", text: "use Book from \"./book.expec\"\ntype Basket { book: Book\n  missing: Unknown }" }, 1, 3)
+    then expectOutlineDeclaration(1, [1], "Basket", "record-type-declaration", 2)
+    then expectOutlineDeclaration(1, [1, 1], "book", "field", 0)
+    then expectOutlineDeclaration(1, [1, 2], "missing", "field", 0)
+    then expectNoDocumentOutline(2)
+  }
+  scenario "a rejected edit withdraws both the old version and current outline" {
+    given documentOutline()
+    when openOutlineSource(outlineBook, 1)
+    when requestDocumentOutline(outlineBook.uri, 1)
+    when changeOutlineSource({ uri: outlineBook.uri, text: "type Book {" }, 2)
+    when requestDocumentOutline(outlineBook.uri, 2)
+    when requestDocumentOutline(outlineBook.uri, 1)
+    then expectDocumentOutline(1, outlineBook, 1, 2)
+    then expectNoDocumentOutline(2)
+    then expectNoDocumentOutline(3)
+  }
+  scenario "closing reopening and disposal respect the document lifetime" {
+    given documentOutline()
+    when openOutlineSource(outlineLibrary, 10)
+    when closeOutlineSource(outlineLibrary.uri)
+    when requestDocumentOutline(outlineLibrary.uri, 10)
+    when openOutlineSource(outlineLibrary, 1)
+    when requestDocumentOutline(outlineLibrary.uri, 1)
+    when disposeDocumentOutline()
+    when requestDocumentOutline(outlineLibrary.uri, 1)
+    when openOutlineSource(outlineUnicode, 1)
+    when requestDocumentOutline(outlineUnicode.uri, 1)
+    then expectNoDocumentOutline(1)
+    then expectDocumentOutline(2, outlineLibrary, 1, 2)
+    then expectNoDocumentOutline(3)
+    then expectNoDocumentOutline(4)
+  }
+  scenario "a current accepted document without declarations has an empty outline" {
+    given documentOutline()
+    when openOutlineSource({ uri: "untitled:Outline.expec", text: "// a draft" }, 1)
+    when requestDocumentOutline("untitled:Outline.expec", 1)
+    then expectDocumentOutline(1, { uri: "untitled:Outline.expec", text: "// a draft" }, 0, 0)
+  }
+  scenario "requests reuse prepared facts and caller mutation cannot alter another reply" {
+    given documentOutline()
+    when openOutlineSource(outlineLibrary, 1)
+    when rememberOutlineWork()
+    when requestDocumentOutline(outlineLibrary.uri, 1)
+    when requestDocumentOutline(outlineLibrary.uri, 1)
+    when attemptOutlineReplyMutation(1)
+    when requestDocumentOutline(outlineLibrary.uri, 1)
+    then expectDocumentOutline(2, outlineLibrary, 1, 2)
+    then expectOutlineDeclaration(2, [1], "Library", "component", 1)
+    then expectOutlineDeclaration(2, [1, 1], "count", "capability", 0)
+    then expectDocumentOutline(3, outlineLibrary, 1, 2)
+    then expectOutlineDeclaration(3, [1], "Library", "component", 1)
+    then expectOutlineDeclaration(3, [1, 1], "count", "capability", 0)
+    then expectNoOutlineAnalysis()
+  }
+}

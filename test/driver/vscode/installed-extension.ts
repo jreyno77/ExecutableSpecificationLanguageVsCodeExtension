@@ -107,9 +107,9 @@ export class InstalledExpecEditor {
     return (await this.nativeSession()).missingDocumentDiagnostics(this.extensionId);
   }
 
-  async definitionEditor(sources: Readonly<Record<string, string>>): Promise<NativeDefinitionCase> {
+  async definitionEditor(sources: Readonly<Record<string, string>>, entryFileName = 'entry.expec'): Promise<NativeDefinitionCase> {
     if (this.disposal) throw new Error('The installed definition editor is disposing.');
-    const definition = new NativeDefinitionCase(() => this.nativeSession(), this.extensionId, sources, this.workspace);
+    const definition = new NativeDefinitionCase(() => this.nativeSession(), this.extensionId, sources, this.workspace, entryFileName);
     this.sourceDefinitions.add(definition);
     onTestFinished(async () => { await definition.dispose(); this.sourceDefinitions.delete(definition); }, 40_000);
     try { await definition.open(); return definition; }

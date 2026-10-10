@@ -40,8 +40,10 @@ export type NativeDefinitionObservation = {
 export type NativeHoverObservation = NativeDefinitionObservation & {
   hovers: readonly { markdown: string; name: string; range: DiagnosticRange }[];
 };
+export type NativeOutlineSymbol = { name: string; kind: string; range: DiagnosticRange; selectionRange: DiagnosticRange; children: readonly NativeOutlineSymbol[] };
+export type NativeOutlineObservation = NativeDefinitionObservation & { entryText: string; symbols: readonly NativeOutlineSymbol[] };
 
-type Operation = 'definitionOpen' | 'definitionEdit' | 'definitionGoTo' | 'definitionHover' | 'definitionDispose' | 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
+type Operation = 'definitionOpen' | 'definitionEdit' | 'definitionGoTo' | 'definitionHover' | 'definitionSymbols' | 'definitionDispose' | 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
 type Pending = { promise: Promise<unknown>; resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> };
 
 /** One owned native host, with only the observations needed by its test consumers. */
@@ -228,6 +230,19 @@ export class VsCodeSession {
   async disposeNativeDefinition(definitionId: string): Promise<void> {
     const value = await this.request('definitionDispose', { definitionId });
     if (value !== null) throw new Error('The native definition disposal returned an invalid receipt.');
+  }
+  async symbolsNativeDefinition(definitionId: string): Promise<NativeOutlineObservation> {
+    const value = await this.definitionRequest('definitionSymbols', { definitionId });
+    const actual = value as Partial<NativeOutlineObservation>;
+    const valid = (symbol: NativeOutlineSymbol): boolean => typeof symbol?.name === 'string' && typeof symbol.kind === 'string'
+      && validPosition(symbol.range?.start) && validPosition(symbol.range?.end)
+      && validPosition(symbol.selectionRange?.start) && validPosition(symbol.selectionRange?.end)
+      && Array.isArray(symbol.children) && symbol.children.every(valid);
+    if (typeof actual.entryText !== 'string' || !Array.isArray(actual.symbols) || !actual.symbols.every(valid)) {
+      const error = new Error('The native host returned an invalid outline observation.');
+      await this.poison(error); throw error;
+    }
+    return value as NativeOutlineObservation;
   }
   private async definitionRequest(operation: Operation, values: Record<string, unknown>): Promise<NativeDefinitionObservation> {
     const value = await this.request(operation, values);

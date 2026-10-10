@@ -26,6 +26,8 @@ Use **Go to Definition** on a source reference to select its declaration, includ
 
 Hover a declaration name or resolved reference to see its authored signature and its own `promises` text. Hover follows unsaved changes, including imported declarations. Container and record headings stay brief; unresolved or unavailable declarations have no fabricated description.
 
+Open VS Code's **Outline** view to navigate the current document's nested components, types, fields and callables. It follows unsaved edits and selects the actual authored names, including quoted names. Rejected syntax clears the outline; semantic findings still allow valid declarations to appear. This view shows the open document's declarations.
+
 Open **.expec Project Connection** in the Explorer and use **Choose Project** to select a local directory. Its status follows saved configuration changes and directory disappearance or restoration automatically. Save or revert unsaved configuration edits before choosing another project. `expec.configurationFile` selects the workspace manifest and defaults to `expec.json`; multiple workspace folders require a folder choice.
 
 A connected status verifies the directory is available. Compilation, dependencies and generated outputs have their own checks. Creating a new manifest sets `src/main.expec` as its initial build entry; configure your actual source entry before compilation.

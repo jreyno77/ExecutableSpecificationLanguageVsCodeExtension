@@ -2069,4 +2069,320 @@ readonly hoverCatalog: SourceDocument = { ["uri"]: "file:///workspace/catalog.ex
 readonly hoverUnicode: SourceDocument = { ["uri"]: "file:///workspace/archive.expec", ["text"]: "component Archive {\n  public `📚save`\n  capability `📚save`(title: Text) returns Text {\n    promises \"Store \\\"Bibliothèque\\\".\\nKeep 📚.\"\n  }\n}\nexamples for Archive.`📚save` {}" };
 
 readonly hoverDeclarations: SourceDocument = { ["uri"]: "file:///workspace/declarations.expec", ["text"]: "component Shelf {}\nconcept Book {}\nclass Library {}\ninterface Reader {}\ntype Box<T> { value: T }" };
+
+async documentOutline(): Promise<void> {
+    return await this.driver.documentOutline();
+  }
+
+async outlineEditor(fileName: string, initialText: string): Promise<void> {
+    return await this.driver.outlineEditor(fileName, initialText);
+  }
+
+async outlineAdapterDocument(uri: string, text: string, version: number): Promise<void> {
+    return await this.driver.outlineAdapterDocument(uri, text, version);
+  }
+
+async saveOutlineSource(source: SourceDocument): Promise<void> {
+    return await this.driver.saveOutlineSource(source);
+  }
+
+async openOutlineSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.openOutlineSource(source, version);
+  }
+
+async changeOutlineSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.changeOutlineSource(source, version);
+  }
+
+async closeOutlineSource(uri: string): Promise<void> {
+    return await this.driver.closeOutlineSource(uri);
+  }
+
+async disposeDocumentOutline(): Promise<void> {
+    return await this.driver.disposeDocumentOutline();
+  }
+
+async requestDocumentOutline(uri: string, version: number): Promise<void> {
+    return await this.driver.requestDocumentOutline(uri, version);
+  }
+
+async rememberOutlineWork(): Promise<void> {
+    return await this.driver.rememberOutlineWork();
+  }
+
+async attemptOutlineReplyMutation(request: number): Promise<void> {
+    return await this.driver.attemptOutlineReplyMutation(request);
+  }
+
+async editOutlineWithoutSaving(text: string): Promise<void> {
+    return await this.driver.editOutlineWithoutSaving(text);
+  }
+
+async requestEditorOutline(): Promise<void> {
+    return await this.driver.requestEditorOutline();
+  }
+
+async changeOutlineAdapterDocument(text: string, version: number): Promise<void> {
+    return await this.driver.changeOutlineAdapterDocument(text, version);
+  }
+
+async requestOutlineAdapter(version: number): Promise<void> {
+    return await this.driver.requestOutlineAdapter(version);
+  }
+
+async hasDocumentOutline(request: number): Promise<boolean> {
+    return await this.driver.hasDocumentOutline(request);
+  }
+
+async outlineSourceUri(request: number): Promise<string> {
+    return await this.driver.outlineSourceUri(request);
+  }
+
+async outlineSourceText(request: number): Promise<string> {
+    return await this.driver.outlineSourceText(request);
+  }
+
+async outlineRootCount(request: number): Promise<number> {
+    return await this.driver.outlineRootCount(request);
+  }
+
+async outlineDeclarationCount(request: number): Promise<number> {
+    return await this.driver.outlineDeclarationCount(request);
+  }
+
+async outlineName(request: number, path: Array<number>): Promise<string> {
+    return await this.driver.outlineName(request, path);
+  }
+
+async outlineKind(request: number, path: Array<number>): Promise<string> {
+    return await this.driver.outlineKind(request, path);
+  }
+
+async outlineChildCount(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.outlineChildCount(request, path);
+  }
+
+async outlineStartLine(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.outlineStartLine(request, path);
+  }
+
+async outlineStartColumn(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.outlineStartColumn(request, path);
+  }
+
+async outlineEndLine(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.outlineEndLine(request, path);
+  }
+
+async outlineEndColumn(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.outlineEndColumn(request, path);
+  }
+
+async outlineNameLine(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.outlineNameLine(request, path);
+  }
+
+async outlineNameColumn(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.outlineNameColumn(request, path);
+  }
+
+async outlineNameEndColumn(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.outlineNameEndColumn(request, path);
+  }
+
+async outlineWorkUnchanged(): Promise<boolean> {
+    return await this.driver.outlineWorkUnchanged();
+  }
+
+async outlineHasProblem(uri: string, code: string): Promise<boolean> {
+    return await this.driver.outlineHasProblem(uri, code);
+  }
+
+async nativeOutlineRootCount(request: number): Promise<number> {
+    return await this.driver.nativeOutlineRootCount(request);
+  }
+
+async nativeOutlineDeclarationCount(request: number): Promise<number> {
+    return await this.driver.nativeOutlineDeclarationCount(request);
+  }
+
+async nativeOutlineName(request: number, path: Array<number>): Promise<string> {
+    return await this.driver.nativeOutlineName(request, path);
+  }
+
+async nativeOutlineKind(request: number, path: Array<number>): Promise<string> {
+    return await this.driver.nativeOutlineKind(request, path);
+  }
+
+async nativeOutlineChildCount(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.nativeOutlineChildCount(request, path);
+  }
+
+async nativeOutlineStartLine(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.nativeOutlineStartLine(request, path);
+  }
+
+async nativeOutlineStartColumn(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.nativeOutlineStartColumn(request, path);
+  }
+
+async nativeOutlineEndLine(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.nativeOutlineEndLine(request, path);
+  }
+
+async nativeOutlineEndColumn(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.nativeOutlineEndColumn(request, path);
+  }
+
+async nativeOutlineNameLine(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.nativeOutlineNameLine(request, path);
+  }
+
+async nativeOutlineNameColumn(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.nativeOutlineNameColumn(request, path);
+  }
+
+async nativeOutlineNameEndColumn(request: number, path: Array<number>): Promise<number> {
+    return await this.driver.nativeOutlineNameEndColumn(request, path);
+  }
+
+async nativeOutlineRangesContainNames(request: number): Promise<boolean> {
+    return await this.driver.nativeOutlineRangesContainNames(request);
+  }
+
+async nativeOutlineSavedText(): Promise<string> {
+    return await this.driver.nativeOutlineSavedText();
+  }
+
+async nativeOutlineOpenText(): Promise<string> {
+    return await this.driver.nativeOutlineOpenText();
+  }
+
+async nativeOutlineOpenIsDirty(): Promise<boolean> {
+    return await this.driver.nativeOutlineOpenIsDirty();
+  }
+
+async nativeOutlineWorkspaceUnchanged(): Promise<boolean> {
+    return await this.driver.nativeOutlineWorkspaceUnchanged();
+  }
+
+async expectDocumentOutline(request: number, source: SourceDocument, roots: number, declarations: number): Promise<void> {
+    const present = await this.driver.hasDocumentOutline(request);
+    const uri = await this.driver.outlineSourceUri(request);
+    const text = await this.driver.outlineSourceText(request);
+    const actualRoots = await this.driver.outlineRootCount(request);
+    const actualDeclarations = await this.driver.outlineDeclarationCount(request);
+    expectData(present, true);
+    expectData(uri, (source)["uri"]);
+    expectData(text, (source)["text"]);
+    expectData(actualRoots, roots);
+    expectData(actualDeclarations, declarations);
+  }
+
+async expectOutlineDeclaration(request: number, path: Array<number>, name: string, kind: string, children: number): Promise<void> {
+    const actualName = await this.driver.outlineName(request, path);
+    const actualKind = await this.driver.outlineKind(request, path);
+    const actualChildren = await this.driver.outlineChildCount(request, path);
+    expectData(actualName, name);
+    expectData(actualKind, kind);
+    expectData(actualChildren, children);
+  }
+
+async expectOutlineWholeRange(request: number, path: Array<number>, line: number, column: number, endLine: number, endColumn: number): Promise<void> {
+    const actualLine = await this.driver.outlineStartLine(request, path);
+    const actualColumn = await this.driver.outlineStartColumn(request, path);
+    const actualEndLine = await this.driver.outlineEndLine(request, path);
+    const actualEndColumn = await this.driver.outlineEndColumn(request, path);
+    expectData(actualLine, line);
+    expectData(actualColumn, column);
+    expectData(actualEndLine, endLine);
+    expectData(actualEndColumn, endColumn);
+  }
+
+async expectOutlineNameRange(request: number, path: Array<number>, line: number, column: number, endColumn: number): Promise<void> {
+    const actualLine = await this.driver.outlineNameLine(request, path);
+    const actualColumn = await this.driver.outlineNameColumn(request, path);
+    const actualEndColumn = await this.driver.outlineNameEndColumn(request, path);
+    expectData(actualLine, line);
+    expectData(actualColumn, column);
+    expectData(actualEndColumn, endColumn);
+  }
+
+async expectNoDocumentOutline(request: number): Promise<void> {
+    const present = await this.driver.hasDocumentOutline(request);
+    expectData(present, false);
+  }
+
+async expectNoOutlineAnalysis(): Promise<void> {
+    const unchanged = await this.driver.outlineWorkUnchanged();
+    expectData(unchanged, true);
+  }
+
+async expectOutlineProblem(uri: string, code: string): Promise<void> {
+    const present = await this.driver.outlineHasProblem(uri, code);
+    expectData(present, true);
+  }
+
+async expectNativeOutlineSize(request: number, roots: number, declarations: number): Promise<void> {
+    const actualRoots = await this.driver.nativeOutlineRootCount(request);
+    const actualDeclarations = await this.driver.nativeOutlineDeclarationCount(request);
+    expectData(actualRoots, roots);
+    expectData(actualDeclarations, declarations);
+  }
+
+async expectNativeOutlineDeclaration(request: number, path: Array<number>, name: string, kind: string, children: number): Promise<void> {
+    const actualName = await this.driver.nativeOutlineName(request, path);
+    const actualKind = await this.driver.nativeOutlineKind(request, path);
+    const actualChildren = await this.driver.nativeOutlineChildCount(request, path);
+    expectData(actualName, name);
+    expectData(actualKind, kind);
+    expectData(actualChildren, children);
+  }
+
+async expectNativeOutlineWholeRange(request: number, path: Array<number>, line: number, column: number, endLine: number, endColumn: number): Promise<void> {
+    const actualLine = await this.driver.nativeOutlineStartLine(request, path);
+    const actualColumn = await this.driver.nativeOutlineStartColumn(request, path);
+    const actualEndLine = await this.driver.nativeOutlineEndLine(request, path);
+    const actualEndColumn = await this.driver.nativeOutlineEndColumn(request, path);
+    expectData(actualLine, line);
+    expectData(actualColumn, column);
+    expectData(actualEndLine, endLine);
+    expectData(actualEndColumn, endColumn);
+  }
+
+async expectNativeOutlineNameRange(request: number, path: Array<number>, line: number, column: number, endColumn: number): Promise<void> {
+    const actualLine = await this.driver.nativeOutlineNameLine(request, path);
+    const actualColumn = await this.driver.nativeOutlineNameColumn(request, path);
+    const actualEndColumn = await this.driver.nativeOutlineNameEndColumn(request, path);
+    expectData(actualLine, line);
+    expectData(actualColumn, column);
+    expectData(actualEndColumn, endColumn);
+  }
+
+async expectContainedNativeOutlineNames(request: number): Promise<void> {
+    const contained = await this.driver.nativeOutlineRangesContainNames(request);
+    expectData(contained, true);
+  }
+
+async expectUnsavedOutlineText(current: string, saved: string): Promise<void> {
+    const actualCurrent = await this.driver.nativeOutlineOpenText();
+    const actualSaved = await this.driver.nativeOutlineSavedText();
+    const dirty = await this.driver.nativeOutlineOpenIsDirty();
+    expectData(actualCurrent, current);
+    expectData(actualSaved, saved);
+    expectData(dirty, true);
+  }
+
+async expectNoOutlineProjectWrites(): Promise<void> {
+    const unchanged = await this.driver.nativeOutlineWorkspaceUnchanged();
+    expectData(unchanged, true);
+  }
+
+readonly outlineLibrary: SourceDocument = { ["uri"]: "file:///workspace/library.expec", ["text"]: "component Library {\n  public count\n  capability count() returns Number\n}" };
+
+readonly outlineKinds: SourceDocument = { ["uri"]: "file:///workspace/kinds.expec", ["text"]: "component Library {\n  local type Book {\n    title: Text\n  }\n  public count\n  capability count() returns Number\n}\nconcept Named {}\nclass Shelf {}\ninterface Catalog {}\ntype Name = Text\nopaque type Handle\nfunction describe(value: Text) returns Text\nexamples for describe {}" };
+
+readonly outlineBook: SourceDocument = { ["uri"]: "file:///workspace/book.expec", ["text"]: "type Book { title: Text }" };
+
+readonly outlineUnicode: SourceDocument = { ["uri"]: "file:///workspace/unicode.expec", ["text"]: "type `📚Book` {\n  `résumé`: Text\n}" };
 }

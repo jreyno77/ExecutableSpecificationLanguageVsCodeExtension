@@ -91,6 +91,22 @@ exports.openSourceDefinition = async function openSourceDefinition(vscode, exten
     entryReport = await currentReport(entry);
     return {
       observation,
+      async symbols() {
+        if (disposed) throw new Error('The native source case is disposed.');
+        const returned = await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider', entry.uri);
+        const nativeRange = range => ({ start: { line: range.start.line, character: range.start.character }, end: { line: range.end.line, character: range.end.character } });
+        const record = symbol => {
+          if (!symbol.range || !symbol.selectionRange || typeof symbol.name !== 'string' || !Number.isInteger(symbol.kind)) {
+            throw new Error('The real native symbol provider did not return a hierarchical DocumentSymbol.');
+          }
+          const kind = Object.entries(vscode.SymbolKind).find(([name, value]) => typeof name === 'string' && value === symbol.kind)?.[0];
+          if (!kind || (symbol.children !== undefined && !Array.isArray(symbol.children))) throw new Error('The real native symbol provider returned an invalid kind or children.');
+          return { name: symbol.name, kind, range: nativeRange(symbol.range), selectionRange: nativeRange(symbol.selectionRange),
+            children: (symbol.children ?? []).map(record) };
+        };
+        if (returned !== undefined && !Array.isArray(returned)) throw new Error('The native symbol provider returned an invalid list.');
+        return { ...observation(), entryText: entry.getText(), symbols: (returned ?? []).map(record) };
+      },
       async hover(line, character) {
         if (disposed) throw new Error('The native source case is disposed.');
         const returned = await vscode.commands.executeCommand('vscode.executeHoverProvider', entry.uri, new vscode.Position(line, character));

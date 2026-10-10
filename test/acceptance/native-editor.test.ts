@@ -7,3 +7,4 @@ import '../unit/vscode/diagnostic-middleware.test.js';
 import './GenerationHost.test.js';
 import './SourceDefinitionAdapter.test.js';
 import './SourceHoverAdapter.test.js';
+import './SourceOutlineAdapter.test.js';

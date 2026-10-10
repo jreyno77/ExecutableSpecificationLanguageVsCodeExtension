@@ -49,7 +49,7 @@ jobs:
               `${process.env.BASE_SHA}...${process.env.HEAD_SHA}`], { encoding: 'utf8' }).split('\0').filter(Boolean);
             for (const file of files) {
               if (/\.md$/.test(file) || file.startsWith('generation/uml/')) continue;
-              if (/^(src\/core\/|generation\/expec\/src\/core\/|test\/(?:unit\/)?core\/|test\/resources\/generation-worker\/|test\/acceptance\/(?:WorkspaceCore|DocumentAnalysis|ConnectionController|OutputPreviews|GenerationOnSave|SourceNavigation|SourceHover)(?:\.|\/))/.test(file)) {
+              if (/^(src\/core\/|generation\/expec\/src\/core\/|test\/(?:unit\/)?core\/|test\/resources\/generation-worker\/|test\/acceptance\/(?:WorkspaceCore|DocumentAnalysis|ConnectionController|OutputPreviews|GenerationOnSave|SourceNavigation|SourceHover|DocumentOutline)(?:\.|\/))/.test(file)) {
                 selected.add('core'); selected.add('editor'); selected.add('ui');
               } else if (/^(src\/vscode\/|generation\/expec\/src\/vscode\/|test\/(?:unit\/|driver\/|resources\/)?vscode\/|test\/acceptance\/(?:EditorAdapter(?:\.|\/)|EditorLanguageSupport\.test\.ts|ConnectionSidebar\.test\.ts|OutputPreviewHost\.test\.ts|GenerationHost\.test\.ts|native-editor\.test\.ts|workspace\.test\.ts))/.test(file)) {
                 selected.add('editor');
@@ -62,7 +62,7 @@ jobs:
             }
           }
           const filters = {
-            core: ['test/acceptance/ConnectionController', 'test/acceptance/DocumentAnalysis', 'test/acceptance/WorkspaceCore', 'test/acceptance/OutputPreviews', 'test/acceptance/GenerationOnSave', 'test/acceptance/SourceNavigation', 'test/acceptance/SourceHover', 'test/unit/core/', 'test/core/'],
+            core: ['test/acceptance/ConnectionController', 'test/acceptance/DocumentAnalysis', 'test/acceptance/WorkspaceCore', 'test/acceptance/OutputPreviews', 'test/acceptance/GenerationOnSave', 'test/acceptance/SourceNavigation', 'test/acceptance/SourceHover', 'test/acceptance/DocumentOutline', 'test/unit/core/', 'test/core/'],
             editor: ['test/acceptance/native-editor.test.ts', 'test/acceptance/EditorAdapter', 'test/acceptance/workspace.test.ts', 'test/unit/vscode/', 'test/vscode/'],
             ui: ['test/acceptance/OutputTabs', 'test/unit/ui/', 'test/ui/'],
           };

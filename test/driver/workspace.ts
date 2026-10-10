@@ -1,8 +1,12 @@
 import { SourceDefinitionConversion } from './source-definition-conversion.js';
 import { SourceHoverConversion } from './source-hover-conversion.js';
+import { SourceOutlineConversion } from './source-outline-conversion.js';
+import { NativeOutlineRecording } from './vscode/native-outline.js';
+import type { OutlineReplies } from './outline-replies.js';
 import type { NativeDefinitionCase } from './vscode/native-definition.js';
 import { SourceNavigationRecording } from './source-navigation.js';
 import { SourceHoverRecording } from './source-hover.js';
+import { DocumentOutlineRecording } from './document-outline.js';
 import { GenerationOnSaveRecording } from './generation-on-save.js';
 import type { NativeGenerationCase } from './vscode/native-generation.js';
 import type { ConnectionSidebarCase } from './vscode/connection-sidebar.js';
@@ -24,12 +28,16 @@ import { SourceDocument } from "../../src/core/SourceDocument.js";
 import { OutputPreviewsRecording } from './output-previews.js';
 import type { NativePreviewCase } from './vscode/native-preview.js';
 export class WorkspaceDriver {
+  private nativeOutlineRecording!: NativeOutlineRecording;
+  private outlineConversionRecording!: SourceOutlineConversion;
+  private nativeOutlineReplies!: OutlineReplies;
   private nativeHover!: NativeDefinitionCase;
   private hoverConversionRecording!: SourceHoverConversion;
   private definitionConversionRecording!: SourceDefinitionConversion;
     private nativeDefinition!: NativeDefinitionCase;
   private navigationRecording!: SourceNavigationRecording;
   private sourceHoverRecording!: SourceHoverRecording;
+  private outlineRecording!: DocumentOutlineRecording;
   private sidebarCase!: ConnectionSidebarCase;
   private connectionRecording!: ConnectionRecording;
   private diagnosticDocument!: DiagnosticDocument;
@@ -1377,5 +1385,203 @@ async convertedHoverStartCharacter(request: number): Promise<number> {
 
 async convertedHoverEndCharacter(request: number): Promise<number> {
     return this.hoverConversionRecording.information(request).range!.end.character;
+  }
+
+async documentOutline(): Promise<void> {
+    this.outlineRecording = DocumentOutlineRecording.create();
+  }
+
+async outlineEditor(fileName: string, initialText: string): Promise<void> {
+    this.nativeOutlineRecording = await NativeOutlineRecording.open(fileName, initialText);
+    this.nativeOutlineReplies = this.nativeOutlineRecording.replies;
+  }
+
+async outlineAdapterDocument(uri: string, text: string, version: number): Promise<void> {
+    this.outlineConversionRecording = new SourceOutlineConversion(uri, text, version);
+    this.nativeOutlineReplies = this.outlineConversionRecording.replies;
+  }
+
+async saveOutlineSource(source: SourceDocument): Promise<void> {
+    this.outlineRecording.savedSource(source);
+  }
+
+async openOutlineSource(source: SourceDocument, version: number): Promise<void> {
+    this.outlineRecording.opened(source, version);
+  }
+
+async changeOutlineSource(source: SourceDocument, version: number): Promise<void> {
+    this.outlineRecording.changed(source, version);
+  }
+
+async closeOutlineSource(uri: string): Promise<void> {
+    this.outlineRecording.closed(uri);
+  }
+
+async disposeDocumentOutline(): Promise<void> {
+    this.outlineRecording.disposed();
+  }
+
+async requestDocumentOutline(uri: string, version: number): Promise<void> {
+    this.outlineRecording.request(uri, version);
+  }
+
+async rememberOutlineWork(): Promise<void> {
+    this.outlineRecording.rememberWork();
+  }
+
+async attemptOutlineReplyMutation(request: number): Promise<void> {
+    this.outlineRecording.attemptMutation(request);
+  }
+
+async editOutlineWithoutSaving(text: string): Promise<void> {
+    await this.nativeOutlineRecording.edit(text);
+  }
+
+async requestEditorOutline(): Promise<void> {
+    await this.nativeOutlineRecording.request();
+  }
+
+async changeOutlineAdapterDocument(text: string, version: number): Promise<void> {
+    this.outlineConversionRecording.change(text, version);
+  }
+
+async requestOutlineAdapter(version: number): Promise<void> {
+    this.outlineConversionRecording.request(version);
+  }
+
+async hasDocumentOutline(request: number): Promise<boolean> {
+    return this.outlineRecording.reply(request) !== undefined;
+  }
+
+async outlineSourceUri(request: number): Promise<string> {
+    return this.outlineRecording.outline(request).source.uri;
+  }
+
+async outlineSourceText(request: number): Promise<string> {
+    return this.outlineRecording.outline(request).source.text;
+  }
+
+async outlineRootCount(request: number): Promise<number> {
+    return this.outlineRecording.outline(request).symbols.length;
+  }
+
+async outlineDeclarationCount(request: number): Promise<number> {
+    return this.outlineRecording.declarationCount(request);
+  }
+
+async outlineName(request: number, path: Array<number>): Promise<string> {
+    return this.outlineRecording.symbol(request, path).name;
+  }
+
+async outlineKind(request: number, path: Array<number>): Promise<string> {
+    return this.outlineRecording.symbol(request, path).kind;
+  }
+
+async outlineChildCount(request: number, path: Array<number>): Promise<number> {
+    return this.outlineRecording.symbol(request, path).children.length;
+  }
+
+async outlineStartLine(request: number, path: Array<number>): Promise<number> {
+    return this.outlineRecording.position(request, this.outlineRecording.symbol(request, path).startOffset).line;
+  }
+
+async outlineStartColumn(request: number, path: Array<number>): Promise<number> {
+    return this.outlineRecording.position(request, this.outlineRecording.symbol(request, path).startOffset).column;
+  }
+
+async outlineEndLine(request: number, path: Array<number>): Promise<number> {
+    return this.outlineRecording.position(request, this.outlineRecording.symbol(request, path).endOffset).line;
+  }
+
+async outlineEndColumn(request: number, path: Array<number>): Promise<number> {
+    return this.outlineRecording.position(request, this.outlineRecording.symbol(request, path).endOffset).column;
+  }
+
+async outlineNameLine(request: number, path: Array<number>): Promise<number> {
+    return this.outlineRecording.position(request, this.outlineRecording.symbol(request, path).nameStartOffset).line;
+  }
+
+async outlineNameColumn(request: number, path: Array<number>): Promise<number> {
+    return this.outlineRecording.position(request, this.outlineRecording.symbol(request, path).nameStartOffset).column;
+  }
+
+async outlineNameEndColumn(request: number, path: Array<number>): Promise<number> {
+    return this.outlineRecording.position(request, this.outlineRecording.symbol(request, path).nameEndOffset).column;
+  }
+
+async outlineWorkUnchanged(): Promise<boolean> {
+    return this.outlineRecording.workUnchanged();
+  }
+
+async outlineHasProblem(uri: string, code: string): Promise<boolean> {
+    return this.outlineRecording.hasProblem(uri, code);
+  }
+
+async nativeOutlineRootCount(request: number): Promise<number> {
+    return this.nativeOutlineReplies.reply(request).length;
+  }
+
+async nativeOutlineDeclarationCount(request: number): Promise<number> {
+    return this.nativeOutlineReplies.count(request);
+  }
+
+async nativeOutlineName(request: number, path: Array<number>): Promise<string> {
+    return this.nativeOutlineReplies.symbol(request, path).name;
+  }
+
+async nativeOutlineKind(request: number, path: Array<number>): Promise<string> {
+    return this.nativeOutlineReplies.symbol(request, path).kind;
+  }
+
+async nativeOutlineChildCount(request: number, path: Array<number>): Promise<number> {
+    return this.nativeOutlineReplies.symbol(request, path).children.length;
+  }
+
+async nativeOutlineStartLine(request: number, path: Array<number>): Promise<number> {
+    return this.nativeOutlineReplies.symbol(request, path).range.start.line + 1;
+  }
+
+async nativeOutlineStartColumn(request: number, path: Array<number>): Promise<number> {
+    return this.nativeOutlineReplies.symbol(request, path).range.start.character + 1;
+  }
+
+async nativeOutlineEndLine(request: number, path: Array<number>): Promise<number> {
+    return this.nativeOutlineReplies.symbol(request, path).range.end.line + 1;
+  }
+
+async nativeOutlineEndColumn(request: number, path: Array<number>): Promise<number> {
+    return this.nativeOutlineReplies.symbol(request, path).range.end.character + 1;
+  }
+
+async nativeOutlineNameLine(request: number, path: Array<number>): Promise<number> {
+    return this.nativeOutlineReplies.symbol(request, path).selectionRange.start.line + 1;
+  }
+
+async nativeOutlineNameColumn(request: number, path: Array<number>): Promise<number> {
+    return this.nativeOutlineReplies.symbol(request, path).selectionRange.start.character + 1;
+  }
+
+async nativeOutlineNameEndColumn(request: number, path: Array<number>): Promise<number> {
+    return this.nativeOutlineReplies.symbol(request, path).selectionRange.end.character + 1;
+  }
+
+async nativeOutlineRangesContainNames(request: number): Promise<boolean> {
+    return this.nativeOutlineReplies.rangesContainNames(request);
+  }
+
+async nativeOutlineSavedText(): Promise<string> {
+    return this.nativeOutlineRecording.savedText();
+  }
+
+async nativeOutlineOpenText(): Promise<string> {
+    return this.nativeOutlineRecording.currentText();
+  }
+
+async nativeOutlineOpenIsDirty(): Promise<boolean> {
+    return this.nativeOutlineRecording.dirty();
+  }
+
+async nativeOutlineWorkspaceUnchanged(): Promise<boolean> {
+    return this.nativeOutlineRecording.filesUnchanged();
   }
 }

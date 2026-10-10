@@ -22,7 +22,7 @@ function recordedServer(sources: DocumentSources = { read: () => undefined }) {
     return { dispose: () => { released.push(name); } };
   };
   const connection = {
-    onInitialize: listen('initialize'), onInitialized: listen('initialized'), onDefinition: listen('definition'), onHover: listen('hover'),
+    onInitialize: listen('initialize'), onInitialized: listen('initialized'), onDefinition: listen('definition'), onHover: listen('hover'), onDocumentSymbol: listen('documentSymbols'),
     onNotification: (method: string, callback: (params: any) => void) => listen(method)(callback),
     sendNotification: (_method: string, value: PreviewPublication) => { publications.push(value); for (const receive of [...publicationListeners]) receive(); return Promise.resolve(); },
     onDidChangeWatchedFiles: listen('watched'),
@@ -59,11 +59,55 @@ function recordedServer(sources: DocumentSources = { read: () => undefined }) {
       if (!handler) throw new Error('No registered textDocument/hover handler.');
       return (await handler({ textDocument: { uri }, position: { line, character } }, token)) ?? null;
     },
+    symbols: async (uri: string, token = CancellationToken.None) => {
+      const handler = callbacks.get('documentSymbols');
+      if (!handler) throw new Error('No registered textDocument/documentSymbol handler.');
+      return (await handler({ textDocument: { uri } }, token)) ?? [];
+    },
   };
 }
 
 const range = (sourceId: string, start: number, end: number, line = 1, column = start + 1) => ({
   sourceId, start: { offset: start, line, column }, end: { offset: end, line, column: column + end - start },
+});
+
+describe('native document outlines at their protocol boundary', () => {
+  it('advertises one standard symbol provider and releases its registration once', () => {
+    const server = recordedServer();
+    try {
+      expect(server.initialization.capabilities.documentSymbolProvider).toBe(true);
+      expect(server.listenerCount('documentSymbols')).toBe(1);
+      server.adapter.start(); expect(server.listenerCount('documentSymbols')).toBe(1);
+      server.adapter.dispose(); server.adapter.dispose();
+      expect(server.released.filter(name => name === 'documentSymbols')).toEqual(['documentSymbols']);
+    } finally { server.adapter.dispose(); }
+  });
+  it('uses the current real document to replace its hierarchical outline after unsaved edits', async () => {
+    const server = recordedServer(), source = { uri: 'file:///workspace/library.expec', text: 'component Library {\n  public count\n  capability count() returns Number\n}' };
+    try {
+      server.open(source);
+      expect(await server.symbols(source.uri)).toEqual([{ name: 'Library', kind: 2,
+        range: { start: { line: 0, character: 0 }, end: { line: 3, character: 1 } },
+        selectionRange: { start: { line: 0, character: 10 }, end: { line: 0, character: 17 } },
+        children: [{ name: 'count', kind: 6, range: { start: { line: 2, character: 2 }, end: { line: 2, character: 35 } },
+          selectionRange: { start: { line: 2, character: 13 }, end: { line: 2, character: 18 } }, children: [] }] }]);
+      server.change({ ...source, text: 'type Book { title: Text }' }, 2);
+      expect(await server.symbols(source.uri)).toMatchObject([{ name: 'Book', children: [{ name: 'title' }] }]);
+    } finally { server.adapter.dispose(); }
+  });
+  it('withdraws native outlines after rejected edits close cancellation and disposal', async () => {
+    const server = recordedServer(), cancellation = new CancellationTokenSource();
+    const source = { uri: 'file:///workspace/book.expec', text: 'type Book { title: Text }' };
+    try {
+      server.open(source); expect(await server.symbols(source.uri)).toHaveLength(1);
+      server.change({ ...source, text: 'type Book {' }, 2); expect(await server.symbols(source.uri)).toEqual([]);
+      server.change(source, 3); expect(await server.symbols(source.uri)).toHaveLength(1);
+      cancellation.cancel(); expect(await server.symbols(source.uri, cancellation.token)).toEqual([]);
+      expect(await server.symbols('file:///workspace/absent.expec')).toEqual([]);
+      server.close(source.uri); expect(await server.symbols(source.uri)).toEqual([]);
+      server.adapter.dispose(); expect(await server.symbols(source.uri)).toEqual([]);
+    } finally { cancellation.dispose(); server.adapter.dispose(); }
+  });
 });
 
 describe('native source hovers at their protocol boundary', () => {
@@ -233,7 +277,7 @@ describe('native semantic feedback at its protocol boundary', () => {
     expect(server.pull(source.uri).items).toEqual([]);
     expect(server.pull(source.uri).resultId).toBeUndefined();
     expect(releases).toBe(1);
-    expect(new Set(server.released)).toEqual(new Set(['initialize', 'initialized', 'watched', 'diagnostics', 'opened', 'changed', 'closed', 'willSave', 'willSaveWaitUntil', 'saved', 'expec/previewConfiguration', 'expec/previewSelection', 'definition', 'hover']));
+    expect(new Set(server.released)).toEqual(new Set(['initialize', 'initialized', 'watched', 'diagnostics', 'opened', 'changed', 'closed', 'willSave', 'willSaveWaitUntil', 'saved', 'expec/previewConfiguration', 'expec/previewSelection', 'definition', 'hover', 'documentSymbols']));
     expect(() => server.adapter.dispose()).not.toThrow();
   });
 });
