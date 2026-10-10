@@ -1378,4 +1378,200 @@ async convertedHoverStartCharacter(request: number): Promise<number> {
 async convertedHoverEndCharacter(request: number): Promise<number> {
     return this.hoverConversionRecording.information(request).range!.end.character;
   }
+
+async documentOutline(): Promise<void> {
+    throw new Error("Not implemented: workspace.documentOutline");
+  }
+
+async outlineEditor(fileName: string, initialText: string): Promise<void> {
+    throw new Error("Not implemented: workspace.outlineEditor");
+  }
+
+async outlineAdapterDocument(uri: string, text: string, version: number): Promise<void> {
+    throw new Error("Not implemented: workspace.outlineAdapterDocument");
+  }
+
+async saveOutlineSource(source: SourceDocument): Promise<void> {
+    throw new Error("Not implemented: workspace.saveOutlineSource");
+  }
+
+async openOutlineSource(source: SourceDocument, version: number): Promise<void> {
+    throw new Error("Not implemented: workspace.openOutlineSource");
+  }
+
+async changeOutlineSource(source: SourceDocument, version: number): Promise<void> {
+    throw new Error("Not implemented: workspace.changeOutlineSource");
+  }
+
+async closeOutlineSource(uri: string): Promise<void> {
+    throw new Error("Not implemented: workspace.closeOutlineSource");
+  }
+
+async disposeDocumentOutline(): Promise<void> {
+    throw new Error("Not implemented: workspace.disposeDocumentOutline");
+  }
+
+async requestDocumentOutline(uri: string, version: number): Promise<void> {
+    throw new Error("Not implemented: workspace.requestDocumentOutline");
+  }
+
+async rememberOutlineWork(): Promise<void> {
+    throw new Error("Not implemented: workspace.rememberOutlineWork");
+  }
+
+async attemptOutlineReplyMutation(request: number): Promise<void> {
+    throw new Error("Not implemented: workspace.attemptOutlineReplyMutation");
+  }
+
+async editOutlineWithoutSaving(text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.editOutlineWithoutSaving");
+  }
+
+async requestEditorOutline(): Promise<void> {
+    throw new Error("Not implemented: workspace.requestEditorOutline");
+  }
+
+async changeOutlineAdapterDocument(text: string, version: number): Promise<void> {
+    throw new Error("Not implemented: workspace.changeOutlineAdapterDocument");
+  }
+
+async requestOutlineAdapter(version: number): Promise<void> {
+    throw new Error("Not implemented: workspace.requestOutlineAdapter");
+  }
+
+async hasDocumentOutline(request: number): Promise<boolean> {
+    throw new Error("Not implemented: workspace.hasDocumentOutline");
+  }
+
+async outlineSourceUri(request: number): Promise<string> {
+    throw new Error("Not implemented: workspace.outlineSourceUri");
+  }
+
+async outlineSourceText(request: number): Promise<string> {
+    throw new Error("Not implemented: workspace.outlineSourceText");
+  }
+
+async outlineRootCount(request: number): Promise<number> {
+    throw new Error("Not implemented: workspace.outlineRootCount");
+  }
+
+async outlineDeclarationCount(request: number): Promise<number> {
+    throw new Error("Not implemented: workspace.outlineDeclarationCount");
+  }
+
+async outlineName(request: number, path: Array<number>): Promise<string> {
+    throw new Error("Not implemented: workspace.outlineName");
+  }
+
+async outlineKind(request: number, path: Array<number>): Promise<string> {
+    throw new Error("Not implemented: workspace.outlineKind");
+  }
+
+async outlineChildCount(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.outlineChildCount");
+  }
+
+async outlineStartLine(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.outlineStartLine");
+  }
+
+async outlineStartColumn(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.outlineStartColumn");
+  }
+
+async outlineEndLine(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.outlineEndLine");
+  }
+
+async outlineEndColumn(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.outlineEndColumn");
+  }
+
+async outlineNameLine(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.outlineNameLine");
+  }
+
+async outlineNameColumn(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.outlineNameColumn");
+  }
+
+async outlineNameEndColumn(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.outlineNameEndColumn");
+  }
+
+async outlineWorkUnchanged(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.outlineWorkUnchanged");
+  }
+
+async outlineHasProblem(uri: string, code: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.outlineHasProblem");
+  }
+
+async nativeOutlineRootCount(request: number): Promise<number> {
+    throw new Error("Not implemented: workspace.nativeOutlineRootCount");
+  }
+
+async nativeOutlineDeclarationCount(request: number): Promise<number> {
+    throw new Error("Not implemented: workspace.nativeOutlineDeclarationCount");
+  }
+
+async nativeOutlineName(request: number, path: Array<number>): Promise<string> {
+    throw new Error("Not implemented: workspace.nativeOutlineName");
+  }
+
+async nativeOutlineKind(request: number, path: Array<number>): Promise<string> {
+    throw new Error("Not implemented: workspace.nativeOutlineKind");
+  }
+
+async nativeOutlineChildCount(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.nativeOutlineChildCount");
+  }
+
+async nativeOutlineStartLine(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.nativeOutlineStartLine");
+  }
+
+async nativeOutlineStartColumn(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.nativeOutlineStartColumn");
+  }
+
+async nativeOutlineEndLine(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.nativeOutlineEndLine");
+  }
+
+async nativeOutlineEndColumn(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.nativeOutlineEndColumn");
+  }
+
+async nativeOutlineNameLine(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.nativeOutlineNameLine");
+  }
+
+async nativeOutlineNameColumn(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.nativeOutlineNameColumn");
+  }
+
+async nativeOutlineNameEndColumn(request: number, path: Array<number>): Promise<number> {
+    throw new Error("Not implemented: workspace.nativeOutlineNameEndColumn");
+  }
+
+async nativeOutlineRangesContainNames(request: number): Promise<boolean> {
+    throw new Error("Not implemented: workspace.nativeOutlineRangesContainNames");
+  }
+
+async nativeOutlineSavedText(): Promise<string> {
+    throw new Error("Not implemented: workspace.nativeOutlineSavedText");
+  }
+
+async nativeOutlineOpenText(): Promise<string> {
+    throw new Error("Not implemented: workspace.nativeOutlineOpenText");
+  }
+
+async nativeOutlineOpenIsDirty(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.nativeOutlineOpenIsDirty");
+  }
+
+async nativeOutlineWorkspaceUnchanged(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.nativeOutlineWorkspaceUnchanged");
+  }
 }
