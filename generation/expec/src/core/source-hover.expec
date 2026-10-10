@@ -1,0 +1,264 @@
+use SourceDocument from "./workspace.expec"
+use DocumentReport from "./document-analysis.expec"
+
+// Plain core hover. This source and half-open Unicode-scalar range belong to the
+// requesting text/name, not the bound declaration's possibly imported source.
+type DeclarationHover {
+  source: SourceDocument
+  startOffset: Number
+  endOffset: Number
+  signature: Text
+  description: Text
+}
+
+component SourceHover {
+  requires package "expec" for runtime
+  requires package "typescript" for build
+  requires package "vitest" for test
+
+  construction()
+  public published, closed, hover, dispose
+
+  capability published(source: SourceDocument, version: Number, report: DocumentReport) returns Nothing {
+    promises "Receive only current immutable DocumentAnalysis publications from the same analysis as diagnostics and navigation, including replacement reports at the same editor version after imported text changes. Capture this exact source/version and report.sources. Prepare readable hover facts from this report's public Inspection once per publication; privately shared prepared reference facts may be cached by immutable report identity with SourceNavigation. Do not parse, resolve, compile, discover files, acquire saved text or create another declaration model. Current bound facts remain useful despite independent compiler problems or deferred requirements; they do not establish a checked Specification. Rejected entry syntax has no Inspection and withdraws previous hovers. Invalid noninteger or negative versions throw RangeError before state changes. The caller excludes publications from a previous document lifetime."
+  }
+  capability closed(uri: Text) returns Nothing {
+    promises "Forget the exact document's current report and prepared hovers. Repeated close is harmless; other documents remain usable. A current publication after reopening starts a new lifetime and may have a lower editor version."
+  }
+  capability hover(uri: Text, version: Number, offset: Number) returns DeclarationHover? {
+    promises "Ask the prepared current report for this exact URI/version and zero-based Unicode-scalar offset. Reject noninteger or negative versions/offsets with RangeError. Return absence without a matching current report, after close/disposal, outside the captured text or without Inspection. Select only a bound reference's final identifier segment, or a supported source declaration's own authored name, when its half-open range contains the cursor. Qualified prefixes, punctuation, comments, unresolved, ambiguous or deferred references return absence. The reply.source is the exact captured requesting text, and reply offsets select that referring or declaration name token. Read bound targets through the same Inspection and require their exact captured source text; source-free external targets, unsupported declarations or unsafe/missing ranges return absence. A bound builtin reference instead shows its exact SDK builtin name with an empty description, without inventing source or an implementation."
+    promises "For source capabilities, functions, setup/action/observation helpers and checks, show the exact authored header from origin.start to an available body's content.origin.start, excluding its opening brace; when the body is absent use the finite whole declaration origin. Remove trailing whitespace only. The description contains only this callable's own decoded promises.text members of its contract body in source order, joined by one blank line; no promises means an empty description. This is the declared signature, not an inferred type or a claim that every signature type is valid. Alias and opaque type declarations use their finite whole authored origin. Record types, components, concepts, classes and interfaces use the brief actual prefix through nameOrigin.end, explicitly omitting generic lists and bodies. Fields and parameters use their finite whole authored origin, including a declared default. Do not dump container bodies, guess a header delimiter, reconstruct generics or attach another declaration's promises. A request only reads prepared facts; it performs no Inspection traversal, parsing, resolution, compilation, acquisition, generation, writes or editor changes."
+  }
+  capability dispose() returns Nothing {
+    promises "End this hover lifetime, clear retained reports/lookups and ignore later publications. Subsequent queries return absence. Repeated disposal is harmless; immutable shared preparation owns no files or native resources."
+  }
+}
+
+// Assemble real DocumentAnalysis, in-memory saved sources and real SourceHover.
+// Feedback forwards actual immutable publications/clears and records actual replies.
+// One-based line/column inputs count Unicode scalars in the real current source.
+// Each request retains its actual reply; request numbers never reconstruct an answer
+// from a fixture or a second parser. Text/name observations inspect that reply.
+// Work counters observe actual reader, compiler, saved-source and Inspection calls
+// before/after requests, proving reuse rather than a timing estimate.
+examples for SourceHover {
+  fixture hoverCallable: SourceDocument = {
+    uri: "file:///workspace/store.expec",
+    text: "error type SaveFailure { code: \"save-failed\"\n  detail: Text }\ncomponent Store {\n  public save\n  capability save(title: Text, copies: Number = 1) returns Boolean fails with SaveFailure {\n    promises \"Save the requested title.\"\n    promises \"Keep existing copies.\"\n  }\n}\nexamples for Store.save {}"
+  }
+  fixture hoverEntry: SourceDocument = {
+    uri: "file:///workspace/client.expec",
+    text: "use publish from \"./publish.expec\"\nexamples for publish {}"
+  }
+  fixture hoverSavedFunction: SourceDocument = {
+    uri: "file:///workspace/publish.expec",
+    text: "function publish(title: Text) returns Boolean {\n  promises \"Publish the title.\"\n}"
+  }
+  fixture hoverUnsavedFunction: SourceDocument = {
+    uri: "file:///workspace/publish.expec",
+    text: "function publish(title: Text, copies: Number = 1) returns Text {\n  promises \"Publish current unsaved copies.\"\n}"
+  }
+  fixture hoverCatalog: SourceDocument = {
+    uri: "file:///workspace/catalog.expec",
+    text: "type Book { title: Text }\ntype Basket { book: Book }"
+  }
+  fixture hoverUnicode: SourceDocument = {
+    uri: "file:///workspace/archive.expec",
+    text: "component Archive {\n  public `📚save`\n  capability `📚save`(title: Text) returns Text {\n    promises \"Store \\\"Bibliothèque\\\".\\nKeep 📚.\"\n  }\n}\nexamples for Archive.`📚save` {}"
+  }
+  fixture hoverDeclarations: SourceDocument = {
+    uri: "file:///workspace/declarations.expec",
+    text: "component Shelf {}\nconcept Book {}\nclass Library {}\ninterface Reader {}\ntype Box<T> { value: T }"
+  }
+
+  setup sourceHovers() returns Nothing
+  action saveHoverSource(source: SourceDocument) returns Nothing
+  action openHoverSource(source: SourceDocument, version: Number) returns Nothing
+  action changeHoverSource(source: SourceDocument, version: Number) returns Nothing
+  action closeHoverSource(uri: Text) returns Nothing
+  action disposeSourceHovers() returns Nothing
+  action requestDeclarationHover(uri: Text, version: Number, line: Number, column: Number) returns Nothing
+  action rememberHoverWork() returns Nothing
+  observation hasDeclarationHover(request: Number) returns Boolean
+  observation declarationHoverUri(request: Number) returns Text
+  observation declarationHoverSource(request: Number) returns Text
+  observation declarationHoverName(request: Number) returns Text
+  observation declarationHoverSignature(request: Number) returns Text
+  observation declarationHoverDescription(request: Number) returns Text
+  observation declarationHoverStartLine(request: Number) returns Number
+  observation declarationHoverStartColumn(request: Number) returns Number
+  observation declarationHoverEndLine(request: Number) returns Number
+  observation declarationHoverEndColumn(request: Number) returns Number
+  observation hoverWorkUnchanged() returns Boolean
+  observation hoverHasProblem(uri: Text, code: Text) returns Boolean
+
+  check expectDeclarationHover(request: Number, source: SourceDocument, name: Text, signature: Text, description: Text, line: Number, column: Number, endColumn: Number) {
+    let present = hasDeclarationHover(request)
+    let uri = declarationHoverUri(request)
+    let text = declarationHoverSource(request)
+    let actualName = declarationHoverName(request)
+    let actualSignature = declarationHoverSignature(request)
+    let actualDescription = declarationHoverDescription(request)
+    let startLine = declarationHoverStartLine(request)
+    let startColumn = declarationHoverStartColumn(request)
+    let endLine = declarationHoverEndLine(request)
+    let actualEnd = declarationHoverEndColumn(request)
+    assert present == true
+    assert uri == source.uri
+    assert text == source.text
+    assert actualName == name
+    assert actualSignature == signature
+    assert actualDescription == description
+    assert startLine == line
+    assert startColumn == column
+    assert endLine == line
+    assert actualEnd == endColumn
+  }
+  check expectNoDeclarationHover(request: Number) {
+    let present = hasDeclarationHover(request)
+    assert present == false
+  }
+  check expectNoHoverAnalysis() {
+    let unchanged = hoverWorkUnchanged()
+    assert unchanged == true
+  }
+  check expectHoverProblem(uri: Text, code: Text) {
+    let present = hoverHasProblem(uri, code)
+    assert present == true
+  }
+
+  scenario "a callable reference shows its declared default failure and own promises without repeating analysis" {
+    given sourceHovers()
+    when openHoverSource(hoverCallable, 1)
+    when rememberHoverWork()
+    when requestDeclarationHover(hoverCallable.uri, 1, 10, 20)
+    when requestDeclarationHover(hoverCallable.uri, 1, 10, 22)
+    then expectDeclarationHover(1, hoverCallable, "save", "capability save(title: Text, copies: Number = 1) returns Boolean fails with SaveFailure", "Save the requested title.\n\nKeep existing copies.", 10, 20, 24)
+    then expectDeclarationHover(2, hoverCallable, "save", "capability save(title: Text, copies: Number = 1) returns Boolean fails with SaveFailure", "Save the requested title.\n\nKeep existing copies.", 10, 20, 24)
+    then expectNoHoverAnalysis()
+  }
+  scenario "hovering the callable declaration name selects the requesting authored name" {
+    given sourceHovers()
+    when openHoverSource(hoverCallable, 1)
+    when requestDeclarationHover(hoverCallable.uri, 1, 5, 15)
+    then expectDeclarationHover(1, hoverCallable, "save", "capability save(title: Text, copies: Number = 1) returns Boolean fails with SaveFailure", "Save the requested title.\n\nKeep existing copies.", 5, 14, 18)
+  }
+  scenario "quoted Unicode names and decoded promises preserve actual text and scalar ranges" {
+    given sourceHovers()
+    when openHoverSource(hoverUnicode, 1)
+    when requestDeclarationHover(hoverUnicode.uri, 1, 7, 24)
+    then expectDeclarationHover(1, hoverUnicode, "`📚save`", "capability `📚save`(title: Text) returns Text", "Store \"Bibliothèque\".\nKeep 📚.", 7, 22, 29)
+  }
+  scenario "an unsaved imported declaration replaces the hover at the same entry version" {
+    given sourceHovers()
+    when saveHoverSource(hoverSavedFunction)
+    when openHoverSource(hoverEntry, 1)
+    when requestDeclarationHover(hoverEntry.uri, 1, 2, 15)
+    when openHoverSource(hoverUnsavedFunction, 2)
+    when requestDeclarationHover(hoverEntry.uri, 1, 2, 15)
+    then expectDeclarationHover(1, hoverEntry, "publish", "function publish(title: Text) returns Boolean", "Publish the title.", 2, 14, 21)
+    then expectDeclarationHover(2, hoverEntry, "publish", "function publish(title: Text, copies: Number = 1) returns Text", "Publish current unsaved copies.", 2, 14, 21)
+  }
+  scenario "an independent semantic error does not suppress a current bound brief type header" {
+    given sourceHovers()
+    when openHoverSource({ uri: hoverCatalog.uri, text: "type Book { title: Text }\ntype Basket { book: Book\n  missing: Unknown }" }, 1)
+    when requestDeclarationHover(hoverCatalog.uri, 1, 2, 22)
+    then expectHoverProblem(hoverCatalog.uri, "unresolved-reference")
+    then expectDeclarationHover(1, { uri: hoverCatalog.uri, text: "type Book { title: Text }\ntype Basket { book: Book\n  missing: Unknown }" }, "Book", "type Book", "", 2, 21, 25)
+  }
+  scenario "alias and opaque type references show finite whole authored declarations" {
+    given sourceHovers()
+    when openHoverSource({ uri: hoverCatalog.uri, text: "type Titles = List<Text>\nopaque type Token<T>\nfunction read(titles: Titles, token: Token<Text>)" }, 1)
+    when requestDeclarationHover(hoverCatalog.uri, 1, 3, 24)
+    when requestDeclarationHover(hoverCatalog.uri, 1, 3, 40)
+    then expectDeclarationHover(1, { uri: hoverCatalog.uri, text: "type Titles = List<Text>\nopaque type Token<T>\nfunction read(titles: Titles, token: Token<Text>)" }, "Titles", "type Titles = List<Text>", "", 3, 23, 29)
+    then expectDeclarationHover(2, { uri: hoverCatalog.uri, text: "type Titles = List<Text>\nopaque type Token<T>\nfunction read(titles: Titles, token: Token<Text>)" }, "Token", "opaque type Token<T>", "", 3, 38, 43)
+  }
+  scenario "containers and records show brief name prefixes without dumping bodies or guessing generic headers" {
+    given sourceHovers()
+    when openHoverSource(hoverDeclarations, 1)
+    when requestDeclarationHover(hoverDeclarations.uri, 1, 1, 12)
+    when requestDeclarationHover(hoverDeclarations.uri, 1, 2, 10)
+    when requestDeclarationHover(hoverDeclarations.uri, 1, 3, 8)
+    when requestDeclarationHover(hoverDeclarations.uri, 1, 4, 12)
+    when requestDeclarationHover(hoverDeclarations.uri, 1, 5, 7)
+    then expectDeclarationHover(1, hoverDeclarations, "Shelf", "component Shelf", "", 1, 11, 16)
+    then expectDeclarationHover(2, hoverDeclarations, "Book", "concept Book", "", 2, 9, 13)
+    then expectDeclarationHover(3, hoverDeclarations, "Library", "class Library", "", 3, 7, 14)
+    then expectDeclarationHover(4, hoverDeclarations, "Reader", "interface Reader", "", 4, 11, 17)
+    then expectDeclarationHover(5, hoverDeclarations, "Box", "type Box", "", 5, 6, 9)
+  }
+  scenario "field and parameter declaration names show their finite declared types and defaults" {
+    given sourceHovers()
+    when openHoverSource({ uri: hoverCatalog.uri, text: "type Book { title: Text = \"Draft\" }\nfunction read(title: Text = \"Untitled\") returns Text" }, 1)
+    when requestDeclarationHover(hoverCatalog.uri, 1, 1, 14)
+    when requestDeclarationHover(hoverCatalog.uri, 1, 2, 17)
+    then expectDeclarationHover(1, { uri: hoverCatalog.uri, text: "type Book { title: Text = \"Draft\" }\nfunction read(title: Text = \"Untitled\") returns Text" }, "title", "title: Text = \"Draft\"", "", 1, 13, 18)
+    then expectDeclarationHover(2, { uri: hoverCatalog.uri, text: "type Book { title: Text = \"Draft\" }\nfunction read(title: Text = \"Untitled\") returns Text" }, "title", "title: Text = \"Untitled\"", "", 2, 15, 20)
+  }
+  scenario "an unresolved reference has no fabricated signature" {
+    given sourceHovers()
+    when openHoverSource({ uri: hoverCatalog.uri, text: "type Basket { book: Missing }" }, 1)
+    when requestDeclarationHover(hoverCatalog.uri, 1, 1, 22)
+    then expectHoverProblem(hoverCatalog.uri, "unresolved-reference")
+    then expectNoDeclarationHover(1)
+  }
+  scenario "ambiguous imports do not choose the first declaration" {
+    given sourceHovers()
+    when saveHoverSource({ uri: "file:///workspace/shopping.expec", text: "type Cart {}" })
+    when saveHoverSource({ uri: "file:///workspace/shipping.expec", text: "type Cart {}" })
+    when openHoverSource({ uri: hoverEntry.uri, text: "use Cart from \"./shopping.expec\"\nuse Cart from \"./shipping.expec\"\nfunction save(cart: Cart)" }, 1)
+    when requestDeclarationHover(hoverEntry.uri, 1, 3, 21)
+    then expectHoverProblem(hoverEntry.uri, "ambiguous-reference")
+    then expectNoDeclarationHover(1)
+  }
+  scenario "a bound builtin shows its exact name without invented documentation" {
+    given sourceHovers()
+    when openHoverSource(hoverCatalog, 1)
+    when requestDeclarationHover(hoverCatalog.uri, 1, 1, 21)
+    then expectDeclarationHover(1, hoverCatalog, "Text", "Text", "", 1, 20, 24)
+  }
+  scenario "qualified prefixes punctuation and the half-open end do not select a hover" {
+    given sourceHovers()
+    when openHoverSource(hoverCallable, 1)
+    when requestDeclarationHover(hoverCallable.uri, 1, 10, 20)
+    when requestDeclarationHover(hoverCallable.uri, 1, 10, 14)
+    when requestDeclarationHover(hoverCallable.uri, 1, 10, 19)
+    when requestDeclarationHover(hoverCallable.uri, 1, 10, 24)
+    then expectDeclarationHover(1, hoverCallable, "save", "capability save(title: Text, copies: Number = 1) returns Boolean fails with SaveFailure", "Save the requested title.\n\nKeep existing copies.", 10, 20, 24)
+    then expectNoDeclarationHover(2)
+    then expectNoDeclarationHover(3)
+    then expectNoDeclarationHover(4)
+  }
+  scenario "a rejected edit withdraws previous hovers for both current and old requested versions" {
+    given sourceHovers()
+    when openHoverSource(hoverCatalog, 1)
+    when requestDeclarationHover(hoverCatalog.uri, 1, 2, 22)
+    when changeHoverSource({ uri: hoverCatalog.uri, text: "type Book { title: Text }\ntype Basket { book: Book " }, 2)
+    when requestDeclarationHover(hoverCatalog.uri, 2, 2, 22)
+    when requestDeclarationHover(hoverCatalog.uri, 1, 2, 22)
+    then expectDeclarationHover(1, hoverCatalog, "Book", "type Book", "", 2, 21, 25)
+    then expectNoDeclarationHover(2)
+    then expectNoDeclarationHover(3)
+  }
+  scenario "closing and reopening starts a new lower-version lifetime" {
+    given sourceHovers()
+    when openHoverSource(hoverCatalog, 10)
+    when closeHoverSource(hoverCatalog.uri)
+    when requestDeclarationHover(hoverCatalog.uri, 10, 2, 22)
+    when openHoverSource(hoverCatalog, 1)
+    when requestDeclarationHover(hoverCatalog.uri, 10, 2, 22)
+    when requestDeclarationHover(hoverCatalog.uri, 1, 2, 22)
+    then expectNoDeclarationHover(1)
+    then expectNoDeclarationHover(2)
+    then expectDeclarationHover(3, hoverCatalog, "Book", "type Book", "", 2, 21, 25)
+  }
+  scenario "disposal withdraws hovers and ignores later current publications" {
+    given sourceHovers()
+    when openHoverSource(hoverCatalog, 1)
+    when disposeSourceHovers()
+    when changeHoverSource({ uri: hoverCatalog.uri, text: "type Magazine { title: Text }\ntype Basket { book: Magazine }" }, 2)
+    when requestDeclarationHover(hoverCatalog.uri, 2, 2, 22)
+    then expectNoDeclarationHover(1)
+  }
+}
