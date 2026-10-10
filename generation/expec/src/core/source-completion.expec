@@ -1,6 +1,6 @@
 // EXT-10 completes an existing final named-type token from one current publication.
-// Generation/implementation requires the reviewed CORE-36 typeCandidates SDK capture;
-// the current development package does not yet supply that query.
+// The full reviewed CORE-36 development SDK capture cecb20e supplies typeCandidates;
+// language CI and exact package delivery remain separate from this capture.
 use SourceDocument from "./workspace.expec"
 use DocumentReport from "./document-analysis.expec"
 
