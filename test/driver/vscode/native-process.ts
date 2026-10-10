@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,6 +35,9 @@ export class NativeLauncher {
   static async start(directory: string, request: Record<string, unknown>, signal?: AbortSignal): Promise<NativeLauncher> {
     const requestPath = join(directory, 'native-request.json');
     await writeFile(requestPath, JSON.stringify(request), { signal });
+    signal?.throwIfAborted();
+    if (typeof request.userDataDirectory !== 'string') throw new TypeError('A native launch needs its user-data directory.');
+    await mkdir(request.userDataDirectory, { recursive: true });
     signal?.throwIfAborted();
     const inherited = { ...process.env };
     const env = nativeLauncherEnvironment(inherited);
