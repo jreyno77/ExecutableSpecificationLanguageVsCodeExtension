@@ -56,7 +56,7 @@ exports.run = async function run() {
           const definition = await openSourceDefinition(vscode, frame.extensionId, frame.files);
           sourceDefinitions.set(frame.definitionId, definition);
           value = definition.observation();
-        } else if (['definitionEdit', 'definitionGoTo', 'definitionHover', 'definitionSymbols', 'definitionDispose'].includes(frame.operation) && typeof frame.definitionId === 'string') {
+        } else if (['definitionEdit', 'definitionGoTo', 'definitionHover', 'definitionSymbols', 'definitionCompletion', 'definitionApplyCompletion', 'definitionDispose'].includes(frame.operation) && typeof frame.definitionId === 'string') {
           const definition = sourceDefinitions.get(frame.definitionId);
           if (frame.operation === 'definitionDispose' && !definition) value = null;
           else {
@@ -68,6 +68,10 @@ exports.run = async function run() {
             else if (frame.operation === 'definitionHover' && Number.isInteger(frame.line) && frame.line >= 0
               && Number.isInteger(frame.character) && frame.character >= 0) value = await definition.hover(frame.line, frame.character);
             else if (frame.operation === 'definitionSymbols') value = await definition.symbols();
+            else if (frame.operation === 'definitionCompletion' && Number.isInteger(frame.line) && frame.line >= 0
+              && Number.isInteger(frame.character) && frame.character >= 0) value = await definition.completion(frame.line, frame.character);
+            else if (frame.operation === 'definitionApplyCompletion' && Number.isInteger(frame.request) && frame.request > 0
+              && Number.isInteger(frame.index) && frame.index > 0) value = await definition.applyCompletion(frame.request, frame.index);
             else if (frame.operation === 'definitionDispose') {
               await definition.dispose(); sourceDefinitions.delete(frame.definitionId); value = null;
             } else throw new Error('Invalid owned definition operation.');

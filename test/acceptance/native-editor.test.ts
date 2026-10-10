@@ -8,3 +8,4 @@ import './GenerationHost.test.js';
 import './SourceDefinitionAdapter.test.js';
 import './SourceHoverAdapter.test.js';
 import './SourceOutlineAdapter.test.js';
+import './SourceCompletionAdapter.test.js';

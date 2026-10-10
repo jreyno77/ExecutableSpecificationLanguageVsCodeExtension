@@ -83,8 +83,9 @@ examples for SourceCompletionAdapter {
     given completionEditor("type Book {}\ncomponent Store {\n  local type Bookcase {}\n}\ntype Basket { book: Boo }")
     when requestNativeTypeCompletion(5, 24)
     when applyNativeTypeSuggestion(1, 1)
-    then expectNativeTypeSuggestions(1, 1)
+    then expectNativeTypeSuggestions(1, 2)
     then expectNativeTypeEdit(1, 1, "Book", "Book", 5, 21, 24)
+    then expectNativeTypeEdit(1, 2, "Boolean", "Boolean", 5, 21, 24)
     then expectNativeCompletionText("type Book {}\ncomponent Store {\n  local type Bookcase {}\n}\ntype Basket { book: Book }", "type Book {}\ncomponent Store {\n  local type Bookcase {}\n}\ntype Basket { book: Boo }", true)
     then expectNoCompletionProjectWrites()
   }

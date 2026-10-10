@@ -1,4 +1,5 @@
 // EXT-10 completes an existing final named-type token from one current publication.
+// Boo also matches builtin Boolean; independent eligible names survive bad imports.
 // The full reviewed CORE-36 development SDK capture cecb20e supplies typeCandidates;
 // language CI and exact package delivery remain separate from this capture.
 use SourceDocument from "./workspace.expec"
@@ -93,14 +94,15 @@ examples for SourceCompletion {
     assert unchanged == true
   }
 
-  scenario "the actual type scope offers Book and excludes another owner's local Bookcase" {
+  scenario "the actual type scope offers Book and Boolean and excludes another owner's local Bookcase" {
     given sourceCompletions()
     when openCompletionSource({ uri: "file:///workspace/basket.expec", text: "type Book {}\ncomponent Store {\n  local type Bookcase {}\n}\ntype Basket { book: Boo }" }, 1)
     when rememberCompletionWork()
     when requestTypeCompletion("file:///workspace/basket.expec", 1, 5, 24)
     then expectTypeCompletionAvailable(1, true)
-    then expectTypeSuggestions(1, 1)
+    then expectTypeSuggestions(1, 2)
     then expectTypeSuggestion(1, 1, "Book", "Book", "Book")
+    then expectTypeSuggestion(1, 2, "Boolean", "Boolean", "Boolean")
     then expectTypeReplacement(1, "type Book {}\ncomponent Store {\n  local type Bookcase {}\n}\ntype Basket { book: Boo }", 5, 21, 24)
     then expectNoCompletionWork()
   }
@@ -166,7 +168,8 @@ examples for SourceCompletion {
     when requestTypeCompletion("file:///workspace/basket.expec", 1, 2, 24)
     then expectTypeSuggestion(1, 1, "Book", "Book", "Book")
     then expectTypeCompletionAvailable(2, true)
-    then expectTypeSuggestions(2, 0)
+    then expectTypeSuggestions(2, 1)
+    then expectTypeSuggestion(2, 1, "Boolean", "Boolean", "Boolean")
   }
   scenario "ambiguous imported spellings do not choose the first Book" {
     given sourceCompletions()
@@ -175,7 +178,8 @@ examples for SourceCompletion {
     when openCompletionSource({ uri: "file:///workspace/basket.expec", text: "use Book from \"./first.expec\"\nuse Book from \"./second.expec\"\ntype Basket { book: Boo }" }, 1)
     when requestTypeCompletion("file:///workspace/basket.expec", 1, 3, 24)
     then expectTypeCompletionAvailable(1, true)
-    then expectTypeSuggestions(1, 0)
+    then expectTypeSuggestions(1, 1)
+    then expectTypeSuggestion(1, 1, "Boolean", "Boolean", "Boolean")
   }
   scenario "rejected text withdraws old suggestions instead of using the previous model" {
     given sourceCompletions()
