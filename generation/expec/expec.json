@@ -23,7 +23,9 @@
       "src/core/source-hover.expec",
       "src/vscode/source-hover.expec",
       "src/core/document-outline.expec",
-      "src/vscode/document-outline.expec"
+      "src/vscode/document-outline.expec",
+      "src/core/source-completion.expec",
+      "src/vscode/source-completion.expec"
     ]
   },
   "outputs": [
@@ -92,6 +94,13 @@
           },
           {
             "declaration": [
+              "SourceResolution"
+            ],
+            "from": "executable-specification-language",
+            "name": "Resolution"
+          },
+          {
+            "declaration": [
               "DefinitionTextDocument"
             ],
             "from": "vscode-languageserver-textdocument",
@@ -131,6 +140,13 @@
             ],
             "from": "vscode-languageserver",
             "name": "DocumentSymbol"
+          },
+          {
+            "declaration": [
+              "NativeCompletionItem"
+            ],
+            "from": "vscode-languageserver",
+            "name": "CompletionItem"
           }
         ]
       }
