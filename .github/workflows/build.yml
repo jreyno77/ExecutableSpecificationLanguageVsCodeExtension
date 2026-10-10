@@ -67,7 +67,7 @@ jobs:
             ui: ['test/acceptance/OutputTabs', 'test/unit/ui/', 'test/ui/'],
           };
           const tests = all || selected.size > 0;
-          appendFileSync(process.env.GITHUB_OUTPUT, `tests=${tests}\nui=${all || selected.has('ui') || selected.has('editor')}\nfilters=${all ? '' : [...selected].flatMap(part => filters[part]).join(' ')}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `tests=${tests}\nnative=${all || selected.has('editor')}\nui=${all || selected.has('ui') || selected.has('editor')}\nfilters=${all ? '' : [...selected].flatMap(part => filters[part]).join(' ')}\n`);
           console.log(all ? 'Full extension suite' : tests ? `Affected components: ${[...selected].join(', ')}` : 'Documentation only; no tests selected');
           NODE
       - name: Install dependencies
@@ -80,11 +80,6 @@ jobs:
         run: npm run build
       - name: Package the extension
         run: npm run package:vsix
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: expec-vsix-${{ matrix.os }}
-          path: dist/expec-vscode-extension.vsix
-          if-no-files-found: error
       - name: Install Chromium for browser observations
         if: steps.scope.outputs.ui == 'true'
         run: npx --no-install playwright install --with-deps chromium
@@ -92,9 +87,47 @@ jobs:
         if: steps.scope.outputs.tests == 'true'
         env:
           TEST_FILTERS: ${{ steps.scope.outputs.filters }}
+          EXPEC_TEST_VSIX: ${{ github.workspace }}/dist/expec-vscode-extension.vsix
+          EXPEC_NATIVE_VSIX_EVIDENCE: ${{ runner.temp }}/expec-installed-vsix.json
         run: |
           if [ "${{ runner.os }}" = "Linux" ]; then
             xvfb-run -a npm test -- $TEST_FILTERS
           else
             npm test -- $TEST_FILTERS
           fi
+      - name: Verify tested VSIX
+        env:
+          NATIVE_CHECKS: ${{ steps.scope.outputs.native }}
+          PLATFORM: ${{ matrix.os }}
+          EXPEC_NATIVE_VSIX_EVIDENCE: ${{ runner.temp }}/expec-installed-vsix.json
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const packageName = 'expec-vscode-extension.vsix';
+          const finalSha256 = createHash('sha256').update(readFileSync(`dist/${packageName}`)).digest('hex');
+          const provenance = { kind: 'validation-only', commit: process.env.GITHUB_SHA,
+            run: Number(process.env.GITHUB_RUN_ID), attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+            platform: process.env.PLATFORM, package: packageName, finalSha256 };
+          if (process.env.NATIVE_CHECKS === 'true') {
+            const installed = JSON.parse(readFileSync(process.env.EXPEC_NATIVE_VSIX_EVIDENCE, 'utf8'));
+            if (installed.kind !== 'installed-vsix' || installed.nativeHost !== true ||
+              [installed.sourceSha256, installed.copiedSha256, installed.postNativeSha256].some(hash => hash !== finalSha256)) {
+              throw new Error('Native installation and final package bytes do not agree.');
+            }
+            Object.assign(provenance, { kind: 'tested-vsix', suppliedSha256: installed.sourceSha256,
+              copiedSha256: installed.copiedSha256, postNativeSha256: installed.postNativeSha256 });
+          } else if (process.env.GITHUB_EVENT_NAME !== 'pull_request') {
+            throw new Error('Main delivery requires actual native installation evidence.');
+          }
+          writeFileSync('dist/provenance.json', JSON.stringify(provenance) + '\n', { flag: 'wx' });
+          console.log(JSON.stringify(provenance));
+          NODE
+      - name: Upload verified VSIX
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: expec-vsix-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist/expec-vscode-extension.vsix
+            dist/provenance.json
+          if-no-files-found: error

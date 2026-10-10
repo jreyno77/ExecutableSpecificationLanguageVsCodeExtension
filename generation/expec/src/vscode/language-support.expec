@@ -2,12 +2,24 @@
 // Its export is executable-specification-language/syntax/expec.tmLanguage.json.
 // Copy it under src/vscode/syntax/ with exact source/grammar hash provenance.
 // The language package generates it from the existing Langium grammar.
-// Project generation uses captured source a69ceca4382cb91ff28174ceb6c3ed73a5a6eae2, version 0.1.0.
-// This retains PR68 analysis and reviewed PR85/PR91 capture, PR88 syntax and PR92 builtin declarations; later checks stay strict.
-// Pin generation/tooling/executable-specification-language-a69ceca.tgz with its recorded SHA-512 integrity.
+// Build/runtime dependency: captured development source 76afb46f1329a4ae7c80b57b3b34eb3d85722c08, version 0.1.0.
+// Pin generation/tooling/executable-specification-language-76afb46.tgz with its recorded SHA-512 integrity.
+// This reviewed PROJECT-43 build queries all contract subjects within one captured
+// post-application scope, then verifies freshness before generating tests. It
+// preserves the same output adapter lifetime and all strict evidence checks.
+// Keep the complete SDK/runtime payload, source/test capture and syntax asset.
+// It is development provenance: the language's separate exact-main delivery is
+// held by issue 106; this pin does not claim a verified language package release.
 // The project generator need not export this separate language-produced syntax asset.
 // The extension copies it unchanged; it authors no grammar, keyword table or token regex.
 // Plain and quoted names have lexical entity.name.expec scopes, not semantic type claims.
+// EXT-14 native CI supplies the already packaged extension VSIX to this owned installer.
+// Copy that archive into the owned installation tree without repackaging or changing its bytes.
+// Check and log the actual SHA-256 of the supplied archive and its owned copy before installation.
+// Check that both still have that same digest after the installed native checks finish.
+// CI verifies its final packaged VSIX digest against that installed digest before artifact upload.
+// A normal local run without a supplied archive may package the project into its owned tree.
+// That local fallback is explicit setup; it does not prove the identity of a separate CI artifact.
 // The editor observes the actual VSIX installed in an isolated VS Code host.
 // The real TextMate/Oniguruma engine reads that same packaged grammar before these actions.
 // Each example owns its mutable documents and token state; scopes come from the real engine.
