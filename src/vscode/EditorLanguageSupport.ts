@@ -79,10 +79,22 @@ export class EditorLanguageSupport {
             return result;
         };
         middleware.provideHover = hoverGuard;
+        const previousSymbols = middleware.provideDocumentSymbols;
+        const symbolGuard: NonNullable<typeof previousSymbols> = async (document, token, next) => {
+            const version = document.version;
+            const current = () => !this.disposed && !token.isCancellationRequested && !document.isClosed &&
+                document.version === version && workspace.textDocuments.includes(document);
+            if (!current()) throw new CancellationError();
+            const result = await (previousSymbols ? previousSymbols(document, token, next) : next(document, token));
+            if (!current()) throw new CancellationError();
+            return result;
+        };
+        middleware.provideDocumentSymbols = symbolGuard;
         this.releaseMiddleware = () => {
             if (middleware.provideDiagnostics === guard) middleware.provideDiagnostics = previous;
             if (middleware.provideDefinition === definitionGuard) middleware.provideDefinition = previousDefinition;
             if (middleware.provideHover === hoverGuard) middleware.provideHover = previousHover;
+            if (middleware.provideDocumentSymbols === symbolGuard) middleware.provideDocumentSymbols = previousSymbols;
         };
         this.context.subscriptions.push(this);
         void this.client.start().catch(error => this.client.error('.expec language server failed to start.', error, true));

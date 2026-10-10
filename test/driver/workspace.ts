@@ -1,8 +1,12 @@
 import { SourceDefinitionConversion } from './source-definition-conversion.js';
 import { SourceHoverConversion } from './source-hover-conversion.js';
+import { SourceOutlineConversion } from './source-outline-conversion.js';
+import { NativeOutlineRecording } from './vscode/native-outline.js';
+import type { OutlineReplies } from './outline-replies.js';
 import type { NativeDefinitionCase } from './vscode/native-definition.js';
 import { SourceNavigationRecording } from './source-navigation.js';
 import { SourceHoverRecording } from './source-hover.js';
+import { DocumentOutlineRecording } from './document-outline.js';
 import { GenerationOnSaveRecording } from './generation-on-save.js';
 import type { NativeGenerationCase } from './vscode/native-generation.js';
 import type { ConnectionSidebarCase } from './vscode/connection-sidebar.js';
@@ -24,12 +28,16 @@ import { SourceDocument } from "../../src/core/SourceDocument.js";
 import { OutputPreviewsRecording } from './output-previews.js';
 import type { NativePreviewCase } from './vscode/native-preview.js';
 export class WorkspaceDriver {
+  private nativeOutlineRecording!: NativeOutlineRecording;
+  private outlineConversionRecording!: SourceOutlineConversion;
+  private nativeOutlineReplies!: OutlineReplies;
   private nativeHover!: NativeDefinitionCase;
   private hoverConversionRecording!: SourceHoverConversion;
   private definitionConversionRecording!: SourceDefinitionConversion;
     private nativeDefinition!: NativeDefinitionCase;
   private navigationRecording!: SourceNavigationRecording;
   private sourceHoverRecording!: SourceHoverRecording;
+  private outlineRecording!: DocumentOutlineRecording;
   private sidebarCase!: ConnectionSidebarCase;
   private connectionRecording!: ConnectionRecording;
   private diagnosticDocument!: DiagnosticDocument;
@@ -1380,198 +1388,200 @@ async convertedHoverEndCharacter(request: number): Promise<number> {
   }
 
 async documentOutline(): Promise<void> {
-    throw new Error("Not implemented: workspace.documentOutline");
+    this.outlineRecording = DocumentOutlineRecording.create();
   }
 
 async outlineEditor(fileName: string, initialText: string): Promise<void> {
-    throw new Error("Not implemented: workspace.outlineEditor");
+    this.nativeOutlineRecording = await NativeOutlineRecording.open(fileName, initialText);
+    this.nativeOutlineReplies = this.nativeOutlineRecording.replies;
   }
 
 async outlineAdapterDocument(uri: string, text: string, version: number): Promise<void> {
-    throw new Error("Not implemented: workspace.outlineAdapterDocument");
+    this.outlineConversionRecording = new SourceOutlineConversion(uri, text, version);
+    this.nativeOutlineReplies = this.outlineConversionRecording.replies;
   }
 
 async saveOutlineSource(source: SourceDocument): Promise<void> {
-    throw new Error("Not implemented: workspace.saveOutlineSource");
+    this.outlineRecording.savedSource(source);
   }
 
 async openOutlineSource(source: SourceDocument, version: number): Promise<void> {
-    throw new Error("Not implemented: workspace.openOutlineSource");
+    this.outlineRecording.opened(source, version);
   }
 
 async changeOutlineSource(source: SourceDocument, version: number): Promise<void> {
-    throw new Error("Not implemented: workspace.changeOutlineSource");
+    this.outlineRecording.changed(source, version);
   }
 
 async closeOutlineSource(uri: string): Promise<void> {
-    throw new Error("Not implemented: workspace.closeOutlineSource");
+    this.outlineRecording.closed(uri);
   }
 
 async disposeDocumentOutline(): Promise<void> {
-    throw new Error("Not implemented: workspace.disposeDocumentOutline");
+    this.outlineRecording.disposed();
   }
 
 async requestDocumentOutline(uri: string, version: number): Promise<void> {
-    throw new Error("Not implemented: workspace.requestDocumentOutline");
+    this.outlineRecording.request(uri, version);
   }
 
 async rememberOutlineWork(): Promise<void> {
-    throw new Error("Not implemented: workspace.rememberOutlineWork");
+    this.outlineRecording.rememberWork();
   }
 
 async attemptOutlineReplyMutation(request: number): Promise<void> {
-    throw new Error("Not implemented: workspace.attemptOutlineReplyMutation");
+    this.outlineRecording.attemptMutation(request);
   }
 
 async editOutlineWithoutSaving(text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.editOutlineWithoutSaving");
+    await this.nativeOutlineRecording.edit(text);
   }
 
 async requestEditorOutline(): Promise<void> {
-    throw new Error("Not implemented: workspace.requestEditorOutline");
+    await this.nativeOutlineRecording.request();
   }
 
 async changeOutlineAdapterDocument(text: string, version: number): Promise<void> {
-    throw new Error("Not implemented: workspace.changeOutlineAdapterDocument");
+    this.outlineConversionRecording.change(text, version);
   }
 
 async requestOutlineAdapter(version: number): Promise<void> {
-    throw new Error("Not implemented: workspace.requestOutlineAdapter");
+    this.outlineConversionRecording.request(version);
   }
 
 async hasDocumentOutline(request: number): Promise<boolean> {
-    throw new Error("Not implemented: workspace.hasDocumentOutline");
+    return this.outlineRecording.reply(request) !== undefined;
   }
 
 async outlineSourceUri(request: number): Promise<string> {
-    throw new Error("Not implemented: workspace.outlineSourceUri");
+    return this.outlineRecording.outline(request).source.uri;
   }
 
 async outlineSourceText(request: number): Promise<string> {
-    throw new Error("Not implemented: workspace.outlineSourceText");
+    return this.outlineRecording.outline(request).source.text;
   }
 
 async outlineRootCount(request: number): Promise<number> {
-    throw new Error("Not implemented: workspace.outlineRootCount");
+    return this.outlineRecording.outline(request).symbols.length;
   }
 
 async outlineDeclarationCount(request: number): Promise<number> {
-    throw new Error("Not implemented: workspace.outlineDeclarationCount");
+    return this.outlineRecording.declarationCount(request);
   }
 
 async outlineName(request: number, path: Array<number>): Promise<string> {
-    throw new Error("Not implemented: workspace.outlineName");
+    return this.outlineRecording.symbol(request, path).name;
   }
 
 async outlineKind(request: number, path: Array<number>): Promise<string> {
-    throw new Error("Not implemented: workspace.outlineKind");
+    return this.outlineRecording.symbol(request, path).kind;
   }
 
 async outlineChildCount(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.outlineChildCount");
+    return this.outlineRecording.symbol(request, path).children.length;
   }
 
 async outlineStartLine(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.outlineStartLine");
+    return this.outlineRecording.position(request, this.outlineRecording.symbol(request, path).startOffset).line;
   }
 
 async outlineStartColumn(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.outlineStartColumn");
+    return this.outlineRecording.position(request, this.outlineRecording.symbol(request, path).startOffset).column;
   }
 
 async outlineEndLine(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.outlineEndLine");
+    return this.outlineRecording.position(request, this.outlineRecording.symbol(request, path).endOffset).line;
   }
 
 async outlineEndColumn(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.outlineEndColumn");
+    return this.outlineRecording.position(request, this.outlineRecording.symbol(request, path).endOffset).column;
   }
 
 async outlineNameLine(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.outlineNameLine");
+    return this.outlineRecording.position(request, this.outlineRecording.symbol(request, path).nameStartOffset).line;
   }
 
 async outlineNameColumn(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.outlineNameColumn");
+    return this.outlineRecording.position(request, this.outlineRecording.symbol(request, path).nameStartOffset).column;
   }
 
 async outlineNameEndColumn(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.outlineNameEndColumn");
+    return this.outlineRecording.position(request, this.outlineRecording.symbol(request, path).nameEndOffset).column;
   }
 
 async outlineWorkUnchanged(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.outlineWorkUnchanged");
+    return this.outlineRecording.workUnchanged();
   }
 
 async outlineHasProblem(uri: string, code: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.outlineHasProblem");
+    return this.outlineRecording.hasProblem(uri, code);
   }
 
 async nativeOutlineRootCount(request: number): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeOutlineRootCount");
+    return this.nativeOutlineReplies.reply(request).length;
   }
 
 async nativeOutlineDeclarationCount(request: number): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeOutlineDeclarationCount");
+    return this.nativeOutlineReplies.count(request);
   }
 
 async nativeOutlineName(request: number, path: Array<number>): Promise<string> {
-    throw new Error("Not implemented: workspace.nativeOutlineName");
+    return this.nativeOutlineReplies.symbol(request, path).name;
   }
 
 async nativeOutlineKind(request: number, path: Array<number>): Promise<string> {
-    throw new Error("Not implemented: workspace.nativeOutlineKind");
+    return this.nativeOutlineReplies.symbol(request, path).kind;
   }
 
 async nativeOutlineChildCount(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeOutlineChildCount");
+    return this.nativeOutlineReplies.symbol(request, path).children.length;
   }
 
 async nativeOutlineStartLine(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeOutlineStartLine");
+    return this.nativeOutlineReplies.symbol(request, path).range.start.line + 1;
   }
 
 async nativeOutlineStartColumn(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeOutlineStartColumn");
+    return this.nativeOutlineReplies.symbol(request, path).range.start.character + 1;
   }
 
 async nativeOutlineEndLine(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeOutlineEndLine");
+    return this.nativeOutlineReplies.symbol(request, path).range.end.line + 1;
   }
 
 async nativeOutlineEndColumn(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeOutlineEndColumn");
+    return this.nativeOutlineReplies.symbol(request, path).range.end.character + 1;
   }
 
 async nativeOutlineNameLine(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeOutlineNameLine");
+    return this.nativeOutlineReplies.symbol(request, path).selectionRange.start.line + 1;
   }
 
 async nativeOutlineNameColumn(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeOutlineNameColumn");
+    return this.nativeOutlineReplies.symbol(request, path).selectionRange.start.character + 1;
   }
 
 async nativeOutlineNameEndColumn(request: number, path: Array<number>): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeOutlineNameEndColumn");
+    return this.nativeOutlineReplies.symbol(request, path).selectionRange.end.character + 1;
   }
 
 async nativeOutlineRangesContainNames(request: number): Promise<boolean> {
-    throw new Error("Not implemented: workspace.nativeOutlineRangesContainNames");
+    return this.nativeOutlineReplies.rangesContainNames(request);
   }
 
 async nativeOutlineSavedText(): Promise<string> {
-    throw new Error("Not implemented: workspace.nativeOutlineSavedText");
+    return this.nativeOutlineRecording.savedText();
   }
 
 async nativeOutlineOpenText(): Promise<string> {
-    throw new Error("Not implemented: workspace.nativeOutlineOpenText");
+    return this.nativeOutlineRecording.currentText();
   }
 
 async nativeOutlineOpenIsDirty(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.nativeOutlineOpenIsDirty");
+    return this.nativeOutlineRecording.dirty();
   }
 
 async nativeOutlineWorkspaceUnchanged(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.nativeOutlineWorkspaceUnchanged");
+    return this.nativeOutlineRecording.filesUnchanged();
   }
 }

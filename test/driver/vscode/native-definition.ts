@@ -3,7 +3,7 @@ import { lstat, readFile, readdir, readlink, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NativeCleanupError, ownTemporaryDirectory, removeOwnedDirectory } from './native-process.js';
-import { type NativeDefinitionObservation, type NativeHoverObservation, VsCodeSession } from './vscode-session.js';
+import { type NativeDefinitionObservation, type NativeHoverObservation, type NativeOutlineObservation, VsCodeSession } from './vscode-session.js';
 
 /** Mutable documents/files belong to one case; the installed host has suite ownership. */
 export class NativeDefinitionCase {
@@ -18,16 +18,17 @@ export class NativeDefinitionCase {
   private actualHover: NativeHoverObservation | undefined;
   private initialEntryVersion: number | undefined;
   constructor(private readonly getSession: () => Promise<VsCodeSession>, private readonly extensionId: string,
-    private readonly sources: Readonly<Record<string, string>>, private readonly workspace: string) {}
+    private readonly sources: Readonly<Record<string, string>>, private readonly workspace: string, private readonly entryFileName = 'entry.expec') {}
 
   open(): Promise<void> { return this.opening ??= this.openOwnedCase(); }
   private async openOwnedCase(): Promise<void> {
     if (typeof this.sources['entry.expec'] !== 'string') throw new Error('A definition case needs its owned entry.');
+    if (basename(this.entryFileName) !== this.entryFileName || this.entryFileName === '.' || this.entryFileName === '..') throw new Error('A source case needs one owned entry file name.');
     this.directory = await ownTemporaryDirectory('expec-native-definition-', this.workspace);
     const files: Record<string, string> = {};
     for (const [name, text] of Object.entries(this.sources)) {
       if (basename(name) !== name || name === '.' || name === '..') throw new Error('A definition source must be one owned file name.');
-      files[name] = join(this.directory, name);
+      files[name] = join(this.directory, name === 'entry.expec' ? this.entryFileName : name);
       await writeFile(files[name], text, 'utf8');
     }
     this.initialTree = await tree(this.directory);
@@ -63,6 +64,13 @@ export class NativeDefinitionCase {
     return this.actualHover;
   }
   entryVersionUnchanged(): boolean { return this.observation().entryVersion === this.initialEntryVersion; }
+  async symbols(): Promise<NativeOutlineObservation> {
+    await this.open();
+    const actual = await this.session!.symbolsNativeDefinition(this.id);
+    this.actual = actual;
+    return actual;
+  }
+  async savedEntryText(): Promise<string> { await this.open(); return readFile(join(this.directory!, this.entryFileName), 'utf8'); }
   locationFileName(): string { const location = this.observation().locations[0]; return location ? basename(fileURLToPath(location.uri)) : ''; }
   activeFileName(): string { return basename(fileURLToPath(this.observation().active.uri)); }
   locationUsesOwnedFile(fileName: string): boolean { const uri = this.observation().locations[0]?.uri; return uri !== undefined && uri === this.observation().ownedUris[fileName]; }

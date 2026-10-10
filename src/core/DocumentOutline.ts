@@ -1,3 +1,11 @@
+import type { Inspection, Item, NodeKind } from 'executable-specification-language';
+import type { SourceOutlineSymbol } from './SourceOutlineSymbol.js';
+import { validSourceRange } from './source-reference-facts.js';
+
+type PreparedOutline = { version: number; outline: SourceOutline | undefined };
+const declarationKinds = new Set<NodeKind>(['component', 'concept', 'class', 'interface',
+    'record-type-declaration', 'alias-type-declaration', 'opaque-type-declaration', 'field', 'function', 'capability']);
+
 import type { SourceDocument } from "./SourceDocument.js";
 import type { DocumentReport } from "./DocumentReport.js";
 import type { SourceOutline } from "./SourceOutline.js";
@@ -12,8 +20,10 @@ import type { SourceOutline } from "./SourceOutline.js";
  * Requires package: vitest (test)
  */
 export class DocumentOutline {
+    private readonly documents = new Map<string, PreparedOutline>();
+    private disposed = false;
     constructor() {
-        throw new Error("Not implemented: DocumentOutline.construction");
+
     }
     /**
      * Unverified implementation obligation.
@@ -22,27 +32,63 @@ export class DocumentOutline {
      * Each emitted child's whole range must also be contained in its emitted parent's whole range. Omit an invalid supported declaration and its subtree rather than invent ranges or promote its children into a different parent.
      */
     published(source: SourceDocument, version: number, report: DocumentReport): void {
-        throw new Error("Not implemented: DocumentOutline.published");
+        this.validateVersion(version);
+        if (this.disposed) return;
+        const captured = report.sources.find(candidate => candidate.uri === source.uri && candidate.text === source.text);
+        const outline = report.inspection && captured ? this.prepare(captured, report.inspection) : undefined;
+        this.documents.set(source.uri, { version, outline });
     }
     /**
      * Unverified implementation obligation.
      * Forget this exact document's outline when DocumentAnalysis ends its lifetime. Repeated close is harmless and other documents remain usable. A later current publication after reopening starts a new lifetime and may have a lower version.
      */
     closed(uri: string): void {
-        throw new Error("Not implemented: DocumentOutline.closed");
+        this.documents.delete(uri);
     }
     /**
      * Unverified implementation obligation.
      * Reject a noninteger or negative version with RangeError before changing state. Return the prepared outline only for the exact retained URI/version and current captured text. A current accepted document with no supported declarations has an empty symbols list. Missing, stale, rejected, closed or disposed publications return absence. The reply includes the exact captured source used for all whole/name scalar ranges. A request performs no Inspection walk, parsing, checking, acquisition, generation or project scan. Caller mutation cannot change retained state or other earlier/current replies; use immutable values or independent copies. This operation never writes files or changes editor selection.
      */
     symbols(uri: string, version: number): SourceOutline | undefined {
-        throw new Error("Not implemented: DocumentOutline.symbols");
+        this.validateVersion(version);
+        const prepared = this.documents.get(uri);
+        return !this.disposed && prepared?.version === version ? prepared.outline : undefined;
     }
     /**
      * Unverified implementation obligation.
      * End this outline lifetime, clear retained trees and ignore later publications. All queries return absence; repeated disposal is harmless.
      */
     dispose(): void {
-        throw new Error("Not implemented: DocumentOutline.dispose");
+        this.disposed = true;
+        this.documents.clear();
+    }
+    private validateVersion(version: number): void {
+        if (!Number.isInteger(version) || version < 0) throw new RangeError('Document versions must be nonnegative integers.');
+    }
+    private prepare(source: SourceDocument, inspection: Inspection): SourceOutline {
+        const length = Array.from(source.text).length;
+        const ordered = (items: Iterable<Item>, parent?: SourceOutlineSymbol): SourceOutlineSymbol[] => {
+            const symbols = [...items].flatMap(item => visit(item, parent));
+            symbols.sort((left, right) => left.startOffset - right.startOffset);
+            Object.freeze(symbols);
+            return symbols;
+        };
+        const visit = (item: Item, parent?: SourceOutlineSymbol): SourceOutlineSymbol[] => {
+            if (item.kind === 'local') return ordered(inspection.children(item.id), parent);
+            if (!declarationKinds.has(item.kind) || !('name' in item) || !('nameOrigin' in item)) return [];
+            if (item.origin.kind !== 'source' || item.nameOrigin.kind !== 'source') return [];
+            const whole = item.origin.range, name = item.nameOrigin.range;
+            if (whole.sourceId !== source.uri || name.sourceId !== source.uri ||
+                !validSourceRange(whole, length) || !validSourceRange(name, length) ||
+                name.start.offset < whole.start.offset || name.end.offset > whole.end.offset ||
+                (parent && (whole.start.offset < parent.startOffset || whole.end.offset > parent.endOffset))) return [];
+            const symbol: SourceOutlineSymbol = { name: item.name, kind: item.kind,
+                startOffset: whole.start.offset, endOffset: whole.end.offset,
+                nameStartOffset: name.start.offset, nameEndOffset: name.end.offset, children: [] };
+            symbol.children = ordered(inspection.children(item.id), symbol);
+            Object.freeze(symbol);
+            return [symbol];
+        };
+        return Object.freeze({ source: Object.freeze({ ...source }), symbols: ordered(inspection.roots()) });
     }
 }

@@ -1,3 +1,5 @@
+import { DocumentOutline as CoreDocumentOutline } from '../core/DocumentOutline.js';
+import { SourceOutlineAdapter as NativeSourceOutlineAdapter } from './SourceOutlineAdapter.js';
 import { SourceHover as CoreSourceHover } from '../core/SourceHover.js';
 import { SourceHoverAdapter as NativeSourceHoverAdapter } from './SourceHoverAdapter.js';
 import { OutputPreviews as CoreOutputPreviews } from '../core/OutputPreviews.js';
@@ -59,6 +61,8 @@ export class LanguageServerAdapter {
     private readonly definitions = new NativeSourceDefinitionAdapter(this.navigation);
     private readonly hover = new CoreSourceHover();
     private readonly hovers = new NativeSourceHoverAdapter(this.hover);
+    private readonly outline = new CoreDocumentOutline();
+    private readonly outlines = new NativeSourceOutlineAdapter(this.outline);
     private readonly documents = new TextDocuments(TextDocument);
     private readonly subscriptions: Disposable[] = [];
     private readonly reports = new Map<string, { resultId: string; items: Diagnostic[]; dependencies: readonly string[] }>();
@@ -99,6 +103,7 @@ export class LanguageServerAdapter {
                     diagnosticProvider: { interFileDependencies: true, workspaceDiagnostics: false },
                     definitionProvider: true,
                     hoverProvider: true,
+                    documentSymbolProvider: true,
                 } };
             }),
             this.connection.onInitialized(() => {
@@ -121,6 +126,11 @@ export class LanguageServerAdapter {
                 const document = this.documents.get(textDocument.uri);
                 return document ? this.hovers.information(document, position) : undefined;
             }),
+            this.connection.onDocumentSymbol(({ textDocument }, token) => {
+                if (this.disposed || token.isCancellationRequested) return [];
+                const document = this.documents.get(textDocument.uri);
+                return document ? this.outlines.symbols(document) : [];
+            }),
             this.connection.languages.diagnostics.on(({ textDocument }) => {
                 const report = this.reports.get(textDocument.uri);
                 return { kind: 'full', resultId: report?.resultId, items: report?.items ?? [] };
@@ -137,6 +147,7 @@ export class LanguageServerAdapter {
         if (this.disposed) return;
         this.navigation.published(source, version, report);
         this.hover.published(source, version, report);
+        this.outline.published(source, version, report);
         this.previews.published(source, version, report);
         const snapshots = new Map(report.sources.map(snapshot => [snapshot.uri, snapshot]));
         snapshots.set(source.uri, source);
@@ -207,6 +218,7 @@ export class LanguageServerAdapter {
     clear(uri: string): void {
         this.navigation.closed(uri);
         this.hover.closed(uri);
+        this.outline.closed(uri);
         this.previews.closed(uri);
         this.reports.delete(uri);
         this.updateWatches();
@@ -226,6 +238,7 @@ export class LanguageServerAdapter {
         for (const subscription of this.subscriptions.splice(0)) release(() => subscription.dispose());
         release(() => this.navigation.dispose());
         release(() => this.hover.dispose());
+        release(() => this.outline.dispose());
         release(() => this.previews.dispose());
         for (const uri of this.documents.keys()) release(() => this.analysis.closed(uri));
         this.reports.clear();
