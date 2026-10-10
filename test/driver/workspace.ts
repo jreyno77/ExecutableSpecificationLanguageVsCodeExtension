@@ -1,3 +1,6 @@
+import { NativeCompletionRecording } from './vscode/native-completion.js';
+import { SourceCompletionRecording } from './source-completion.js';
+import { SourceCompletionConversion } from './source-completion-conversion.js';
 import { SourceDefinitionConversion } from './source-definition-conversion.js';
 import { SourceHoverConversion } from './source-hover-conversion.js';
 import { SourceOutlineConversion } from './source-outline-conversion.js';
@@ -28,6 +31,9 @@ import { SourceDocument } from "../../src/core/SourceDocument.js";
 import { OutputPreviewsRecording } from './output-previews.js';
 import type { NativePreviewCase } from './vscode/native-preview.js';
 export class WorkspaceDriver {
+  private nativeCompletionRecording!: NativeCompletionRecording;
+  private sourceCompletionRecording!: SourceCompletionRecording;
+  private completionConversionRecording!: SourceCompletionConversion;
   private nativeOutlineRecording!: NativeOutlineRecording;
   private outlineConversionRecording!: SourceOutlineConversion;
   private nativeOutlineReplies!: OutlineReplies;
@@ -1583,5 +1589,165 @@ async nativeOutlineOpenIsDirty(): Promise<boolean> {
 
 async nativeOutlineWorkspaceUnchanged(): Promise<boolean> {
     return this.nativeOutlineRecording.filesUnchanged();
+  }
+
+async sourceCompletions(): Promise<void> {
+    this.sourceCompletionRecording = SourceCompletionRecording.create();
+  }
+
+async completionEditor(text: string): Promise<void> {
+    this.nativeCompletionRecording = await NativeCompletionRecording.open(text);
+  }
+
+async completionConversion(text: string): Promise<void> {
+    this.completionConversionRecording = new SourceCompletionConversion(text);
+  }
+
+async saveCompletionSource(source: SourceDocument): Promise<void> {
+    this.sourceCompletionRecording.savedSource(source);
+  }
+
+async openCompletionSource(source: SourceDocument, version: number): Promise<void> {
+    this.sourceCompletionRecording.opened(source, version);
+  }
+
+async changeCompletionSource(source: SourceDocument, version: number): Promise<void> {
+    this.sourceCompletionRecording.changed(source, version);
+  }
+
+async closeCompletionSource(uri: string): Promise<void> {
+    this.sourceCompletionRecording.closed(uri);
+  }
+
+async requestTypeCompletion(uri: string, version: number, line: number, column: number): Promise<void> {
+    this.sourceCompletionRecording.request(uri, version, line, column);
+  }
+
+async rememberCompletionWork(): Promise<void> {
+    this.sourceCompletionRecording.rememberWork();
+  }
+
+async requestNativeTypeCompletion(line: number, column: number): Promise<void> {
+    await this.nativeCompletionRecording.request(line, column);
+  }
+
+async editCompletionWithoutSaving(text: string): Promise<void> {
+    await this.nativeCompletionRecording.edit(text);
+  }
+
+async applyNativeTypeSuggestion(request: number, index: number): Promise<void> {
+    await this.nativeCompletionRecording.apply(request, index);
+  }
+
+async requestConvertedTypeCompletion(line: number, character: number): Promise<void> {
+    this.completionConversionRecording.request(line, character);
+  }
+
+async hasTypeCompletion(request: number): Promise<boolean> {
+    return this.sourceCompletionRecording.reply(request) !== undefined;
+  }
+
+async typeSuggestionCount(request: number): Promise<number> {
+    return this.sourceCompletionRecording.reply(request)?.suggestions.length ?? 0;
+  }
+
+async typeSuggestionSpelling(request: number, index: number): Promise<string> {
+    return this.sourceCompletionRecording.suggestion(request, index).spelling;
+  }
+
+async typeSuggestionInsertion(request: number, index: number): Promise<string> {
+    return this.sourceCompletionRecording.suggestion(request, index).insertionText;
+  }
+
+async typeSuggestionTarget(request: number, index: number): Promise<string> {
+    return this.sourceCompletionRecording.suggestion(request, index).targetName;
+  }
+
+async typeCompletionText(request: number): Promise<string> {
+    return this.sourceCompletionRecording.completed(request).source.text;
+  }
+
+async typeCompletionStartLine(request: number): Promise<number> {
+    return this.sourceCompletionRecording.start(request).line;
+  }
+
+async typeCompletionStartColumn(request: number): Promise<number> {
+    return this.sourceCompletionRecording.start(request).column;
+  }
+
+async typeCompletionEndLine(request: number): Promise<number> {
+    return this.sourceCompletionRecording.end(request).line;
+  }
+
+async typeCompletionEndColumn(request: number): Promise<number> {
+    return this.sourceCompletionRecording.end(request).column;
+  }
+
+async completionWorkUnchanged(): Promise<boolean> {
+    return this.sourceCompletionRecording.workUnchanged();
+  }
+
+async nativeTypeSuggestionCount(request: number): Promise<number> {
+    return this.nativeCompletionRecording.reply(request).items.length;
+  }
+
+async nativeTypeSuggestionLabel(request: number, index: number): Promise<string> {
+    return this.nativeCompletionRecording.item(request, index).label;
+  }
+
+async nativeTypeSuggestionInsertion(request: number, index: number): Promise<string> {
+    return this.nativeCompletionRecording.item(request, index).insertion;
+  }
+
+async nativeTypeSuggestionStartLine(request: number, index: number): Promise<number> {
+    return this.nativeCompletionRecording.item(request, index).range.start.line + 1;
+  }
+
+async nativeTypeSuggestionStartColumn(request: number, index: number): Promise<number> {
+    return this.nativeCompletionRecording.item(request, index).range.start.character + 1;
+  }
+
+async nativeTypeSuggestionEndLine(request: number, index: number): Promise<number> {
+    return this.nativeCompletionRecording.item(request, index).range.end.line + 1;
+  }
+
+async nativeTypeSuggestionEndColumn(request: number, index: number): Promise<number> {
+    return this.nativeCompletionRecording.item(request, index).range.end.character + 1;
+  }
+
+async nativeCompletionOpenText(): Promise<string> {
+    return this.nativeCompletionRecording.currentText();
+  }
+
+async nativeCompletionSavedText(): Promise<string> {
+    return this.nativeCompletionRecording.savedText();
+  }
+
+async nativeCompletionOpenIsDirty(): Promise<boolean> {
+    return this.nativeCompletionRecording.dirty();
+  }
+
+async completionProjectUnchanged(): Promise<boolean> {
+    return this.nativeCompletionRecording.filesUnchanged();
+  }
+
+async convertedTypeCount(request: number): Promise<number> {
+    return this.completionConversionRecording.reply(request).length;
+  }
+
+async convertedTypeLabel(request: number, index: number): Promise<string> {
+    return this.completionConversionRecording.item(request, index).label;
+  }
+
+async convertedTypeInsertion(request: number, index: number): Promise<string> {
+    return this.completionConversionRecording.edit(request, index).newText;
+  }
+
+async convertedTypeStart(request: number, index: number): Promise<number> {
+    return this.completionConversionRecording.edit(request, index).range.start.character;
+  }
+
+async convertedTypeEnd(request: number, index: number): Promise<number> {
+    return this.completionConversionRecording.edit(request, index).range.end.character;
   }
 }

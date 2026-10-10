@@ -2,6 +2,8 @@ import type { SyntaxDiagnostic } from "executable-specification-language";
 import type { Compilation } from "executable-specification-language";
 import type { SourceDocument } from "./SourceDocument.js";
 import type { Inspection } from "executable-specification-language";
+import type { Resolution } from "executable-specification-language";
+
 
 
 
@@ -13,4 +15,6 @@ export type DocumentReport = {
     dependencies: Array<string>;
 
 inspection?: Inspection | undefined;
+
+resolution?: Resolution | undefined;
 };

@@ -3,7 +3,7 @@ import { lstat, readFile, readdir, readlink, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NativeCleanupError, ownTemporaryDirectory, removeOwnedDirectory } from './native-process.js';
-import { type NativeDefinitionObservation, type NativeHoverObservation, type NativeOutlineObservation, VsCodeSession } from './vscode-session.js';
+import { type NativeDefinitionObservation, type NativeHoverObservation, type NativeOutlineObservation, type NativeCompletionObservation, VsCodeSession } from './vscode-session.js';
 
 /** Mutable documents/files belong to one case; the installed host has suite ownership. */
 export class NativeDefinitionCase {
@@ -64,6 +64,19 @@ export class NativeDefinitionCase {
     return this.actualHover;
   }
   entryVersionUnchanged(): boolean { return this.observation().entryVersion === this.initialEntryVersion; }
+  async completions(line: number, column: number): Promise<NativeCompletionObservation> {
+    if (!Number.isInteger(line) || !Number.isInteger(column) || line < 1 || column < 1) throw new RangeError('Native completion coordinates are one-based integers.');
+    await this.open();
+    const actual = await this.session!.completeNativeDefinition(this.id, line - 1, column - 1);
+    this.actual = actual;
+    return actual;
+  }
+  async applyCompletion(request: number, index: number): Promise<string> {
+    await this.open();
+    const actual = await this.session!.applyNativeDefinitionCompletion(this.id, request, index);
+    this.actual = actual;
+    return actual.entryText;
+  }
   async symbols(): Promise<NativeOutlineObservation> {
     await this.open();
     const actual = await this.session!.symbolsNativeDefinition(this.id);

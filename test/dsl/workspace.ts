@@ -2385,4 +2385,253 @@ readonly outlineKinds: SourceDocument = { ["uri"]: "file:///workspace/kinds.expe
 readonly outlineBook: SourceDocument = { ["uri"]: "file:///workspace/book.expec", ["text"]: "type Book { title: Text }" };
 
 readonly outlineUnicode: SourceDocument = { ["uri"]: "file:///workspace/unicode.expec", ["text"]: "type `📚Book` {\n  `résumé`: Text\n}" };
+
+async sourceCompletions(): Promise<void> {
+    return await this.driver.sourceCompletions();
+  }
+
+async completionEditor(text: string): Promise<void> {
+    return await this.driver.completionEditor(text);
+  }
+
+async completionConversion(text: string): Promise<void> {
+    return await this.driver.completionConversion(text);
+  }
+
+async saveCompletionSource(source: SourceDocument): Promise<void> {
+    return await this.driver.saveCompletionSource(source);
+  }
+
+async openCompletionSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.openCompletionSource(source, version);
+  }
+
+async changeCompletionSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.changeCompletionSource(source, version);
+  }
+
+async closeCompletionSource(uri: string): Promise<void> {
+    return await this.driver.closeCompletionSource(uri);
+  }
+
+async requestTypeCompletion(uri: string, version: number, line: number, column: number): Promise<void> {
+    return await this.driver.requestTypeCompletion(uri, version, line, column);
+  }
+
+async rememberCompletionWork(): Promise<void> {
+    return await this.driver.rememberCompletionWork();
+  }
+
+async requestNativeTypeCompletion(line: number, column: number): Promise<void> {
+    return await this.driver.requestNativeTypeCompletion(line, column);
+  }
+
+async editCompletionWithoutSaving(text: string): Promise<void> {
+    return await this.driver.editCompletionWithoutSaving(text);
+  }
+
+async applyNativeTypeSuggestion(request: number, index: number): Promise<void> {
+    return await this.driver.applyNativeTypeSuggestion(request, index);
+  }
+
+async requestConvertedTypeCompletion(line: number, character: number): Promise<void> {
+    return await this.driver.requestConvertedTypeCompletion(line, character);
+  }
+
+async hasTypeCompletion(request: number): Promise<boolean> {
+    return await this.driver.hasTypeCompletion(request);
+  }
+
+async typeSuggestionCount(request: number): Promise<number> {
+    return await this.driver.typeSuggestionCount(request);
+  }
+
+async typeSuggestionSpelling(request: number, index: number): Promise<string> {
+    return await this.driver.typeSuggestionSpelling(request, index);
+  }
+
+async typeSuggestionInsertion(request: number, index: number): Promise<string> {
+    return await this.driver.typeSuggestionInsertion(request, index);
+  }
+
+async typeSuggestionTarget(request: number, index: number): Promise<string> {
+    return await this.driver.typeSuggestionTarget(request, index);
+  }
+
+async typeCompletionText(request: number): Promise<string> {
+    return await this.driver.typeCompletionText(request);
+  }
+
+async typeCompletionStartLine(request: number): Promise<number> {
+    return await this.driver.typeCompletionStartLine(request);
+  }
+
+async typeCompletionStartColumn(request: number): Promise<number> {
+    return await this.driver.typeCompletionStartColumn(request);
+  }
+
+async typeCompletionEndLine(request: number): Promise<number> {
+    return await this.driver.typeCompletionEndLine(request);
+  }
+
+async typeCompletionEndColumn(request: number): Promise<number> {
+    return await this.driver.typeCompletionEndColumn(request);
+  }
+
+async completionWorkUnchanged(): Promise<boolean> {
+    return await this.driver.completionWorkUnchanged();
+  }
+
+async nativeTypeSuggestionCount(request: number): Promise<number> {
+    return await this.driver.nativeTypeSuggestionCount(request);
+  }
+
+async nativeTypeSuggestionLabel(request: number, index: number): Promise<string> {
+    return await this.driver.nativeTypeSuggestionLabel(request, index);
+  }
+
+async nativeTypeSuggestionInsertion(request: number, index: number): Promise<string> {
+    return await this.driver.nativeTypeSuggestionInsertion(request, index);
+  }
+
+async nativeTypeSuggestionStartLine(request: number, index: number): Promise<number> {
+    return await this.driver.nativeTypeSuggestionStartLine(request, index);
+  }
+
+async nativeTypeSuggestionStartColumn(request: number, index: number): Promise<number> {
+    return await this.driver.nativeTypeSuggestionStartColumn(request, index);
+  }
+
+async nativeTypeSuggestionEndLine(request: number, index: number): Promise<number> {
+    return await this.driver.nativeTypeSuggestionEndLine(request, index);
+  }
+
+async nativeTypeSuggestionEndColumn(request: number, index: number): Promise<number> {
+    return await this.driver.nativeTypeSuggestionEndColumn(request, index);
+  }
+
+async nativeCompletionOpenText(): Promise<string> {
+    return await this.driver.nativeCompletionOpenText();
+  }
+
+async nativeCompletionSavedText(): Promise<string> {
+    return await this.driver.nativeCompletionSavedText();
+  }
+
+async nativeCompletionOpenIsDirty(): Promise<boolean> {
+    return await this.driver.nativeCompletionOpenIsDirty();
+  }
+
+async completionProjectUnchanged(): Promise<boolean> {
+    return await this.driver.completionProjectUnchanged();
+  }
+
+async convertedTypeCount(request: number): Promise<number> {
+    return await this.driver.convertedTypeCount(request);
+  }
+
+async convertedTypeLabel(request: number, index: number): Promise<string> {
+    return await this.driver.convertedTypeLabel(request, index);
+  }
+
+async convertedTypeInsertion(request: number, index: number): Promise<string> {
+    return await this.driver.convertedTypeInsertion(request, index);
+  }
+
+async convertedTypeStart(request: number, index: number): Promise<number> {
+    return await this.driver.convertedTypeStart(request, index);
+  }
+
+async convertedTypeEnd(request: number, index: number): Promise<number> {
+    return await this.driver.convertedTypeEnd(request, index);
+  }
+
+async expectTypeSuggestions(request: number, count: number): Promise<void> {
+    const actual = await this.driver.typeSuggestionCount(request);
+    expectData(actual, count);
+  }
+
+async expectTypeCompletionAvailable(request: number, available: boolean): Promise<void> {
+    const actual = await this.driver.hasTypeCompletion(request);
+    expectData(actual, available);
+  }
+
+async expectTypeSuggestion(request: number, index: number, spelling: string, insertion: string, target: string): Promise<void> {
+    const actualSpelling = await this.driver.typeSuggestionSpelling(request, index);
+    const actualInsertion = await this.driver.typeSuggestionInsertion(request, index);
+    const actualTarget = await this.driver.typeSuggestionTarget(request, index);
+    expectData(actualSpelling, spelling);
+    expectData(actualInsertion, insertion);
+    expectData(actualTarget, target);
+  }
+
+async expectTypeReplacement(request: number, text: string, line: number, start: number, end: number): Promise<void> {
+    const actualText = await this.driver.typeCompletionText(request);
+    const actualLine = await this.driver.typeCompletionStartLine(request);
+    const actualStart = await this.driver.typeCompletionStartColumn(request);
+    const actualEndLine = await this.driver.typeCompletionEndLine(request);
+    const actualEnd = await this.driver.typeCompletionEndColumn(request);
+    expectData(actualText, text);
+    expectData(actualLine, line);
+    expectData(actualStart, start);
+    expectData(actualEndLine, line);
+    expectData(actualEnd, end);
+  }
+
+async expectNoCompletionWork(): Promise<void> {
+    const unchanged = await this.driver.completionWorkUnchanged();
+    expectData(unchanged, true);
+  }
+
+async expectNativeTypeSuggestions(request: number, count: number): Promise<void> {
+    const actual = await this.driver.nativeTypeSuggestionCount(request);
+    expectData(actual, count);
+  }
+
+async expectNativeTypeEdit(request: number, index: number, label: string, insertion: string, line: number, start: number, end: number): Promise<void> {
+    const actualLabel = await this.driver.nativeTypeSuggestionLabel(request, index);
+    const actualInsertion = await this.driver.nativeTypeSuggestionInsertion(request, index);
+    const actualLine = await this.driver.nativeTypeSuggestionStartLine(request, index);
+    const actualStart = await this.driver.nativeTypeSuggestionStartColumn(request, index);
+    const actualEndLine = await this.driver.nativeTypeSuggestionEndLine(request, index);
+    const actualEnd = await this.driver.nativeTypeSuggestionEndColumn(request, index);
+    expectData(actualLabel, label);
+    expectData(actualInsertion, insertion);
+    expectData(actualLine, line);
+    expectData(actualStart, start);
+    expectData(actualEndLine, line);
+    expectData(actualEnd, end);
+  }
+
+async expectNativeCompletionText(current: string, saved: string, dirty: boolean): Promise<void> {
+    const actualCurrent = await this.driver.nativeCompletionOpenText();
+    const actualSaved = await this.driver.nativeCompletionSavedText();
+    const actualDirty = await this.driver.nativeCompletionOpenIsDirty();
+    expectData(actualCurrent, current);
+    expectData(actualSaved, saved);
+    expectData(actualDirty, dirty);
+  }
+
+async expectNoCompletionProjectWrites(): Promise<void> {
+    const unchanged = await this.driver.completionProjectUnchanged();
+    expectData(unchanged, true);
+  }
+
+async expectConvertedTypeEdit(request: number, label: string, insertion: string, start: number, end: number): Promise<void> {
+    const count = await this.driver.convertedTypeCount(request);
+    const actualLabel = await this.driver.convertedTypeLabel(request, 1);
+    const actualInsertion = await this.driver.convertedTypeInsertion(request, 1);
+    const actualStart = await this.driver.convertedTypeStart(request, 1);
+    const actualEnd = await this.driver.convertedTypeEnd(request, 1);
+    expectData(count, 1);
+    expectData(actualLabel, label);
+    expectData(actualInsertion, insertion);
+    expectData(actualStart, start);
+    expectData(actualEnd, end);
+  }
+
+async expectNoConvertedTypeItems(request: number): Promise<void> {
+    const count = await this.driver.convertedTypeCount(request);
+    expectData(count, 0);
+  }
 }

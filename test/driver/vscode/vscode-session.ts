@@ -43,7 +43,12 @@ export type NativeHoverObservation = NativeDefinitionObservation & {
 export type NativeOutlineSymbol = { name: string; kind: string; range: DiagnosticRange; selectionRange: DiagnosticRange; children: readonly NativeOutlineSymbol[] };
 export type NativeOutlineObservation = NativeDefinitionObservation & { entryText: string; symbols: readonly NativeOutlineSymbol[] };
 
-type Operation = 'definitionOpen' | 'definitionEdit' | 'definitionGoTo' | 'definitionHover' | 'definitionSymbols' | 'definitionDispose' | 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
+export type NativeCompletionObservation = NativeDefinitionObservation & {
+  entryText: string; requestUri: string; requestVersion: number; requestPosition: DiagnosticPosition;
+  items: readonly { label: string; insertion: string; range: DiagnosticRange }[]; aggregate?: unknown;
+};
+export type NativeCompletionDocumentObservation = NativeDefinitionObservation & { entryText: string };
+type Operation = 'definitionOpen' | 'definitionEdit' | 'definitionGoTo' | 'definitionHover' | 'definitionSymbols' | 'definitionCompletion' | 'definitionApplyCompletion' | 'definitionDispose' | 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
 type Pending = { promise: Promise<unknown>; resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> };
 
 /** One owned native host, with only the observations needed by its test consumers. */
@@ -226,6 +231,26 @@ export class VsCodeSession {
       await this.poison(error); throw error;
     }
     return value as NativeHoverObservation;
+  }
+  async completeNativeDefinition(definitionId: string, line: number, character: number): Promise<NativeCompletionObservation> {
+    const value = await this.definitionRequest('definitionCompletion', { definitionId, line, character });
+    const actual = value as Partial<NativeCompletionObservation>;
+    if (typeof actual.entryText !== 'string' || actual.requestUri !== actual.entryUri || actual.requestVersion !== actual.entryVersion
+      || actual.requestPosition?.line !== line || actual.requestPosition?.character !== character
+      || !Array.isArray(actual.items) || !actual.items.every(item => typeof item?.label === 'string'
+        && typeof item.insertion === 'string' && validPosition(item.range?.start) && validPosition(item.range?.end))) {
+      const error = new Error('The native host returned an invalid completion observation.');
+      await this.poison(error); throw error;
+    }
+    return value as NativeCompletionObservation;
+  }
+  async applyNativeDefinitionCompletion(definitionId: string, request: number, index: number): Promise<NativeCompletionDocumentObservation> {
+    const value = await this.definitionRequest('definitionApplyCompletion', { definitionId, request, index });
+    if (typeof (value as Partial<NativeCompletionDocumentObservation>).entryText !== 'string') {
+      const error = new Error('The native host returned an invalid applied completion observation.');
+      await this.poison(error); throw error;
+    }
+    return value as NativeCompletionDocumentObservation;
   }
   async disposeNativeDefinition(definitionId: string): Promise<void> {
     const value = await this.request('definitionDispose', { definitionId });

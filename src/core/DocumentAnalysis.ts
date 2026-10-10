@@ -168,6 +168,7 @@ export class DocumentAnalysis {
                 syntax: [...captures.values()].flatMap(parsed => parsed.result.status === 'rejected' ? [...parsed.result.diagnostics] : []),
                 ...(compilation === undefined ? {} : { compilation }),
                 ...(inspection === undefined ? {} : { inspection }),
+                ...(resolution === undefined ? {} : { resolution }),
                 sources: [...captures.values()].map(parsed => parsed.source), dependencies: [...dependencies],
             };
             Object.freeze(report.syntax);

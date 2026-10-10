@@ -22,7 +22,7 @@ function recordedServer(sources: DocumentSources = { read: () => undefined }) {
     return { dispose: () => { released.push(name); } };
   };
   const connection = {
-    onInitialize: listen('initialize'), onInitialized: listen('initialized'), onDefinition: listen('definition'), onHover: listen('hover'), onDocumentSymbol: listen('documentSymbols'),
+    onInitialize: listen('initialize'), onInitialized: listen('initialized'), onDefinition: listen('definition'), onHover: listen('hover'), onDocumentSymbol: listen('documentSymbols'), onCompletion: listen('completion'),
     onNotification: (method: string, callback: (params: any) => void) => listen(method)(callback),
     sendNotification: (_method: string, value: PreviewPublication) => { publications.push(value); for (const receive of [...publicationListeners]) receive(); return Promise.resolve(); },
     onDidChangeWatchedFiles: listen('watched'),
@@ -277,7 +277,7 @@ describe('native semantic feedback at its protocol boundary', () => {
     expect(server.pull(source.uri).items).toEqual([]);
     expect(server.pull(source.uri).resultId).toBeUndefined();
     expect(releases).toBe(1);
-    expect(new Set(server.released)).toEqual(new Set(['initialize', 'initialized', 'watched', 'diagnostics', 'opened', 'changed', 'closed', 'willSave', 'willSaveWaitUntil', 'saved', 'expec/previewConfiguration', 'expec/previewSelection', 'definition', 'hover', 'documentSymbols']));
+    expect(new Set(server.released)).toEqual(new Set(['initialize', 'initialized', 'watched', 'diagnostics', 'opened', 'changed', 'closed', 'willSave', 'willSaveWaitUntil', 'saved', 'expec/previewConfiguration', 'expec/previewSelection', 'definition', 'hover', 'documentSymbols', 'completion']));
     expect(() => server.adapter.dispose()).not.toThrow();
   });
 });
