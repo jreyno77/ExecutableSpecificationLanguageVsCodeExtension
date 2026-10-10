@@ -20,6 +20,13 @@
 // CI verifies its final packaged VSIX digest against that installed digest before artifact upload.
 // A normal local run without a supplied archive may package the project into its owned tree.
 // That local fallback is explicit setup; it does not prove the identity of a separate CI artifact.
+// EXT-15: the shared native launcher prepares the exact requested owned profile directory
+// before starting its SDK child, for installation and the reusable editor session.
+// Await filesystem preparation, preserve existing profile contents and surface a
+// preparation failure without starting a child. Cancellation and owned cleanup stay strict.
+// Launch-order controls observe real owned filesystem state at the forwarded spawn.
+// They prove preparation only; keep the actual owned DevToolsActivePort and endpoint
+// identity checks, and retain all installed checks without retries or longer deadlines.
 // The editor observes the actual VSIX installed in an isolated VS Code host.
 // The real TextMate/Oniguruma engine reads that same packaged grammar before these actions.
 // Each example owns its mutable documents and token state; scopes come from the real engine.
