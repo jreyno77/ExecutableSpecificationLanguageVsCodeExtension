@@ -94,13 +94,6 @@
           },
           {
             "declaration": [
-              "SourceResolution"
-            ],
-            "from": "executable-specification-language",
-            "name": "Resolution"
-          },
-          {
-            "declaration": [
               "DefinitionTextDocument"
             ],
             "from": "vscode-languageserver-textdocument",
@@ -140,6 +133,13 @@
             ],
             "from": "vscode-languageserver",
             "name": "DocumentSymbol"
+          },
+          {
+            "declaration": [
+              "SourceResolution"
+            ],
+            "from": "executable-specification-language",
+            "name": "Resolution"
           },
           {
             "declaration": [
