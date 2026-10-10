@@ -9,8 +9,9 @@ test("the actual type scope offers Book and excludes another owner's local Bookc
   await workspace.rememberCompletionWork();
   await workspace.requestTypeCompletion("file:///workspace/basket.expec", 1, 5, 24);
   await workspace.expectTypeCompletionAvailable(1, true);
-  await workspace.expectTypeSuggestions(1, 1);
+  await workspace.expectTypeSuggestions(1, 2);
   await workspace.expectTypeSuggestion(1, 1, "Book", "Book", "Book");
+  await workspace.expectTypeSuggestion(1, 2, "Boolean", "Boolean", "Boolean");
   await workspace.expectTypeReplacement(1, "type Book {}\ncomponent Store {\n  local type Bookcase {}\n}\ntype Basket { book: Boo }", 5, 21, 24);
   await workspace.expectNoCompletionWork();
 });
@@ -90,7 +91,8 @@ test("an unsaved imported replacement withdraws Book at the same entry version",
   await workspace.requestTypeCompletion("file:///workspace/basket.expec", 1, 2, 24);
   await workspace.expectTypeSuggestion(1, 1, "Book", "Book", "Book");
   await workspace.expectTypeCompletionAvailable(2, true);
-  await workspace.expectTypeSuggestions(2, 0);
+  await workspace.expectTypeSuggestions(2, 1);
+  await workspace.expectTypeSuggestion(2, 1, "Boolean", "Boolean", "Boolean");
 });
 
 /* @expec-test "05b755f7-7ebd-4c55-a9ba-a29bb6fa532c" */
@@ -101,7 +103,8 @@ test("ambiguous imported spellings do not choose the first Book", async ({ works
   await workspace.openCompletionSource({ ["uri"]: "file:///workspace/basket.expec", ["text"]: "use Book from \"./first.expec\"\nuse Book from \"./second.expec\"\ntype Basket { book: Boo }" }, 1);
   await workspace.requestTypeCompletion("file:///workspace/basket.expec", 1, 3, 24);
   await workspace.expectTypeCompletionAvailable(1, true);
-  await workspace.expectTypeSuggestions(1, 0);
+  await workspace.expectTypeSuggestions(1, 1);
+  await workspace.expectTypeSuggestion(1, 1, "Boolean", "Boolean", "Boolean");
 });
 
 /* @expec-test "60a0571b-6214-46e5-a15d-88e0a87159b2" */

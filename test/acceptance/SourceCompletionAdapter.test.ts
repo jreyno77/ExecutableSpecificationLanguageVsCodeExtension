@@ -7,8 +7,9 @@ test("the installed type provider offers Book and its returned edit changes only
   await workspace.completionEditor("type Book {}\ncomponent Store {\n  local type Bookcase {}\n}\ntype Basket { book: Boo }");
   await workspace.requestNativeTypeCompletion(5, 24);
   await workspace.applyNativeTypeSuggestion(1, 1);
-  await workspace.expectNativeTypeSuggestions(1, 1);
+  await workspace.expectNativeTypeSuggestions(1, 2);
   await workspace.expectNativeTypeEdit(1, 1, "Book", "Book", 5, 21, 24);
+  await workspace.expectNativeTypeEdit(1, 2, "Boolean", "Boolean", 5, 21, 24);
   await workspace.expectNativeCompletionText("type Book {}\ncomponent Store {\n  local type Bookcase {}\n}\ntype Basket { book: Book }", "type Book {}\ncomponent Store {\n  local type Bookcase {}\n}\ntype Basket { book: Boo }", true);
   await workspace.expectNoCompletionProjectWrites();
 });

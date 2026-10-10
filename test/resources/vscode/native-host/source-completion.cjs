@@ -17,7 +17,10 @@ exports.observeCompletions = function observeCompletions(vscode, client, entry, 
     const request = active;
     const owned = request && document === entry && document.version === request.version
       && position.line === request.position.line && position.character === request.position.character;
-    if (owned) request.calls++;
+    if (!owned) return previous ? previous(document, position, context, token, next) : next(document, position, context, token);
+    request.calls++;
+    request.callback = { document, uri: document.uri.toString(), version: document.version,
+      position: { line: position.line, character: position.character } };
     return track(async () => {
       try {
         const reply = await (previous ? previous(document, position, context, token, next) : next(document, position, context, token));
@@ -62,7 +65,7 @@ exports.observeCompletions = function observeCompletions(vscode, client, entry, 
           request.items = request.nativeItems.map(item);
           requests.push(request);
           return { items: request.items, aggregate: request.aggregate, entryText: entry.getText(),
-            requestUri: request.document.uri.toString(), requestVersion: request.version, requestPosition: position(request.position) };
+            requestUri: request.callback.uri, requestVersion: request.callback.version, requestPosition: request.callback.position };
         } finally { active = undefined; }
       });
     },
