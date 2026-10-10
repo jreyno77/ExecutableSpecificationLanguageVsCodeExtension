@@ -137,7 +137,7 @@ examples for SourceHoverAdapter {
     then expectNoConvertedHover(4)
   }
   scenario "authored promises stay literal text rather than HTML or a command link" {
-    given hoverConversion("function echo(text: Text) returns Text { promises \"<b>raw</b> and [run](command:unsafe)\"\n  return text }")
+    given hoverConversion("function echo(text: Text) returns Text { promises \"<b>raw</b> and [run](command:unsafe)\" }")
     when requestConvertedHover(0, 10)
     then expectConvertedHover(1, "```expec\nfunction echo(text: Text) returns Text\n```\n\n&lt;b&gt;raw&lt;/b&gt; and \\[run\\]\\(command:unsafe\\)", "echo", 9, 13)
   }

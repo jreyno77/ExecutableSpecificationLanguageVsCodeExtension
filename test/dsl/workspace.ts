@@ -1807,4 +1807,266 @@ readonly nativeDefinitionBook: string = "type Book { title: Text }";
 readonly nativeDefinitionUnicodeEntry: string = "use Book from \"./book.expec\"\ntype Marker { label: Text = \"📚\" }\ntype Basket { book: Book }";
 
 readonly nativeDefinitionUnicodeBook: string = "type Marker { label: Text = \"📚\" }\n\ntype Book { title: Text }";
+
+async sourceHovers(): Promise<void> {
+    return await this.driver.sourceHovers();
+  }
+
+async localHoverEditor(text: string): Promise<void> {
+    return await this.driver.localHoverEditor(text);
+  }
+
+async importedHoverEditor(entry: string, imported: string): Promise<void> {
+    return await this.driver.importedHoverEditor(entry, imported);
+  }
+
+async hoverConversion(text: string): Promise<void> {
+    return await this.driver.hoverConversion(text);
+  }
+
+async saveHoverSource(source: SourceDocument): Promise<void> {
+    return await this.driver.saveHoverSource(source);
+  }
+
+async openHoverSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.openHoverSource(source, version);
+  }
+
+async changeHoverSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.changeHoverSource(source, version);
+  }
+
+async closeHoverSource(uri: string): Promise<void> {
+    return await this.driver.closeHoverSource(uri);
+  }
+
+async disposeSourceHovers(): Promise<void> {
+    return await this.driver.disposeSourceHovers();
+  }
+
+async requestDeclarationHover(uri: string, version: number, line: number, column: number): Promise<void> {
+    return await this.driver.requestDeclarationHover(uri, version, line, column);
+  }
+
+async rememberHoverWork(): Promise<void> {
+    return await this.driver.rememberHoverWork();
+  }
+
+async editHoverImport(text: string): Promise<void> {
+    return await this.driver.editHoverImport(text);
+  }
+
+async requestNativeHover(line: number, column: number): Promise<void> {
+    return await this.driver.requestNativeHover(line, column);
+  }
+
+async requestConvertedHover(line: number, character: number): Promise<void> {
+    return await this.driver.requestConvertedHover(line, character);
+  }
+
+async hasDeclarationHover(request: number): Promise<boolean> {
+    return await this.driver.hasDeclarationHover(request);
+  }
+
+async declarationHoverUri(request: number): Promise<string> {
+    return await this.driver.declarationHoverUri(request);
+  }
+
+async declarationHoverSource(request: number): Promise<string> {
+    return await this.driver.declarationHoverSource(request);
+  }
+
+async declarationHoverName(request: number): Promise<string> {
+    return await this.driver.declarationHoverName(request);
+  }
+
+async declarationHoverSignature(request: number): Promise<string> {
+    return await this.driver.declarationHoverSignature(request);
+  }
+
+async declarationHoverDescription(request: number): Promise<string> {
+    return await this.driver.declarationHoverDescription(request);
+  }
+
+async declarationHoverStartLine(request: number): Promise<number> {
+    return await this.driver.declarationHoverStartLine(request);
+  }
+
+async declarationHoverStartColumn(request: number): Promise<number> {
+    return await this.driver.declarationHoverStartColumn(request);
+  }
+
+async declarationHoverEndLine(request: number): Promise<number> {
+    return await this.driver.declarationHoverEndLine(request);
+  }
+
+async declarationHoverEndColumn(request: number): Promise<number> {
+    return await this.driver.declarationHoverEndColumn(request);
+  }
+
+async hoverWorkUnchanged(): Promise<boolean> {
+    return await this.driver.hoverWorkUnchanged();
+  }
+
+async hoverHasProblem(uri: string, code: string): Promise<boolean> {
+    return await this.driver.hoverHasProblem(uri, code);
+  }
+
+async nativeHoverCount(): Promise<number> {
+    return await this.driver.nativeHoverCount();
+  }
+
+async nativeHoverMarkdown(): Promise<string> {
+    return await this.driver.nativeHoverMarkdown();
+  }
+
+async nativeHoverName(): Promise<string> {
+    return await this.driver.nativeHoverName();
+  }
+
+async nativeHoverStartLine(): Promise<number> {
+    return await this.driver.nativeHoverStartLine();
+  }
+
+async nativeHoverStartColumn(): Promise<number> {
+    return await this.driver.nativeHoverStartColumn();
+  }
+
+async nativeHoverEndColumn(): Promise<number> {
+    return await this.driver.nativeHoverEndColumn();
+  }
+
+async hoverFilesUnchanged(): Promise<boolean> {
+    return await this.driver.hoverFilesUnchanged();
+  }
+
+async hoverImportIsDirty(): Promise<boolean> {
+    return await this.driver.hoverImportIsDirty();
+  }
+
+async hoverEntryVersionUnchanged(): Promise<boolean> {
+    return await this.driver.hoverEntryVersionUnchanged();
+  }
+
+async hasConvertedHover(request: number): Promise<boolean> {
+    return await this.driver.hasConvertedHover(request);
+  }
+
+async convertedHoverMarkdown(request: number): Promise<string> {
+    return await this.driver.convertedHoverMarkdown(request);
+  }
+
+async convertedHoverName(request: number): Promise<string> {
+    return await this.driver.convertedHoverName(request);
+  }
+
+async convertedHoverStartCharacter(request: number): Promise<number> {
+    return await this.driver.convertedHoverStartCharacter(request);
+  }
+
+async convertedHoverEndCharacter(request: number): Promise<number> {
+    return await this.driver.convertedHoverEndCharacter(request);
+  }
+
+async expectDeclarationHover(request: number, source: SourceDocument, name: string, signature: string, description: string, line: number, column: number, endColumn: number): Promise<void> {
+    const present = await this.driver.hasDeclarationHover(request);
+    const uri = await this.driver.declarationHoverUri(request);
+    const text = await this.driver.declarationHoverSource(request);
+    const actualName = await this.driver.declarationHoverName(request);
+    const actualSignature = await this.driver.declarationHoverSignature(request);
+    const actualDescription = await this.driver.declarationHoverDescription(request);
+    const startLine = await this.driver.declarationHoverStartLine(request);
+    const startColumn = await this.driver.declarationHoverStartColumn(request);
+    const endLine = await this.driver.declarationHoverEndLine(request);
+    const actualEnd = await this.driver.declarationHoverEndColumn(request);
+    expectData(present, true);
+    expectData(uri, (source)["uri"]);
+    expectData(text, (source)["text"]);
+    expectData(actualName, name);
+    expectData(actualSignature, signature);
+    expectData(actualDescription, description);
+    expectData(startLine, line);
+    expectData(startColumn, column);
+    expectData(endLine, line);
+    expectData(actualEnd, endColumn);
+  }
+
+async expectNoDeclarationHover(request: number): Promise<void> {
+    const present = await this.driver.hasDeclarationHover(request);
+    expectData(present, false);
+  }
+
+async expectNoHoverAnalysis(): Promise<void> {
+    const unchanged = await this.driver.hoverWorkUnchanged();
+    expectData(unchanged, true);
+  }
+
+async expectHoverProblem(uri: string, code: string): Promise<void> {
+    const present = await this.driver.hoverHasProblem(uri, code);
+    expectData(present, true);
+  }
+
+async expectNativeHover(markdown: string, name: string, line: number, column: number, endColumn: number): Promise<void> {
+    const count = await this.driver.nativeHoverCount();
+    const content = await this.driver.nativeHoverMarkdown();
+    const actualName = await this.driver.nativeHoverName();
+    const startLine = await this.driver.nativeHoverStartLine();
+    const startColumn = await this.driver.nativeHoverStartColumn();
+    const actualEnd = await this.driver.nativeHoverEndColumn();
+    expectData(count, 1);
+    expectData(content, markdown);
+    expectData(actualName, name);
+    expectData(startLine, line);
+    expectData(startColumn, column);
+    expectData(actualEnd, endColumn);
+  }
+
+async expectNoNativeHover(): Promise<void> {
+    const count = await this.driver.nativeHoverCount();
+    expectData(count, 0);
+  }
+
+async expectHoverFilesUnchanged(): Promise<void> {
+    const unchanged = await this.driver.hoverFilesUnchanged();
+    expectData(unchanged, true);
+  }
+
+async expectUnsavedHoverImport(): Promise<void> {
+    const dirty = await this.driver.hoverImportIsDirty();
+    const unchanged = await this.driver.hoverEntryVersionUnchanged();
+    expectData(dirty, true);
+    expectData(unchanged, true);
+  }
+
+async expectConvertedHover(request: number, markdown: string, name: string, start: number, end: number): Promise<void> {
+    const present = await this.driver.hasConvertedHover(request);
+    const content = await this.driver.convertedHoverMarkdown(request);
+    const actualName = await this.driver.convertedHoverName(request);
+    const actualStart = await this.driver.convertedHoverStartCharacter(request);
+    const actualEnd = await this.driver.convertedHoverEndCharacter(request);
+    expectData(present, true);
+    expectData(content, markdown);
+    expectData(actualName, name);
+    expectData(actualStart, start);
+    expectData(actualEnd, end);
+  }
+
+async expectNoConvertedHover(request: number): Promise<void> {
+    const present = await this.driver.hasConvertedHover(request);
+    expectData(present, false);
+  }
+
+readonly hoverCallable: SourceDocument = { ["uri"]: "file:///workspace/store.expec", ["text"]: "error type SaveFailure { code: \"save-failed\"\n  detail: Text }\ncomponent Store {\n  public save\n  capability save(title: Text, copies: Number = 1) returns Boolean fails with SaveFailure {\n    promises \"Save the requested title.\"\n    promises \"Keep existing copies.\"\n  }\n}\nexamples for Store.save {}" };
+
+readonly hoverEntry: SourceDocument = { ["uri"]: "file:///workspace/client.expec", ["text"]: "use publish from \"./publish.expec\"\nexamples for publish {}" };
+
+readonly hoverSavedFunction: SourceDocument = { ["uri"]: "file:///workspace/publish.expec", ["text"]: "function publish(title: Text) returns Boolean {\n  promises \"Publish the title.\"\n}" };
+
+readonly hoverUnsavedFunction: SourceDocument = { ["uri"]: "file:///workspace/publish.expec", ["text"]: "function publish(title: Text, copies: Number = 1) returns Text {\n  promises \"Publish current unsaved copies.\"\n}" };
+
+readonly hoverCatalog: SourceDocument = { ["uri"]: "file:///workspace/catalog.expec", ["text"]: "type Book { title: Text }\ntype Basket { book: Book }" };
+
+readonly hoverUnicode: SourceDocument = { ["uri"]: "file:///workspace/archive.expec", ["text"]: "component Archive {\n  public `📚save`\n  capability `📚save`(title: Text) returns Text {\n    promises \"Store \\\"Bibliothèque\\\".\\nKeep 📚.\"\n  }\n}\nexamples for Archive.`📚save` {}" };
+
+readonly hoverDeclarations: SourceDocument = { ["uri"]: "file:///workspace/declarations.expec", ["text"]: "component Shelf {}\nconcept Book {}\nclass Library {}\ninterface Reader {}\ntype Box<T> { value: T }" };
 }

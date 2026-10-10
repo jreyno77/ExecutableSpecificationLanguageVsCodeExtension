@@ -1,4 +1,4 @@
-import type { SourceRange } from 'executable-specification-language';
+import { capturedOrigin, sourceReferenceFacts } from './source-reference-facts.js';
 
 type PreparedDefinition = { start: number; end: number; target: SourceDefinition };
 type PreparedDocument = { version: number; length: number; definitions: PreparedDefinition[] };
@@ -31,20 +31,16 @@ export class SourceNavigation {
         if (this.disposed) return;
         const length = Array.from(source.text).length;
         const definitions: PreparedDefinition[] = [];
-        const sources = new Map(report.sources.map(captured => [captured.uri,
-            { source: Object.freeze({ uri: captured.uri, text: captured.text }), length: Array.from(captured.text).length }]));
-        const inspection = report.inspection;
-        if (inspection && sources.get(source.uri)?.source.text === source.text) {
-            for (const reference of inspection.query('reference')) {
-                const origin = reference.segmentOrigins.at(-1);
-                if (origin?.kind !== 'source' || origin.range.sourceId !== source.uri ||
-                    !this.validRange(origin.range, length) || reference.resolution.status !== 'bound') continue;
-                const target = inspection.read(reference.resolution.target);
+        const facts = sourceReferenceFacts(report);
+        if (report.inspection && facts.sources.get(source.uri)?.source.text === source.text) {
+            for (const reference of facts.references) {
+                if (reference.range.sourceId !== source.uri) continue;
+                const target = reference.target;
                 if (!('nameOrigin' in target) || target.nameOrigin.kind !== 'source') continue;
                 const range = target.nameOrigin.range;
-                const captured = sources.get(range.sourceId);
-                if (!captured || !this.validRange(range, captured.length)) continue;
-                definitions.push({ start: origin.range.start.offset, end: origin.range.end.offset,
+                const captured = capturedOrigin(target.nameOrigin, facts.sources);
+                if (!captured) continue;
+                definitions.push({ start: reference.range.start.offset, end: reference.range.end.offset,
                     target: { source: captured.source, startOffset: range.start.offset, endOffset: range.end.offset } });
             }
         }
@@ -79,9 +75,5 @@ export class SourceNavigation {
     }
     private validateInteger(value: number, name: string): void {
         if (!Number.isInteger(value) || value < 0) throw new RangeError(name + ' must be a nonnegative integer.');
-    }
-    private validRange(range: SourceRange, length: number): boolean {
-        return Number.isInteger(range.start.offset) && Number.isInteger(range.end.offset) &&
-            range.start.offset >= 0 && range.end.offset > range.start.offset && range.end.offset <= length;
     }
 }
