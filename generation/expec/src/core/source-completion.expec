@@ -94,7 +94,7 @@ examples for SourceCompletion {
     assert unchanged == true
   }
 
-  scenario "the actual type scope offers Book and Boolean and excludes another owner's local Bookcase" {
+  scenario "the actual type scope offers Book and excludes another owner's local Bookcase" {
     given sourceCompletions()
     when openCompletionSource({ uri: "file:///workspace/basket.expec", text: "type Book {}\ncomponent Store {\n  local type Bookcase {}\n}\ntype Basket { book: Boo }" }, 1)
     when rememberCompletionWork()
