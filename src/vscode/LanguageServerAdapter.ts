@@ -1,3 +1,5 @@
+import { SourceHover as CoreSourceHover } from '../core/SourceHover.js';
+import { SourceHoverAdapter as NativeSourceHoverAdapter } from './SourceHoverAdapter.js';
 import { OutputPreviews as CoreOutputPreviews } from '../core/OutputPreviews.js';
 import { SourceNavigation as CoreSourceNavigation } from '../core/SourceNavigation.js';
 import { SourceDefinitionAdapter as NativeSourceDefinitionAdapter } from './SourceDefinitionAdapter.js';
@@ -18,6 +20,10 @@ import type { OutputPreviews } from "../core/OutputPreviews.js";
 import type { SourceNavigation } from "../core/SourceNavigation.js";
 
 import type { SourceDefinitionAdapter } from "./SourceDefinitionAdapter.js";
+import type { SourceHover } from "../core/SourceHover.js";
+
+import type { SourceHoverAdapter } from "./SourceHoverAdapter.js";
+
 
 
 
@@ -36,6 +42,8 @@ import type { SourceDefinitionAdapter } from "./SourceDefinitionAdapter.js";
  * Depends on: OutputPreviews
  * Depends on: SourceNavigation
  * Depends on: SourceDefinitionAdapter
+ * Depends on: SourceHover
+ * Depends on: SourceHoverAdapter
  */
 export class LanguageServerAdapter {
     private readonly connection: Connection;
@@ -43,6 +51,8 @@ export class LanguageServerAdapter {
     private readonly previews: OutputPreviews;
     private readonly navigation = new CoreSourceNavigation();
     private readonly definitions = new NativeSourceDefinitionAdapter(this.navigation);
+    private readonly hover = new CoreSourceHover();
+    private readonly hovers = new NativeSourceHoverAdapter(this.hover);
     private readonly documents = new TextDocuments(TextDocument);
     private readonly subscriptions: Disposable[] = [];
     private readonly reports = new Map<string, { resultId: string; items: Diagnostic[]; dependencies: readonly string[] }>();
@@ -64,7 +74,7 @@ export class LanguageServerAdapter {
     }
     /**
      * Unverified implementation obligation.
-     * Register native LSP initialization and document events once, using TextDocuments to reconstruct incremental text. Feed actual open/change/close snapshots and versions to core DocumentAnalysis. Opening must check exactly once despite TextDocuments also emitting a content-change event. Core owns checking and version/lifetime policy; this adapter owns protocol registration and translation. Register standard LSP document diagnostic pull with inter-file dependencies and no workspace diagnostic enumeration, and negotiate UTF-16 positions. Register standard LSP watched-file notifications for requested dependency URIs, including currently missing files, using native relative-pattern registration. Core chooses relevant invalidation; forward creation/change/deletion to sourceChanged. Reconcile capture-to-watch gaps by rechecking after each newly established registration. Retain registrations only for dependency URIs requested by current open entries, and dispose them when unneeded or on shutdown. Unsupported native watch capabilities remain an observable limitation rather than a promised live update. Do not scan or compile in the adapter. Register native preview selection/configuration notifications and forward them to one core OutputPreviews instance using its default shipped registrations. Its feedback emits only plain PreviewPublication values through the native channel. Do not construct another reader/compiler or inspect output models. Advertise definitionProvider and register standard textDocument/definition once. Obtain the current TextDocuments snapshot, then delegate coordinate conversion and the query to SourceDefinitionAdapter with one core SourceNavigation. Missing/cancelled/currently unavailable documents return no location. The adapter never chooses targets or rechecks source.
+     * Register native LSP initialization and document events once, using TextDocuments to reconstruct incremental text. Feed actual open/change/close snapshots and versions to core DocumentAnalysis. Opening must check exactly once despite TextDocuments also emitting a content-change event. Core owns checking and version/lifetime policy; this adapter owns protocol registration and translation. Register standard LSP document diagnostic pull with inter-file dependencies and no workspace diagnostic enumeration, and negotiate UTF-16 positions. Register standard LSP watched-file notifications for requested dependency URIs, including currently missing files, using native relative-pattern registration. Core chooses relevant invalidation; forward creation/change/deletion to sourceChanged. Reconcile capture-to-watch gaps by rechecking after each newly established registration. Retain registrations only for dependency URIs requested by current open entries, and dispose them when unneeded or on shutdown. Unsupported native watch capabilities remain an observable limitation rather than a promised live update. Do not scan or compile in the adapter. Register native preview selection/configuration notifications and forward them to one core OutputPreviews instance using its default shipped registrations. Its feedback emits only plain PreviewPublication values through the native channel. Do not construct another reader/compiler or inspect output models. Advertise definitionProvider and register standard textDocument/definition once. Obtain the current TextDocuments snapshot, then delegate coordinate conversion and the query to SourceDefinitionAdapter with one core SourceNavigation. Missing/cancelled/currently unavailable documents return no location. The adapter never chooses targets or rechecks source. Advertise hoverProvider and register standard textDocument/hover once. Obtain the current TextDocuments snapshot and delegate to SourceHoverAdapter using one core SourceHover; missing, cancelled or unavailable snapshots return absence. Hover uses the same existing analysis publications as diagnostics and navigation, without another reader/compiler.
      */
     start(): void {
         if (this.started || this.disposed) return;
@@ -81,6 +91,7 @@ export class LanguageServerAdapter {
                     textDocumentSync: TextDocumentSyncKind.Incremental,
                     diagnosticProvider: { interFileDependencies: true, workspaceDiagnostics: false },
                     definitionProvider: true,
+                    hoverProvider: true,
                 } };
             }),
             this.connection.onInitialized(() => {
@@ -98,6 +109,11 @@ export class LanguageServerAdapter {
                 const document = this.documents.get(textDocument.uri);
                 return document ? this.definitions.definition(document, position) : undefined;
             }),
+            this.connection.onHover(({ textDocument, position }, token) => {
+                if (this.disposed || token.isCancellationRequested) return undefined;
+                const document = this.documents.get(textDocument.uri);
+                return document ? this.hovers.information(document, position) : undefined;
+            }),
             this.connection.languages.diagnostics.on(({ textDocument }) => {
                 const report = this.reports.get(textDocument.uri);
                 return { kind: 'full', resultId: report?.resultId, items: report?.items ?? [] };
@@ -107,11 +123,12 @@ export class LanguageServerAdapter {
     }
     /**
      * Unverified implementation obligation.
-     * Retain real syntax and compiler errors whose primary source URI matches this document in its current native pull cache. Foreign primary findings remain in the raw Compilation and output log; an open imported document receives its own entry analysis. Never attach a foreign primary range to the requesting document. Convert each scalar range with the captured text for that range's exact URI, including cross-file related information. Preserve messages and codes. Keep nonlocated problems and deferred requirements observable in the language-client output log without inventing editor positions. Replace old feedback, including an empty full report when findings clear. Give each accepted publication an opaque analysis resultId; editor version alone cannot identify changed imports. Request the SDK diagnostic refresh after dependent feedback changes. Never reparse, generate or make semantic decisions here. Forward this same captured source/version/report to core OutputPreviews before reducing it to native diagnostic data; preserve ordinary diagnostic publication and dependency-watch behavior. Forward this same current source/version/report to one core SourceNavigation before native conversion. No Inspection or Specification crosses the protocol boundary.
+     * Retain real syntax and compiler errors whose primary source URI matches this document in its current native pull cache. Foreign primary findings remain in the raw Compilation and output log; an open imported document receives its own entry analysis. Never attach a foreign primary range to the requesting document. Convert each scalar range with the captured text for that range's exact URI, including cross-file related information. Preserve messages and codes. Keep nonlocated problems and deferred requirements observable in the language-client output log without inventing editor positions. Replace old feedback, including an empty full report when findings clear. Give each accepted publication an opaque analysis resultId; editor version alone cannot identify changed imports. Request the SDK diagnostic refresh after dependent feedback changes. Never reparse, generate or make semantic decisions here. Forward this same captured source/version/report to core OutputPreviews before reducing it to native diagnostic data; preserve ordinary diagnostic publication and dependency-watch behavior. Forward this same current source/version/report to one core SourceNavigation before native conversion. Forward this same current source/version/report to one core SourceHover before native conversion, including same-version replacement reports after imported edits. No Inspection or Specification crosses the protocol boundary.
      */
     publish(source: SourceDocument, version: number, report: DocumentReport): void {
         if (this.disposed) return;
         this.navigation.published(source, version, report);
+        this.hover.published(source, version, report);
         this.previews.published(source, version, report);
         const snapshots = new Map(report.sources.map(snapshot => [snapshot.uri, snapshot]));
         snapshots.set(source.uri, source);
@@ -176,17 +193,18 @@ export class LanguageServerAdapter {
     }
     /**
      * Unverified implementation obligation.
-     * Remove the closed document from the pull-response cache. Native document diagnostic pull owns editor close cleanup; never resurrect a cached response from an earlier lifetime. Forward this closed URI to core OutputPreviews so pending work and selected content from the closed lifetime are withdrawn. End the same core SourceNavigation report lifetime through closed(uri).
+     * Remove the closed document from the pull-response cache. Native document diagnostic pull owns editor close cleanup; never resurrect a cached response from an earlier lifetime. Forward this closed URI to core OutputPreviews so pending work and selected content from the closed lifetime are withdrawn. End the same core SourceNavigation and SourceHover report lifetimes through closed(uri).
      */
     clear(uri: string): void {
         this.navigation.closed(uri);
+        this.hover.closed(uri);
         this.previews.closed(uri);
         this.reports.delete(uri);
         this.updateWatches();
     }
     /**
      * Unverified implementation obligation.
-     * Remove owned subscriptions, end tracked document lifetimes and prevent further diagnostic publication. Repeated disposal is harmless. Leave connection/process shutdown to the native server entry point. Dispose core OutputPreviews, invalidating pending output work; started renderer callbacks retain their own asynchronous cleanup obligation. Dispose SourceNavigation and its retained reports; later definition requests cannot use old targets.
+     * Remove owned subscriptions, end tracked document lifetimes and prevent further diagnostic publication. Repeated disposal is harmless. Leave connection/process shutdown to the native server entry point. Dispose core OutputPreviews, invalidating pending output work; started renderer callbacks retain their own asynchronous cleanup obligation. Dispose SourceNavigation and its retained reports; later definition requests cannot use old targets. Dispose SourceHover; later hover requests cannot retain earlier meaning.
      */
     dispose(): void {
         if (this.disposed) return;
@@ -197,6 +215,7 @@ export class LanguageServerAdapter {
         };
         for (const subscription of this.subscriptions.splice(0)) release(() => subscription.dispose());
         release(() => this.navigation.dispose());
+        release(() => this.hover.dispose());
         release(() => this.previews.dispose());
         for (const uri of this.documents.keys()) release(() => this.analysis.closed(uri));
         this.reports.clear();

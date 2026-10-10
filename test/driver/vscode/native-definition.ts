@@ -3,7 +3,7 @@ import { lstat, readFile, readdir, readlink, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NativeCleanupError, ownTemporaryDirectory, removeOwnedDirectory } from './native-process.js';
-import { type NativeDefinitionObservation, VsCodeSession } from './vscode-session.js';
+import { type NativeDefinitionObservation, type NativeHoverObservation, VsCodeSession } from './vscode-session.js';
 
 /** Mutable documents/files belong to one case; the installed host has suite ownership. */
 export class NativeDefinitionCase {
@@ -15,6 +15,8 @@ export class NativeDefinitionCase {
   private opened = false;
   private initialTree: readonly TreeEntry[] = [];
   private actual: NativeDefinitionObservation | undefined;
+  private actualHover: NativeHoverObservation | undefined;
+  private initialEntryVersion: number | undefined;
   constructor(private readonly getSession: () => Promise<VsCodeSession>, private readonly extensionId: string,
     private readonly sources: Readonly<Record<string, string>>, private readonly workspace: string) {}
 
@@ -31,6 +33,7 @@ export class NativeDefinitionCase {
     this.initialTree = await tree(this.directory);
     this.session = await this.getSession();
     this.actual = await this.session.openNativeDefinition(this.id, this.extensionId, files);
+    this.initialEntryVersion = this.actual.entryVersion;
     this.opened = true;
   }
   async editEntry(text: string): Promise<void> {
@@ -50,6 +53,16 @@ export class NativeDefinitionCase {
     if (!this.actual) throw new Error('No real native definition observation was recorded.');
     return this.actual;
   }
+  async hover(line: number, column: number): Promise<void> {
+    if (!Number.isInteger(line) || !Number.isInteger(column) || line < 1 || column < 1) throw new RangeError('Native editor coordinates are one-based integers.');
+    await this.open();
+    this.actual = this.actualHover = await this.session!.hoverNativeDefinition(this.id, line - 1, column - 1);
+  }
+  hoverObservation(): NativeHoverObservation {
+    if (!this.actualHover) throw new Error('No real native hover observation was recorded.');
+    return this.actualHover;
+  }
+  entryVersionUnchanged(): boolean { return this.observation().entryVersion === this.initialEntryVersion; }
   locationFileName(): string { const location = this.observation().locations[0]; return location ? basename(fileURLToPath(location.uri)) : ''; }
   activeFileName(): string { return basename(fileURLToPath(this.observation().active.uri)); }
   locationUsesOwnedFile(fileName: string): boolean { const uri = this.observation().locations[0]?.uri; return uri !== undefined && uri === this.observation().ownedUris[fileName]; }

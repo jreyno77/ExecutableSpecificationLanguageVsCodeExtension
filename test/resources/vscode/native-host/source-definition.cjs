@@ -91,6 +91,19 @@ exports.openSourceDefinition = async function openSourceDefinition(vscode, exten
     entryReport = await currentReport(entry);
     return {
       observation,
+      async hover(line, character) {
+        if (disposed) throw new Error('The native source case is disposed.');
+        const returned = await vscode.commands.executeCommand('vscode.executeHoverProvider', entry.uri, new vscode.Position(line, character));
+        const hovers = (returned ?? []).map(hover => {
+          if (!hover.range || !Array.isArray(hover.contents) || !hover.contents.every(content => typeof content.value === 'string')) {
+            throw new Error('The actual native hover provider returned an invalid range/content.');
+          }
+          return { markdown: hover.contents.map(content => content.value).join('\n\n'), name: entry.getText(hover.range),
+            range: { start: { line: hover.range.start.line, character: hover.range.start.character },
+              end: { line: hover.range.end.line, character: hover.range.end.character } } };
+        });
+        return { ...observation(), hovers };
+      },
       async edit(kind, text) {
         if (disposed) throw new Error('The native definition case is disposed.');
         if (kind === 'entry') {

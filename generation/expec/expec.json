@@ -19,7 +19,9 @@
       "src/core/generation-on-save.expec",
       "src/vscode/generation-on-save.expec",
       "src/core/source-navigation.expec",
-      "src/vscode/source-navigation.expec"
+      "src/vscode/source-navigation.expec",
+      "src/core/source-hover.expec",
+      "src/vscode/source-hover.expec"
     ]
   },
   "outputs": [
@@ -106,6 +108,13 @@
             ],
             "from": "vscode-languageserver",
             "name": "Location"
+          },
+          {
+            "declaration": [
+              "NativeHover"
+            ],
+            "from": "vscode-languageserver",
+            "name": "Hover"
           }
         ]
       }

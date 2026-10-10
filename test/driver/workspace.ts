@@ -1,6 +1,8 @@
 import { SourceDefinitionConversion } from './source-definition-conversion.js';
+import { SourceHoverConversion } from './source-hover-conversion.js';
 import type { NativeDefinitionCase } from './vscode/native-definition.js';
 import { SourceNavigationRecording } from './source-navigation.js';
+import { SourceHoverRecording } from './source-hover.js';
 import { GenerationOnSaveRecording } from './generation-on-save.js';
 import type { NativeGenerationCase } from './vscode/native-generation.js';
 import type { ConnectionSidebarCase } from './vscode/connection-sidebar.js';
@@ -22,9 +24,12 @@ import { SourceDocument } from "../../src/core/SourceDocument.js";
 import { OutputPreviewsRecording } from './output-previews.js';
 import type { NativePreviewCase } from './vscode/native-preview.js';
 export class WorkspaceDriver {
+  private nativeHover!: NativeDefinitionCase;
+  private hoverConversionRecording!: SourceHoverConversion;
   private definitionConversionRecording!: SourceDefinitionConversion;
     private nativeDefinition!: NativeDefinitionCase;
   private navigationRecording!: SourceNavigationRecording;
+  private sourceHoverRecording!: SourceHoverRecording;
   private sidebarCase!: ConnectionSidebarCase;
   private connectionRecording!: ConnectionRecording;
   private diagnosticDocument!: DiagnosticDocument;
@@ -1209,5 +1214,168 @@ async convertedDefinitionEndLine(request: number): Promise<number> {
 
 async convertedDefinitionEndCharacter(request: number): Promise<number> {
     return this.definitionConversionRecording.location(request).range.end.character;
+  }
+
+async sourceHovers(): Promise<void> {
+    this.sourceHoverRecording = SourceHoverRecording.create();
+  }
+
+async localHoverEditor(text: string): Promise<void> {
+    this.nativeHover = await (await InstalledExpecEditor.prepare()).definitionEditor({ 'entry.expec': text });
+  }
+
+async importedHoverEditor(entry: string, imported: string): Promise<void> {
+    this.nativeHover = await (await InstalledExpecEditor.prepare()).definitionEditor({ 'entry.expec': entry, 'book.expec': imported });
+  }
+
+async hoverConversion(text: string): Promise<void> {
+    this.hoverConversionRecording = new SourceHoverConversion(text);
+  }
+
+async saveHoverSource(source: SourceDocument): Promise<void> {
+    this.sourceHoverRecording.savedSource(source);
+  }
+
+async openHoverSource(source: SourceDocument, version: number): Promise<void> {
+    this.sourceHoverRecording.opened(source, version);
+  }
+
+async changeHoverSource(source: SourceDocument, version: number): Promise<void> {
+    this.sourceHoverRecording.changed(source, version);
+  }
+
+async closeHoverSource(uri: string): Promise<void> {
+    this.sourceHoverRecording.closed(uri);
+  }
+
+async disposeSourceHovers(): Promise<void> {
+    this.sourceHoverRecording.disposed();
+  }
+
+async requestDeclarationHover(uri: string, version: number, line: number, column: number): Promise<void> {
+    this.sourceHoverRecording.request(uri, version, line, column);
+  }
+
+async rememberHoverWork(): Promise<void> {
+    this.sourceHoverRecording.rememberWork();
+  }
+
+async editHoverImport(text: string): Promise<void> {
+    await this.nativeHover.editImport(text);
+  }
+
+async requestNativeHover(line: number, column: number): Promise<void> {
+    await this.nativeHover.hover(line, column);
+  }
+
+async requestConvertedHover(line: number, character: number): Promise<void> {
+    this.hoverConversionRecording.request(line, character);
+  }
+
+async hasDeclarationHover(request: number): Promise<boolean> {
+    return this.sourceHoverRecording.reply(request) !== undefined;
+  }
+
+async declarationHoverUri(request: number): Promise<string> {
+    return this.sourceHoverRecording.hover(request).source.uri;
+  }
+
+async declarationHoverSource(request: number): Promise<string> {
+    return this.sourceHoverRecording.hover(request).source.text;
+  }
+
+async declarationHoverName(request: number): Promise<string> {
+    return this.sourceHoverRecording.name(request);
+  }
+
+async declarationHoverSignature(request: number): Promise<string> {
+    return this.sourceHoverRecording.hover(request).signature;
+  }
+
+async declarationHoverDescription(request: number): Promise<string> {
+    return this.sourceHoverRecording.hover(request).description;
+  }
+
+async declarationHoverStartLine(request: number): Promise<number> {
+    return this.sourceHoverRecording.start(request).line;
+  }
+
+async declarationHoverStartColumn(request: number): Promise<number> {
+    return this.sourceHoverRecording.start(request).column;
+  }
+
+async declarationHoverEndLine(request: number): Promise<number> {
+    return this.sourceHoverRecording.end(request).line;
+  }
+
+async declarationHoverEndColumn(request: number): Promise<number> {
+    return this.sourceHoverRecording.end(request).column;
+  }
+
+async hoverWorkUnchanged(): Promise<boolean> {
+    return this.sourceHoverRecording.workUnchanged();
+  }
+
+async hoverHasProblem(uri: string, code: string): Promise<boolean> {
+    return this.sourceHoverRecording.hasProblem(uri, code);
+  }
+
+async nativeHoverCount(): Promise<number> {
+    return this.nativeHover.hoverObservation().hovers.length;
+  }
+
+async nativeHoverMarkdown(): Promise<string> {
+    return this.nativeHover.hoverObservation().hovers[0]?.markdown ?? '';
+  }
+
+async nativeHoverName(): Promise<string> {
+    return this.nativeHover.hoverObservation().hovers[0]?.name ?? '';
+  }
+
+async nativeHoverStartLine(): Promise<number> {
+    const hover = this.nativeHover.hoverObservation().hovers[0];
+    return hover ? hover.range.start.line + 1 : 0;
+  }
+
+async nativeHoverStartColumn(): Promise<number> {
+    const hover = this.nativeHover.hoverObservation().hovers[0];
+    return hover ? hover.range.start.character + 1 : 0;
+  }
+
+async nativeHoverEndColumn(): Promise<number> {
+    const hover = this.nativeHover.hoverObservation().hovers[0];
+    return hover ? hover.range.end.character + 1 : 0;
+  }
+
+async hoverFilesUnchanged(): Promise<boolean> {
+    return this.nativeHover.filesUnchanged();
+  }
+
+async hoverImportIsDirty(): Promise<boolean> {
+    return this.nativeHover.observation().importDirty;
+  }
+
+async hoverEntryVersionUnchanged(): Promise<boolean> {
+    return this.nativeHover.entryVersionUnchanged();
+  }
+
+async hasConvertedHover(request: number): Promise<boolean> {
+    return this.hoverConversionRecording.reply(request) !== undefined;
+  }
+
+async convertedHoverMarkdown(request: number): Promise<string> {
+    return this.hoverConversionRecording.markdown(request);
+  }
+
+async convertedHoverName(request: number): Promise<string> {
+    return this.hoverConversionRecording.name(request);
+  }
+
+async convertedHoverStartCharacter(request: number): Promise<number> {
+    return this.hoverConversionRecording.information(request).range!.start.character;
+  }
+
+async convertedHoverEndCharacter(request: number): Promise<number> {
+    return this.hoverConversionRecording.information(request).range!.end.character;
   }
 }

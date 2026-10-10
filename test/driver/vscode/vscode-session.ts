@@ -37,7 +37,11 @@ export type NativeDefinitionObservation = {
   active: { uri: string; line: number; character: number };
 };
 
-type Operation = 'definitionOpen' | 'definitionEdit' | 'definitionGoTo' | 'definitionDispose' | 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
+export type NativeHoverObservation = NativeDefinitionObservation & {
+  hovers: readonly { markdown: string; name: string; range: DiagnosticRange }[];
+};
+
+type Operation = 'definitionOpen' | 'definitionEdit' | 'definitionGoTo' | 'definitionHover' | 'definitionDispose' | 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
 type Pending = { promise: Promise<unknown>; resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> };
 
 /** One owned native host, with only the observations needed by its test consumers. */
@@ -210,6 +214,16 @@ export class VsCodeSession {
   }
   goToNativeDefinition(definitionId: string, line: number, character: number): Promise<NativeDefinitionObservation> {
     return this.definitionRequest('definitionGoTo', { definitionId, line, character });
+  }
+  async hoverNativeDefinition(definitionId: string, line: number, character: number): Promise<NativeHoverObservation> {
+    const value = await this.definitionRequest('definitionHover', { definitionId, line, character });
+    const hovers = (value as Partial<NativeHoverObservation>).hovers;
+    if (!Array.isArray(hovers) || !hovers.every(hover => typeof hover?.markdown === 'string' && typeof hover.name === 'string'
+      && validPosition(hover.range?.start) && validPosition(hover.range?.end))) {
+      const error = new Error('The native host returned an invalid hover observation.');
+      await this.poison(error); throw error;
+    }
+    return value as NativeHoverObservation;
   }
   async disposeNativeDefinition(definitionId: string): Promise<void> {
     const value = await this.request('definitionDispose', { definitionId });

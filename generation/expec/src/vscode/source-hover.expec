@@ -1,0 +1,144 @@
+use SourceHover from "../core/source-hover.expec"
+use DefinitionTextDocument, DefinitionPosition from "./source-navigation.expec"
+
+// Bind this value to the existing standard LSP Hover in the generation manifest.
+opaque type NativeHover
+
+component SourceHoverAdapter {
+  requires package "language-server" for runtime
+  requires package "language-server-document" for runtime
+  requires package "typescript" for build
+  requires package "vitest" for test
+  requires package "vscode-test-electron" for test
+  depends on SourceHover
+
+  construction(hover: SourceHover)
+  public information
+
+  capability information(document: DefinitionTextDocument, position: DefinitionPosition) returns NativeHover? {
+    promises "Convert the exact current standard LSP TextDocument and UTF-16 Position to one SourceHover.hover query using its URI/version and a Unicode-scalar offset. Reject negative, fractional, out-of-line positions or positions inside a surrogate pair with absence; never clamp. Convert the reply's referring name range with its exact captured source back to a standard LSP Hover range. Render the authored signature in an expec fenced code block and its nonempty description as literal Markdown text beneath it. Choose a fence longer than any run of backticks in the signature, escape Markdown and HTML in the description, and never enable command links or trusted HTML. Absence stays absence. The adapter owns coordinates and presentation only; it never parses, checks, chooses a declaration, reads files, generates or constructs another analysis."
+  }
+}
+
+// These installed-provider cases reuse the existing owned extension host. Each
+// owns fresh entry/import files, editor tabs and listeners; setup/edits await the
+// actual native analysis resultId, including imported replacement at the same
+// entry version. Requests use the registered native hover provider. Observations
+// inspect its actual range/content; no expected signature is parsed by the driver.
+// One-based line/column positions use UTF-16 editor coordinates. Compare the full
+// owned saved tree before/after and discard dirty tabs during ordinary cleanup.
+examples for SourceHoverAdapter {
+  setup localHoverEditor(text: Text) returns Nothing
+  setup importedHoverEditor(entry: Text, imported: Text) returns Nothing
+  action editHoverImport(text: Text) returns Nothing
+  action requestNativeHover(line: Number, column: Number) returns Nothing
+  observation nativeHoverCount() returns Number
+  observation nativeHoverMarkdown() returns Text
+  observation nativeHoverName() returns Text
+  observation nativeHoverStartLine() returns Number
+  observation nativeHoverStartColumn() returns Number
+  observation nativeHoverEndColumn() returns Number
+  observation hoverFilesUnchanged() returns Boolean
+  observation hoverImportIsDirty() returns Boolean
+  observation hoverEntryVersionUnchanged() returns Boolean
+
+  check expectNativeHover(markdown: Text, name: Text, line: Number, column: Number, endColumn: Number) {
+    let count = nativeHoverCount()
+    let content = nativeHoverMarkdown()
+    let actualName = nativeHoverName()
+    let startLine = nativeHoverStartLine()
+    let startColumn = nativeHoverStartColumn()
+    let actualEnd = nativeHoverEndColumn()
+    assert count == 1
+    assert content == markdown
+    assert actualName == name
+    assert startLine == line
+    assert startColumn == column
+    assert actualEnd == endColumn
+  }
+  check expectNoNativeHover() {
+    let count = nativeHoverCount()
+    assert count == 0
+  }
+  check expectHoverFilesUnchanged() {
+    let unchanged = hoverFilesUnchanged()
+    assert unchanged == true
+  }
+  check expectUnsavedHoverImport() {
+    let dirty = hoverImportIsDirty()
+    let unchanged = hoverEntryVersionUnchanged()
+    assert dirty == true
+    assert unchanged == true
+  }
+
+  scenario "a quoted type reference shows a readable declaration with its real editor range" {
+    given localHoverEditor("type `📚Book` { title: Text }\ntype Basket { book: `📚Book` }")
+    when requestNativeHover(2, 24)
+    then expectNativeHover("```expec\ntype `📚Book`\n```", "`📚Book`", 2, 21, 29)
+    then expectHoverFilesUnchanged()
+  }
+  scenario "an unsaved imported callable changes its signature and promises without saving the entry" {
+    given importedHoverEditor("use publish from \"./book.expec\"\nexamples for publish {}", "function publish(title: Text) returns Boolean {\n  promises \"Publish the title.\"\n}")
+    when editHoverImport("function publish(title: Text, copies: Number = 1) returns Text {\n  promises \"Publish current unsaved copies.\"\n}")
+    when requestNativeHover(2, 15)
+    then expectNativeHover("```expec\nfunction publish(title: Text, copies: Number = 1) returns Text\n```\n\nPublish current unsaved copies.", "publish", 2, 14, 21)
+    then expectUnsavedHoverImport()
+    then expectHoverFilesUnchanged()
+  }
+  scenario "an unresolved name has no invented hover" {
+    given localHoverEditor("type Basket { book: Missing }")
+    when requestNativeHover(1, 21)
+    then expectNoNativeHover()
+    then expectHoverFilesUnchanged()
+  }
+
+  // Small protocol caller controls use real TextDocument, DocumentAnalysis,
+  // SourceHover and this adapter; they need no editor process. Record each reply.
+  // Pass literal protocol positions unchanged. Request numbers are one-based.
+  setup hoverConversion(text: Text) returns Nothing
+  action requestConvertedHover(line: Number, character: Number) returns Nothing
+  observation hasConvertedHover(request: Number) returns Boolean
+  observation convertedHoverMarkdown(request: Number) returns Text
+  observation convertedHoverName(request: Number) returns Text
+  observation convertedHoverStartCharacter(request: Number) returns Number
+  observation convertedHoverEndCharacter(request: Number) returns Number
+
+  check expectConvertedHover(request: Number, markdown: Text, name: Text, start: Number, end: Number) {
+    let present = hasConvertedHover(request)
+    let content = convertedHoverMarkdown(request)
+    let actualName = convertedHoverName(request)
+    let actualStart = convertedHoverStartCharacter(request)
+    let actualEnd = convertedHoverEndCharacter(request)
+    assert present == true
+    assert content == markdown
+    assert actualName == name
+    assert actualStart == start
+    assert actualEnd == end
+  }
+  check expectNoConvertedHover(request: Number) {
+    let present = hasConvertedHover(request)
+    assert present == false
+  }
+
+  scenario "protocol conversion preserves astral characters and quoted names" {
+    given hoverConversion("type `📚Book` { title: Text }\ntype Basket { book: `📚Book` }")
+    when requestConvertedHover(1, 23)
+    then expectConvertedHover(1, "```expec\ntype `📚Book`\n```", "`📚Book`", 20, 28)
+  }
+  scenario "malformed protocol positions do not clamp into an existing hover" {
+    given hoverConversion("type `📚Book` { title: Text }\ntype Basket { book: `📚Book` }")
+    when requestConvertedHover(-1, 23)
+    when requestConvertedHover(1, 999)
+    when requestConvertedHover(1, 23.5)
+    when requestConvertedHover(1, 22)
+    then expectNoConvertedHover(1)
+    then expectNoConvertedHover(2)
+    then expectNoConvertedHover(3)
+    then expectNoConvertedHover(4)
+  }
+  scenario "authored promises stay literal text rather than HTML or a command link" {
+    given hoverConversion("function echo(text: Text) returns Text { promises \"<b>raw</b> and [run](command:unsafe)\" }")
+    when requestConvertedHover(0, 10)
+    then expectConvertedHover(1, "```expec\nfunction echo(text: Text) returns Text\n```\n\n&lt;b&gt;raw&lt;/b&gt; and \\[run\\]\\(command:unsafe\\)", "echo", 9, 13)
+  }
+}
