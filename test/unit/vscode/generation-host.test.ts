@@ -44,10 +44,11 @@ function recording() {
     },
   } } as unknown as ExtensionContext;
   let completion: GenerationShutdownFeedback | undefined;
-  const host = new GenerationHost(context, { start() {}, cancel() {}, dispose: joined => { completion = joined; } });
+  let started = 0;
+  const host = new GenerationHost(context, { start() { started++; }, cancel() {}, dispose: joined => { completion = joined; } });
   host.start();
   host.configurationChanged({ file: resolve('selected-expec.json'), text: '{saved}', writable: true });
-  return { host, updates, values, finish: () => { if (!completion) throw Error('Worker shutdown was not requested.'); completion.stopped(undefined); } };
+  return { host, updates, values, starts: () => started, finish: () => { if (!completion) throw Error('Worker shutdown was not requested.'); completion.stopped(undefined); } };
 }
 
 beforeEach(() => { native.commands.clear(); native.released = []; native.item = undefined; native.channel = undefined; });
@@ -88,4 +89,34 @@ describe('generation native author choices and shutdown', () => {
     expect(completed).toHaveLength(2);
     expect(completed[1]).toContain('first shutdown observer failed');
   });
+});
+
+it('session suspension and reconnect retain an earlier explicit opt-in without starting generation', async () => {
+  const r = recording();
+  try {
+    const enabling = native.commands.get('expec.enableGenerationOnSave')!();
+    r.updates[0].finish();
+    await enabling;
+    r.host.configurationChanged(undefined);
+    expect(native.item!.text).toBe('.expec Generation: disabled');
+    expect([...r.values.values()]).toEqual([true]);
+
+    r.host.configurationChanged({ file: resolve('selected-expec.json'), text: '{saved}', writable: true });
+    expect(native.item!.text).toBe('.expec Generation: idle');
+    expect([...r.values.values()]).toEqual([true]);
+    expect(r.updates).toHaveLength(1);
+    expect(r.starts()).toBe(0);
+  } finally { r.host.dispose(); r.finish(); }
+});
+
+it('reconnecting a previously disabled manifest never grants opt-in or starts generation', () => {
+  const r = recording();
+  try {
+    r.host.configurationChanged(undefined);
+    r.host.configurationChanged({ file: resolve('selected-expec.json'), text: '{saved}', writable: true });
+    expect(native.item!.text).toBe('.expec Generation: disabled');
+    expect(r.updates).toEqual([]);
+    expect([...r.values.values()]).toEqual([]);
+    expect(r.starts()).toBe(0);
+  } finally { r.host.dispose(); r.finish(); }
 });

@@ -9,6 +9,17 @@ import { VsCodeSession, type GenerationEditorObservation } from './vscode-sessio
 
 type NativeGenerationPresentation = { status: string; explanation: string; log: string };
 
+/** Matches the rendered status to recorded native output; a save also needs a new publication. */
+export function generationPublication(renderedStatus: string, log: string, since?: number): NativeGenerationPresentation | undefined {
+  const line = [...log.slice(since ?? 0).split(/\r?\n/)].reverse()
+    .find(value => /^\[(?:idle|disabled|blocked|generating|queued|built|failed|refused|cancelled)\] /.test(value));
+  if (!line?.startsWith('[' + renderedStatus + '] ')) return undefined;
+  const explanation = line.slice(renderedStatus.length + 3);
+  if (since !== undefined && renderedStatus === 'idle'
+    && explanation === 'Generation will run after a configured source is saved.') return undefined;
+  return { status: renderedStatus, explanation, log };
+}
+
 /** Classifies only the recorded cleanup evidence; it cannot establish process termination. */
 export function generationCleanupState(record: string): 'unconfirmed' | 'pending' | 'settled' {
   if (/Forced owned child cleanup|descendants? (?:may|remain|cannot|unconfirmed)|(?:cleanup|termination) (?:is |was )?unconfirmed|cleanup (?:failed|was not accepted)/i.test(record)) return 'unconfirmed';
@@ -99,8 +110,8 @@ export class NativeGenerationCase {
     while (Date.now() < deadline) {
       last = await this.observe(deadline);
       const terminal = last.status !== '' && !['generating', 'queued'].includes(last.status);
-      const fresh = !this.savedIntent || /^\[(?:built|blocked|disabled|failed|refused|cancelled|idle)\]/m.test(last.log.slice(this.publicationOffset));
-      if (terminal && fresh) { this.presentation = last; return; }
+      const publication = generationPublication(last.status, last.log, this.savedIntent ? this.publicationOffset : undefined);
+      if (terminal && publication) { this.presentation = publication; return; }
       await new Promise(resolve => setTimeout(resolve, 20));
     }
     throw new Error('The actual installed generation did not publish a fresh terminal state: ' + JSON.stringify({ status: last?.status, explanation: last?.explanation, tail: last?.log.slice(-1000) }));
@@ -146,8 +157,8 @@ export class NativeGenerationCase {
       if (rendered.length > 1 || documents.length > 1) throw new Error('Multiple actual native generation presentations: ' + JSON.stringify(actual));
       if (rendered.length === 1 && documents.length === 1) {
         const log = documents[0].text, status = rendered[0].text.slice('.expec Generation: '.length);
-        const line = [...log.split(/\r?\n/)].reverse().find(value => value.startsWith('[' + status + '] '));
-        if (line) return { status, explanation: line.slice(status.length + 3), log };
+        const publication = generationPublication(status, log);
+        if (publication) return publication;
       }
       await new Promise(resolve => setTimeout(resolve, 20));
     }

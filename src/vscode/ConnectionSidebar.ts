@@ -43,12 +43,21 @@ export class ConnectionSidebar {
     private choicePending = false;
     private hostFailure?: string;
     private loading: Promise<void> = Promise.resolve();
+    private work?: ConnectionWorkFeedback;
+    private workRevision = 0;
+    private choices = 0;
+    private commandOperation: Promise<void> = Promise.resolve();
 
     constructor(context: ExtensionContext, previews: PreviewConfigurationFeedback) {
         this.previews = previews;
         this.resources.push(
             vscode.window.registerTreeDataProvider('expec.connection', this),
             vscode.commands.registerCommand('expec.chooseProject', (directory?: vscode.Uri) => this.choose(directory)),
+            vscode.commands.registerCommand('expec.editConnection', () => { this.editConnection(); return this.commandOperation; }),
+            vscode.commands.registerCommand('expec.newConnection', () => { this.newConnection(); return this.commandOperation; }),
+            vscode.commands.registerCommand('expec.disconnectConnection', () => this.disconnect()),
+            vscode.commands.registerCommand('expec.reconnectConnection', () => this.reconnect()),
+            vscode.commands.registerCommand('expec.deleteConnection', () => { this.deleteConnection(); return this.commandOperation; }),
             vscode.workspace.onDidSaveTextDocument(document => {
                 if (!this.saving && this.isManifest(document.uri)) void this.readSaved();
             }),
@@ -83,8 +92,11 @@ export class ConnectionSidebar {
             present: state => { if (this.live(lifetime)) this.present(state); },
             saveConfiguration: (previous, text) => { if (this.live(lifetime)) this.saveConfiguration(previous, text); },
         });
+        const controller = this.controller;
+        this.attachWork(controller, lifetime);
+        if (!this.live(lifetime) || controller !== this.controller) return;
         this.changes.fire(undefined);
-        if (!this.live(lifetime)) return;
+        if (!this.live(lifetime) || controller !== this.controller) return;
         this.loading = this.updateWatches().then(() => this.live(lifetime) ? this.readSaved() : undefined).catch(error => this.hostProblem(error, lifetime));
     }
     /**
@@ -97,6 +109,7 @@ export class ConnectionSidebar {
         this.watchTarget = state.target;
         if (state.verifiedDirectory) this.canonical = state.verifiedDirectory;
         this.state = state;
+        this.projectContext();
         this.changes.fire(undefined);
         const lifetime = this.lifetime;
         void this.followWatches().catch(error => this.hostProblem(error, lifetime));
@@ -116,6 +129,7 @@ export class ConnectionSidebar {
     dispose(): void {
         if (this.disposed) return;
         this.disposed = true;
+        this.choices++;
         this.lifetime++;
         this.reading++;
         this.watching++;
@@ -127,7 +141,12 @@ export class ConnectionSidebar {
         this.controller = undefined;
         this.state = undefined;
         this.saved = undefined;
-        this.release([{ dispose: () => this.previews.configurationChanged(undefined) }, ...resources]);
+        const work = this.work;
+        this.work = undefined;
+        this.workRevision++;
+        this.projectContext();
+        this.release([{ dispose: () => work?.configurationChanged(undefined) },
+            { dispose: () => this.previews.configurationChanged(undefined) }, ...resources]);
     }
     getChildren(element?: ConnectionState): ConnectionState[] {
         if (this.disposed || element) return [];
@@ -136,10 +155,12 @@ export class ConnectionSidebar {
     }
 
     getTreeItem(state: ConnectionState): vscode.TreeItem {
-        const item = new vscode.TreeItem(this.hostFailure ? 'Live connection status unavailable' : state.status);
+        const status = this.hostFailure ? 'Live connection status unavailable' : state.status;
+        const item = new vscode.TreeItem(state.configurationFile ? basename(state.configurationFile) + ' — ' + status : status);
         item.contextValue = this.hostFailure ? 'unavailable' : state.status;
         item.description = state.target;
-        item.tooltip = this.hostFailure ?? state.message;
+        item.tooltip = [state.configurationFile, this.hostFailure ?? state.message].filter(Boolean).join('\n');
+        item.iconPath = new vscode.ThemeIcon(state.status === 'disconnected' ? 'debug-disconnect' : state.status === 'connected' ? 'plug' : 'info');
         if (state.target) item.resourceUri = vscode.Uri.file(state.target);
         return item;
     }
@@ -180,6 +201,7 @@ export class ConnectionSidebar {
             this.choicePending = false;
             this.hostFailure = undefined;
             controller.configurationChanged(snapshot);
+            if (this.live(lifetime) && reading === this.reading && controller === this.controller) this.projectContext();
             if (this.live(lifetime) && reading === this.reading && controller === this.controller
                 && (!previous || previous.file !== snapshot.file || previous.text !== snapshot.text || previous.writable !== snapshot.writable)) {
                 this.previews.configurationChanged(snapshot);
@@ -188,25 +210,16 @@ export class ConnectionSidebar {
     }
 
     private async choose(directory?: vscode.Uri): Promise<void> {
-        const lifetime = this.lifetime;
         if (this.disposed) return;
-        if (!this.controller) {
-            const folders = vscode.workspace.workspaceFolders ?? [];
-            const folder = folders.length === 1 ? folders[0] : await vscode.window.showWorkspaceFolderPick();
-            if (this.disposed || lifetime !== this.lifetime) return;
-            if (!folder || folder.uri.scheme !== 'file') {
-                await vscode.window.showInformationMessage('Choose a local workspace folder before connecting a project.');
-                return;
-            }
-            this.folder = folder;
-            this.followFolder();
-        }
-        await this.loading;
-        const controller = this.controller, selected = this.lifetime;
-        if (!controller || this.disposed) return;
+        const intent = this.newIntent();
+        if (!await this.prepareSelection(intent)) return;
+        const controller = this.controller, previous = this.saved;
+        if (!controller || !previous) return;
+        const current = this.choiceCurrent(controller, previous, intent, false);
+        if (!current()) return;
         const choice = directory ?? (await vscode.window.showOpenDialog({ canSelectFiles: false,
             canSelectFolders: true, canSelectMany: false, openLabel: 'Choose Project' }))?.[0];
-        if (!this.live(selected) || controller !== this.controller || !choice) return;
+        if (!current() || !choice) return;
         if (choice.scheme !== 'file') {
             await vscode.window.showInformationMessage('Project connections require a local directory.');
             return;
@@ -350,6 +363,7 @@ export class ConnectionSidebar {
 
     private withdrawConfiguration(): number {
         const lifetime = ++this.lifetime;
+        this.choices++;
         this.reading++;
         this.watching++;
         this.writing++;
@@ -365,7 +379,12 @@ export class ConnectionSidebar {
         this.watchTarget = undefined;
         this.watchSignature = '';
         this.hostFailure = undefined;
-        if (controller) resources.unshift({ dispose: () => this.previews.configurationChanged(undefined) });
+        this.projectContext();
+        if (controller) {
+            const work = this.work, observing = this.workRevision;
+            resources.unshift({ dispose: () => { if (work && work === this.work && observing === this.workRevision) work.configurationChanged(undefined); } },
+                { dispose: () => this.previews.configurationChanged(undefined) });
+        }
         this.release(resources);
         return lifetime;
     }
@@ -375,7 +394,14 @@ export class ConnectionSidebar {
      * Attach one replaceable connection-owned work observer, immediately forwarding to the current controller or delivering absence if no controller exists. Replacing or disposing the observer withdraws the prior one. Retain this one observer across controller replacement while guarding current selection, observer identity and native lifetime around reentrant callbacks. Existing constructor and metadata-only callers remain valid. Actual activation always attaches its existing single GenerationHost here once; the independent preview callback carries raw saved metadata to previews and live package analysis but never generation. Do not duplicate core connection or generation decisions.
      */
 observeWork(feedback: ConnectionWorkFeedback): void {
-        throw new Error("Not implemented: ConnectionSidebar.observeWork");
+        const observing = ++this.workRevision, previous = this.work;
+        this.work = undefined;
+        previous?.configurationChanged(undefined);
+        if (observing !== this.workRevision) return;
+        if (this.disposed) { feedback.configurationChanged(undefined); return; }
+        this.work = feedback;
+        if (this.controller) this.attachWork(this.controller, this.lifetime);
+        else feedback.configurationChanged(undefined);
     }
 
 /**
@@ -383,7 +409,7 @@ observeWork(feedback: ConnectionWorkFeedback): void {
      * Open the actual selected local manifest in the ordinary VS Code text editor. Preserve dirty text and do not save, create a missing file or change metadata merely to edit it. If the selected file does not exist, explain that New Connection can create it. Editing is the supported path for advanced existing output options. Guard selected filename and native lifetime around awaits.
      */
 editConnection(): void {
-        throw new Error("Not implemented: ConnectionSidebar.editConnection");
+        this.beginAction(intent => this.editSelected(intent));
     }
 
 /**
@@ -391,7 +417,7 @@ editConnection(): void {
      * Guide an explicit author choice with standard VS Code folder dialog, output QuickPick and destination InputBox steps; no project-scaffolding wizard or custom webview. Obtain the current plain ConnectionController.guidance result once before choices; absence uses the existing invalid or unavailable explanation and cannot start a proposal. Consume its captured configuration, configured flags, eligible output IDs, suggested destinations and requiresEntries, rather than parsing saved JSON, registering output profiles or reconstructing setup policy in the native adapter. Select any usable empty or existing local target directory. Present already configured output IDs, preserving their exact options, and the core's eligible new choices. Explain that advanced profiles can be retained or edited in the manifest but are not initialized with guessed options. Preserve authored selection order. Prompt an actual relative destination only for a newly selected output, labelled relative to the connected target, with the core-supplied editable suggestion. Suggestions are extension setup policy, not SDK defaults. Explain TypeScript folder mirroring from the manifest's source folder; core supplies sourceRoot '.', and the target-root suggestion avoids src/src duplication. Request real source entries only when guidance.requiresEntries is true; existing metadata retains build.entries and needs no new source prompt. For a missing manifest use an actual saved ordinary .expec source within its folder, or ask the author to select real .expec source files within that folder, and pass their literal relative entries; absent/cancelled source selection requests no creation. Never assume src/main.expec exists or create an authored entry. Capture the exact selected controller and saved file/text/writable snapshot plus selection revision and native lifetime before guidance; recheck after every asynchronous choice and immediately before forwarding core.createConnection. Cancellation at any step, selection replacement, changed saved metadata, dirty configuration or disposal cannot initiate a late write or change the old selection. Core owns proposal validation, target verification and persistence requests. Surface real refusals and save failures; do not claim rollback, target initialization, dependency readiness or generation success. Only the selected manifest may be created by the explicit New Connection action.
      */
 newConnection(): void {
-        throw new Error("Not implemented: ConnectionSidebar.newConnection");
+        this.beginAction(intent => this.guideConnection(intent));
     }
 
 /**
@@ -399,7 +425,10 @@ newConnection(): void {
      * Forward the explicit session-only suspension to the current core controller. Present its actual disconnected state and explain that saved configuration and files are retained and reconnection is available. The work observer withdraws connection-owned generation; its prior per-manifest opt-in is neither erased nor granted. Keep raw saved preview/package configuration available. No metadata write or target deletion.
      */
 disconnect(): void {
-        throw new Error("Not implemented: ConnectionSidebar.disconnect");
+        if (this.disposed) return;
+        this.choices++;
+        this.choicePending = false;
+        this.controller?.disconnect();
     }
 
 /**
@@ -407,7 +436,10 @@ disconnect(): void {
      * Forward the explicit resume to the current core controller and show its real fresh verification outcome. Preserve prior explicit per-manifest generation opt-in exactly; a previously disabled connection stays disabled. Never start generation, replay a previous save or save configuration from reconnection. A later genuine source save is required even if opt-in was previously true.
      */
 reconnect(): void {
-        throw new Error("Not implemented: ConnectionSidebar.reconnect");
+        if (this.disposed) return;
+        this.choices++;
+        this.choicePending = false;
+        this.controller?.reconnect();
     }
 
 /**
@@ -415,6 +447,166 @@ reconnect(): void {
      * Ask for explicit native confirmation naming the selected manifest and explaining that only its project metadata will be removed, with target files, outputs and packages retained. Cancellation changes nothing. Capture selected controller and exact saved snapshot before prompting; recheck selection, saved text, write safety and lifetime before core.deleteConnection. Dirty configuration or changed selection cannot delete another connection. Core owns the conditional metadata proposal and actual confirmation. Do not delete a manifest, source, generated artifact or target directory.
      */
 deleteConnection(): void {
-        throw new Error("Not implemented: ConnectionSidebar.deleteConnection");
+        this.beginAction(intent => this.confirmDelete(intent));
     }
+    private attachWork(controller: ConnectionController, lifetime: number): void {
+        const feedback = this.work, observing = this.workRevision;
+        if (!feedback || !this.live(lifetime) || controller !== this.controller) return;
+        controller.observeWork({ configurationChanged: configuration => {
+            if (this.live(lifetime) && controller === this.controller && feedback === this.work && observing === this.workRevision) {
+                feedback.configurationChanged(configuration);
+            }
+        } });
+    }
+    private projectContext(): void {
+        const lifetime = this.lifetime;
+        const hasProject = !this.disposed && this.controller?.guidance()?.hasProject === true;
+        void vscode.commands.executeCommand('setContext', 'expec.connection.hasProject', hasProject)
+            .then(undefined, error => this.hostProblem(error, lifetime));
+    }
+    private newIntent(): { choices: number; lifetime: number } { return { choices: ++this.choices, lifetime: this.lifetime }; }
+    private intentCurrent(intent: { choices: number; lifetime: number }): boolean {
+        return this.live(intent.lifetime) && intent.choices === this.choices;
+    }
+    private beginAction(action: (intent: { choices: number; lifetime: number }) => Promise<void>): void {
+        if (this.disposed) { this.commandOperation = Promise.resolve(); return; }
+        const intent = this.newIntent();
+        this.commandOperation = action(intent).catch(error => {
+            if (this.intentCurrent(intent)) this.hostProblem(error, intent.lifetime);
+        });
+    }
+    private async prepareSelection(intent: { choices: number; lifetime: number }): Promise<boolean> {
+        if (!this.intentCurrent(intent)) return false;
+        if (!this.controller) {
+            const folders = vscode.workspace.workspaceFolders ?? [];
+            const folder = folders.length === 1 ? folders[0] : await vscode.window.showWorkspaceFolderPick();
+            if (!this.intentCurrent(intent)) return false;
+            if (!folder || folder.uri.scheme !== 'file') {
+                await vscode.window.showInformationMessage('Choose a local workspace folder before connecting a project.');
+                return false;
+            }
+            const setting = vscode.workspace.getConfiguration('expec', folder.uri).get<string>('configurationFile', 'expec.json');
+            const filename = setting.trim() ? resolve(folder.uri.fsPath, setting) : undefined;
+            const lifetime = intent.lifetime + 1, choices = intent.choices + 1;
+            this.folder = folder;
+            this.followFolder();
+            // Only this command's own first selection may carry its intent into the new lifetime.
+            // Reentrant selection or another command advances either revision again and stays obsolete.
+            if (this.disposed || !this.controller || this.filename !== filename || this.lifetime !== lifetime || this.choices !== choices) return false;
+            intent.lifetime = lifetime;
+            intent.choices = choices;
+        }
+        const controller = this.controller;
+        await this.loading;
+        return !!controller && this.intentCurrent(intent) && controller === this.controller;
+    }
+    private choiceCurrent(controller: ConnectionController, previous: ConnectionConfiguration,
+        intent: { choices: number; lifetime: number }, requireWritable = true): () => boolean {
+        const reading = this.reading;
+        return () => {
+            const writable = !this.dirty() && vscode.workspace.fs.isWritableFileSystem('file') !== false;
+            return this.intentCurrent(intent) && reading === this.reading && controller === this.controller
+                && previous.file === this.filename && this.saved?.file === previous.file && this.saved.text === previous.text
+                && this.saved.writable === previous.writable && writable === previous.writable && (!requireWritable || writable);
+        };
+    }
+    private explainSelection(): Thenable<unknown> {
+        return vscode.window.showInformationMessage(this.hostFailure ?? this.state?.message ?? 'Choose a local workspace and its .expec manifest first.');
+    }
+    private async editSelected(intent: { choices: number; lifetime: number }): Promise<void> {
+        if (!await this.prepareSelection(intent)) return;
+        const filename = this.filename;
+        const current = () => this.intentCurrent(intent) && filename === this.filename;
+        if (!filename || !current()) { if (!this.disposed) await this.explainSelection(); return; }
+        const uri = vscode.Uri.file(filename);
+        try {
+            const info = await vscode.workspace.fs.stat(uri);
+            if (!current()) return;
+            if (!(info.type & vscode.FileType.File)) { await vscode.window.showInformationMessage('Select a local manifest file to edit.'); return; }
+            const document = await vscode.workspace.openTextDocument(uri);
+            if (!current()) return;
+            await vscode.window.showTextDocument(document, { preview: false });
+        } catch (error) {
+            if (!current()) return;
+            if (error && typeof error === 'object' && 'code' in error && error.code === 'FileNotFound') {
+                await vscode.window.showInformationMessage('This manifest does not exist. New Connection can create it from your actual sources.');
+            } else throw error;
+        }
+    }
+    private async guideConnection(intent: { choices: number; lifetime: number }): Promise<void> {
+        if (!await this.prepareSelection(intent)) return;
+        const controller = this.controller, guidance = controller?.guidance();
+        if (!controller || !guidance) { if (!this.disposed) await this.explainSelection(); return; }
+        const current = this.choiceCurrent(controller, guidance.configuration, intent);
+        if (!current()) { await vscode.window.showInformationMessage('Save or revert changed configuration before creating a connection.'); return; }
+        const directory = (await vscode.window.showOpenDialog({ canSelectFiles: false, canSelectFolders: true,
+            canSelectMany: false, openLabel: 'New Connection', title: 'Choose an empty or existing local target' }))?.[0];
+        if (!current() || !directory) return;
+        if (directory.scheme !== 'file') { await vscode.window.showInformationMessage('Project connections require a local directory.'); return; }
+        const items = guidance.outputs.map(output => ({ id: output.id, label: output.id,
+            description: output.configured ? 'Keep existing options' : 'Configure a new output',
+            detail: output.configured ? 'Advanced options stay in the manifest and can be changed with Edit Connection.' : undefined,
+            picked: output.configured, output }));
+        const selected = await vscode.window.showQuickPick(items, { canPickMany: true, title: 'Choose outputs for this connection',
+            placeHolder: 'Retain configured profiles or add simple outputs; advanced profiles are edited in the manifest.' });
+        if (!current() || !selected) return;
+        const outputs: Array<{ id: string; directory?: string }> = [];
+        for (const item of selected) {
+            if (item.output.configured) outputs.push({ id: item.id });
+            else {
+                const destination = await vscode.window.showInputBox({ title: item.id + ' output destination',
+                    prompt: 'Relative to ' + directory.fsPath + (item.id === 'typescript'
+                        ? '. TypeScript mirrors folders from the manifest source folder; . uses the target root.' : '.'),
+                    value: item.output.suggestedDirectory, ignoreFocusOut: true });
+                if (!current() || destination === undefined) return;
+                outputs.push({ id: item.id, directory: destination });
+            }
+        }
+        const entries: string[] = [];
+        if (guidance.requiresEntries) {
+            const sourceFolder = dirname(guidance.configuration.file), editor = vscode.window.activeTextEditor?.document;
+            const active = editor && !editor.isUntitled && !editor.isDirty && this.sourceEntry(editor.uri, sourceFolder) !== undefined ? editor.uri : undefined;
+            const sources = active ? [active] : await vscode.window.showOpenDialog({ canSelectFiles: true, canSelectFolders: false,
+                canSelectMany: true, defaultUri: vscode.Uri.file(sourceFolder), filters: { '.expec sources': ['expec'] },
+                openLabel: 'Use Source Entries', title: 'Choose actual saved sources in the manifest folder' });
+            if (!current() || !sources?.length) return;
+            for (const source of sources) {
+                const entry = this.sourceEntry(source, sourceFolder);
+                if (entry === undefined || vscode.workspace.textDocuments.some(document => document.uri.toString() === source.toString() && document.isDirty)) {
+                    await vscode.window.showInformationMessage('Select saved local .expec sources within the manifest folder.'); return;
+                }
+                const info = await vscode.workspace.fs.stat(source);
+                if (!current()) return;
+                if (!(info.type & vscode.FileType.File) || info.type & vscode.FileType.SymbolicLink) {
+                    await vscode.window.showInformationMessage('Select ordinary saved .expec source files.'); return;
+                }
+                entries.push(entry);
+            }
+        }
+        if (!current()) return;
+        this.choicePending = true;
+        controller.createConnection(directory.fsPath, outputs, entries);
+        if (this.state?.status !== 'checking') this.choicePending = false;
+    }
+    private sourceEntry(uri: vscode.Uri, sourceFolder: string): string | undefined {
+        if (uri.scheme !== 'file' || !uri.fsPath.toLowerCase().endsWith('.expec')) return undefined;
+        const entry = relative(sourceFolder, uri.fsPath);
+        if (!entry || isAbsolute(entry) || entry === '..' || entry.startsWith('..' + (process.platform === 'win32' ? '\\' : '/'))) return undefined;
+        return entry.replaceAll('\\', '/');
+    }
+    private async confirmDelete(intent: { choices: number; lifetime: number }): Promise<void> {
+        if (!await this.prepareSelection(intent)) return;
+        const controller = this.controller, guidance = controller?.guidance();
+        if (!controller || !guidance) { if (!this.disposed) await this.explainSelection(); return; }
+        if (!guidance.hasProject) { await vscode.window.showInformationMessage('This manifest has no project connection to delete.'); return; }
+        const current = this.choiceCurrent(controller, guidance.configuration, intent);
+        if (!current()) { await vscode.window.showInformationMessage('Save or revert changed configuration before deleting a connection.'); return; }
+        const answer = await vscode.window.showWarningMessage('Delete the project connection from ' + guidance.configuration.file
+            + '? Only project metadata will be removed. Target files, sources, output settings and packages will be retained.',
+            { modal: true }, 'Delete Connection');
+        if (!current() || answer !== 'Delete Connection') return;
+        this.choicePending = false;
+        controller.deleteConnection();
+    }
+
 }

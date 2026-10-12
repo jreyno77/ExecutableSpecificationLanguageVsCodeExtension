@@ -32,8 +32,8 @@ export function activate(context: ExtensionContext): LanguageClient & {
   generation.start();
   sidebar = new ConnectionSidebar(context, { configurationChanged: configuration => {
     previews!.configurationChanged(configuration);
-    generation!.configurationChanged(configuration);
   } });
+  sidebar.observeWork(generation);
   context.subscriptions.push(sidebar, previews);
   const folders = workspace.workspaceFolders ?? [];
   const folder = folders.length === 1 ? folders[0] : undefined;

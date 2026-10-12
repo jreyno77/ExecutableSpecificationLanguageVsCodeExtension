@@ -528,7 +528,10 @@ async sidebarConnectionExplanation(): Promise<string> {
 async sidebarSavedProjectName(): Promise<string> {
     const saved = this.sidebarCase.last.saved;
     if (saved === undefined) throw new Error('The native sidebar has no saved configuration.');
-    return basename(JSON.parse(saved).project.root);
+    const project = JSON.parse(saved).project;
+    if (project === undefined) return '';
+    if (!project || typeof project.root !== 'string') throw new Error('The saved project root is not text.');
+    return basename(project.root);
   }
 
 async sidebarSavedConfiguration(): Promise<string> {
@@ -538,9 +541,9 @@ async sidebarSavedConfiguration(): Promise<string> {
   }
 
 async sidebarUnsavedConfiguration(): Promise<string> {
-    const unsaved = this.sidebarCase.last.unsaved;
-    if (unsaved === undefined) throw new Error('The native sidebar has no unsaved configuration.');
-    return unsaved;
+    const current = this.sidebarCase.last.unsaved ?? this.sidebarCase.last.saved;
+    if (current === undefined) throw new Error('The native sidebar has no captured configuration text.');
+    return current;
   }
 
 async previewAuthoring(configuration: string): Promise<void> {
@@ -1786,186 +1789,186 @@ async nativePreviewHasDiagnostics(): Promise<boolean> {
   }
 
 async attachConnectionWorkObserver(): Promise<void> {
-    throw new Error("Not implemented: workspace.attachConnectionWorkObserver");
+    return await this.connectionRecording.attachWork();
   }
 
 async createProjectConnection(name: string, outputs: Array<ConnectionOutputChoice>, entries: Array<string>): Promise<void> {
-    throw new Error("Not implemented: workspace.createProjectConnection");
+    return await this.connectionRecording.create(name, outputs, entries);
   }
 
 async disconnectProjectConnection(): Promise<void> {
-    throw new Error("Not implemented: workspace.disconnectProjectConnection");
+    return await this.connectionRecording.disconnect();
   }
 
 async reconnectProjectConnection(): Promise<void> {
-    throw new Error("Not implemented: workspace.reconnectProjectConnection");
+    return await this.connectionRecording.reconnect();
   }
 
 async deleteProjectConnection(): Promise<void> {
-    throw new Error("Not implemented: workspace.deleteProjectConnection");
+    return await this.connectionRecording.deleteConnection();
   }
 
 async keepConnectionSource(path: string, text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.keepConnectionSource");
+    return await this.connectionRecording.keepSource(path, text);
   }
 
 async keepConnectionTargetFile(name: string, path: string, text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.keepConnectionTargetFile");
+    return await this.connectionRecording.keepTarget(name, path, text);
   }
 
 async openConnectionActivityBar(): Promise<void> {
-    throw new Error("Not implemented: workspace.openConnectionActivityBar");
+    return await this.sidebarCase.openActivityBar();
   }
 
 async openSidebarConnectionMenu(): Promise<void> {
-    throw new Error("Not implemented: workspace.openSidebarConnectionMenu");
+    return await this.sidebarCase.openConnectionMenu();
   }
 
 async editSidebarConnection(): Promise<void> {
-    throw new Error("Not implemented: workspace.editSidebarConnection");
+    return await this.sidebarCase.editConnection();
   }
 
 async guideNewSidebarConnection(directory: string, outputs: Array<ConnectionOutputChoice>, entries: Array<string>): Promise<void> {
-    throw new Error("Not implemented: workspace.guideNewSidebarConnection");
+    return await this.sidebarCase.newConnection(directory, outputs, entries);
   }
 
 async cancelNewSidebarConnectionAtDestination(directory: string, outputs: Array<string>): Promise<void> {
-    throw new Error("Not implemented: workspace.cancelNewSidebarConnectionAtDestination");
+    return await this.sidebarCase.cancelNewAtDestination(directory, outputs);
   }
 
 async disconnectSidebarConnection(): Promise<void> {
-    throw new Error("Not implemented: workspace.disconnectSidebarConnection");
+    return await this.sidebarCase.disconnect();
   }
 
 async reconnectSidebarConnection(): Promise<void> {
-    throw new Error("Not implemented: workspace.reconnectSidebarConnection");
+    return await this.sidebarCase.reconnect();
   }
 
 async deleteSidebarConnection(confirmed: boolean): Promise<void> {
-    throw new Error("Not implemented: workspace.deleteSidebarConnection");
+    return await this.sidebarCase.deleteConnection(confirmed);
   }
 
 async keepSidebarSource(path: string, text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.keepSidebarSource");
+    return await this.sidebarCase.keepSource(path, text);
   }
 
 async keepSidebarTargetFile(directory: string, path: string, text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.keepSidebarTargetFile");
+    return await this.sidebarCase.keepTargetFile(directory, path, text);
   }
 
 async previewSidebarSource(path: string): Promise<void> {
-    throw new Error("Not implemented: workspace.previewSidebarSource");
+    return await this.sidebarCase.previewSource(path);
   }
 
 async connectionWorkProjectName(): Promise<string> {
-    throw new Error("Not implemented: workspace.connectionWorkProjectName");
+    return await this.connectionRecording.workProjectName();
   }
 
 async connectionSavedText(): Promise<string> {
-    throw new Error("Not implemented: workspace.connectionSavedText");
+    return await this.connectionRecording.savedText();
   }
 
 async connectionSavedEntries(): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.connectionSavedEntries");
+    return await this.connectionRecording.savedEntries();
   }
 
 async connectionSavedOutputIds(): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.connectionSavedOutputIds");
+    return await this.connectionRecording.savedOutputIds();
   }
 
 async connectionSavedOutputOptions(id: string): Promise<string> {
-    throw new Error("Not implemented: workspace.connectionSavedOutputOptions");
+    return await this.connectionRecording.savedOutputOptions(id);
   }
 
 async connectionSavedVersion(): Promise<string> {
-    throw new Error("Not implemented: workspace.connectionSavedVersion");
+    return await this.connectionRecording.savedVersion();
   }
 
 async connectionSavedPackages(): Promise<string> {
-    throw new Error("Not implemented: workspace.connectionSavedPackages");
+    return await this.connectionRecording.savedPackages();
   }
 
 async connectionOwnedTreesUnchanged(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.connectionOwnedTreesUnchanged");
+    return await this.connectionRecording.treesUnchanged();
   }
 
 async sidebarActivityBarVisible(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.sidebarActivityBarVisible");
+    return await this.sidebarCase.activityBarVisible();
   }
 
 async sidebarSelectedConfigurationVisible(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.sidebarSelectedConfigurationVisible");
+    return await this.sidebarCase.selectedConfigurationVisible();
   }
 
 async sidebarVisibleConnectionActions(): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.sidebarVisibleConnectionActions");
+    return await this.sidebarCase.visibleConnectionActions();
   }
 
 async sidebarEditingSelectedConfiguration(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.sidebarEditingSelectedConfiguration");
+    return await this.sidebarCase.editingSelectedConfiguration();
   }
 
 async sidebarSavedEntries(): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.sidebarSavedEntries");
+    return await this.sidebarCase.savedEntries();
   }
 
 async sidebarSavedOutputIds(): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.sidebarSavedOutputIds");
+    return await this.sidebarCase.savedOutputIds();
   }
 
 async sidebarSavedOutputOptions(id: string): Promise<string> {
-    throw new Error("Not implemented: workspace.sidebarSavedOutputOptions");
+    return await this.sidebarCase.savedOutputOptions(id);
   }
 
 async sidebarSavedVersion(): Promise<string> {
-    throw new Error("Not implemented: workspace.sidebarSavedVersion");
+    return await this.sidebarCase.savedVersion();
   }
 
 async sidebarSavedPackages(): Promise<string> {
-    throw new Error("Not implemented: workspace.sidebarSavedPackages");
+    return await this.sidebarCase.savedPackages();
   }
 
 async sidebarOwnedTreesUnchanged(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.sidebarOwnedTreesUnchanged");
+    return await this.sidebarCase.ownedTreesUnchanged();
   }
 
 async sidebarPreviewDocumentIncludes(id: string, path: string, text: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.sidebarPreviewDocumentIncludes");
+    return await this.sidebarCase.previewDocumentIncludes(id, path, text);
   }
 
 async inspectConnectionGuidance(): Promise<void> {
-    throw new Error("Not implemented: workspace.inspectConnectionGuidance");
+    return await this.connectionRecording.inspectGuidance();
   }
 
 async disposeConnectionController(): Promise<void> {
-    throw new Error("Not implemented: workspace.disposeConnectionController");
+    return await this.connectionRecording.disposeController();
   }
 
 async connectionGuidanceAvailable(query: number): Promise<boolean> {
-    throw new Error("Not implemented: workspace.connectionGuidanceAvailable");
+    return await this.connectionRecording.guidanceAvailable(query);
   }
 
 async connectionGuidanceRequiresEntries(query: number): Promise<boolean> {
-    throw new Error("Not implemented: workspace.connectionGuidanceRequiresEntries");
+    return await this.connectionRecording.guidanceRequiresEntries(query);
   }
 
 async connectionGuidanceHasProject(query: number): Promise<boolean> {
-    throw new Error("Not implemented: workspace.connectionGuidanceHasProject");
+    return await this.connectionRecording.guidanceHasProject(query);
   }
 
 async connectionGuidanceOutputs(query: number): Promise<Array<ConnectionOutputGuidance>> {
-    throw new Error("Not implemented: workspace.connectionGuidanceOutputs");
+    return await this.connectionRecording.guidanceOutputs(query);
   }
 
 async connectionGuidanceMatchesSavedSnapshot(query: number): Promise<boolean> {
-    throw new Error("Not implemented: workspace.connectionGuidanceMatchesSavedSnapshot");
+    return await this.connectionRecording.guidanceMatchesSavedSnapshot(query);
   }
 
 async connectionGuidancePublications(query: number): Promise<number> {
-    throw new Error("Not implemented: workspace.connectionGuidancePublications");
+    return await this.connectionRecording.guidancePublications(query);
   }
 
 async connectionGuidanceSaves(query: number): Promise<number> {
-    throw new Error("Not implemented: workspace.connectionGuidanceSaves");
+    return await this.connectionRecording.guidanceSaves(query);
   }
 }

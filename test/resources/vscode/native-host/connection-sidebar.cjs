@@ -1,4 +1,4 @@
-const { basename, join, resolve } = require('node:path');
+const { basename, join, resolve, relative, isAbsolute } = require('node:path');
 const { preparedWorkspaceWatch } = require('./diagnostic-document.cjs');
 
 // Native observations use the installed, registered provider and real host events.
@@ -12,6 +12,8 @@ exports.openConnectionSidebar = async function openConnectionSidebar(vscode, ext
   const file = vscode.Uri.file(setup.file);
   let revision = 0, disposed = false;
   const events = [];
+  const sourceFiles = new Map(), panels = new Set();
+  let previewDocument;
   const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(vscode.Uri.file(setup.directory), '*'));
   const received = uri => { events.push(uri.toString()); };
   const resources = [watcher, watcher.onDidCreate(received), watcher.onDidChange(received), watcher.onDidDelete(received),
@@ -46,12 +48,48 @@ exports.openConnectionSidebar = async function openConnectionSidebar(vscode, ext
         continue;
       }
       return { status: actual.status, project: actual.project, explanation: actual.explanation,
-        ...(saved === undefined ? {} : { saved }), ...(unsaved === undefined ? {} : { unsaved }) };
+        ...(saved === undefined ? {} : { saved }), ...(unsaved === undefined ? {} : { unsaved }),
+        ...(vscode.window.activeTextEditor ? { activeFile: vscode.window.activeTextEditor.document.uri.fsPath } : {}),
+        ...(previewDocument ? { sourceUri: previewDocument.uri.toString(), sourceVersion: previewDocument.version } : {}) };
     }
   }
   function project(name) {
     if (typeof name !== 'string' || basename(name) !== name || name === '.' || name === '..') throw new Error('Use one owned project directory name.');
     return vscode.Uri.file(join(setup.directory, name));
+  }
+  function ownedSource(name) {
+    if (typeof name !== 'string' || !name.endsWith('.expec')) throw new Error('Select an actual owned .expec source.');
+    const filename = resolve(setup.directory, name), local = relative(setup.directory, filename);
+    if (!local || isAbsolute(local) || local === '..' || local.startsWith('..' + require('node:path').sep)) throw new Error('Source selection left the owned sidebar directory.');
+    return vscode.Uri.file(filename);
+  }
+  async function manage(action) {
+    if (disposed) throw new Error('The owned native sidebar case is disposed.');
+    if (action.kind === 'activityBar') await vscode.commands.executeCommand('workbench.view.extension.expec');
+    else if (action.kind === 'editConnection') await vscode.commands.executeCommand('expec.editConnection');
+    else if (action.kind === 'newConnection') {
+      await vscode.commands.executeCommand('expec.newConnection');
+    } else if (action.kind === 'disconnect') await vscode.commands.executeCommand('expec.disconnectConnection');
+    else if (action.kind === 'reconnect') await vscode.commands.executeCommand('expec.reconnectConnection');
+    else if (action.kind === 'delete') {
+      await vscode.commands.executeCommand('expec.deleteConnection');
+    } else if (action.kind === 'previewSource') {
+      const uri = ownedSource(action.source), initialTabs = new Set(vscode.window.tabGroups.all.flatMap(group => group.tabs));
+      const capturePanels = () => {
+        for (const tab of vscode.window.tabGroups.all.flatMap(group => group.tabs)) if (!initialTabs.has(tab)
+          && tab.input instanceof vscode.TabInputWebview && tab.input.viewType === 'mainThreadWebview-expec.outputPreviews') panels.add(tab);
+      };
+      resources.push(vscode.window.tabGroups.onDidChangeTabs(capturePanels));
+      previewDocument = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(previewDocument, { preview: false });
+      let sourceGroup;
+      await until(() => (sourceGroup = vscode.window.tabGroups.all.find(group => group.tabs.some(tab => tab.input?.uri?.toString() === uri.toString()))), 'The owned sidebar source did not open in a native tab group.');
+      sourceFiles.set(uri.toString(), sourceGroup.viewColumn);
+      // Keep the selected controller and its session-only disconnect intact.
+      await vscode.commands.executeCommand('expec.showOutputPreviews');
+      await until(() => { capturePanels(); return [...panels].some(tab => tab.isActive); }, 'The actual owned preview panel did not open.');
+    } else throw new Error('Unsupported native sidebar management action.');
+    return observation();
   }
   async function changeFile(uri, operation, relevant) {
     const before = revision, afterEvent = events.length;
@@ -64,6 +102,17 @@ exports.openConnectionSidebar = async function openConnectionSidebar(vscode, ext
     if (disposed) return;
     const deadline = Date.now() + 30_000;
     const errors = [];
+    for (const panel of panels) try {
+      if (vscode.window.tabGroups.all.some(group => group.tabs.includes(panel)) && !await beforeDeadline(vscode.window.tabGroups.close(panel), deadline, 'The owned sidebar preview did not close.')) throw new Error('The owned sidebar preview refused close.');
+    } catch (error) { errors.push(error); }
+    for (const [source, viewColumn] of sourceFiles) try {
+      const document = vscode.workspace.textDocuments.find(document => document.uri.toString() === source);
+      if (document && vscode.window.tabGroups.all.some(group => group.tabs.some(tab => tab.input?.uri?.toString() === source))) {
+        await beforeDeadline(vscode.window.showTextDocument(document, { preview: false, viewColumn }), deadline, 'The owned sidebar source did not activate for cleanup.');
+        await beforeDeadline(vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor'), deadline, 'The owned sidebar source did not close.');
+        await until(() => !vscode.window.tabGroups.all.some(group => group.tabs.some(tab => tab.input?.uri?.toString() === source)), 'The owned sidebar source remained open.', deadline);
+      }
+    } catch (error) { errors.push(error); }
     try {
       const ownedTabs = () => vscode.window.tabGroups.all.flatMap(group => group.tabs)
         .filter(tab => tab.input?.uri?.toString() === file.toString());
@@ -88,7 +137,7 @@ exports.openConnectionSidebar = async function openConnectionSidebar(vscode, ext
     await settled(after);
     await preparedWorkspaceWatch(vscode, setup.file);
     return {
-      observation,
+      observation, manage,
       async action(kind, name, text) {
         if (disposed) throw new Error('The owned native sidebar case is disposed.');
         if (kind === 'choose') {
@@ -101,7 +150,7 @@ exports.openConnectionSidebar = async function openConnectionSidebar(vscode, ext
         if (kind === 'remove' || kind === 'restore') {
           const uri = project(name), actual = await settled();
           return changeFile(uri, () => kind === 'remove' ? vscode.workspace.fs.delete(uri, { recursive: true, useTrash: false })
-            : vscode.workspace.fs.createDirectory(uri), typeof actual.target === 'string' && samePath(actual.target, uri.fsPath));
+            : vscode.workspace.fs.createDirectory(uri), actual.status !== 'disconnected' && typeof actual.target === 'string' && samePath(actual.target, uri.fsPath));
         }
         if (kind === 'edit') {
           const document = await vscode.workspace.openTextDocument(file);
