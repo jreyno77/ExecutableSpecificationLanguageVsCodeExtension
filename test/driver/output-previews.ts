@@ -82,7 +82,11 @@ export class OutputPreviewsRecording {
         this.running.add(call); return call;
       } } : {}) };
   }
-  configure(text: string): void { this.previews!.configurationChanged({ file: join(this.root, 'expec.json'), text, writable: true }); }
+  configure(text: string): void {
+    const configuration = { file: join(this.root, 'expec.json'), text, writable: true };
+    this.previews!.configurationChanged(configuration);
+    this.analysis.configurationChanged(configuration);
+  }
   opened(source: SourceDocument, version: number): void { this.previews!.selected(source.uri); this.analysis.opened(source, version); }
   edited(source: SourceDocument, version: number): void { this.analysis.changed(source, version); }
   savedImport(uri: string, text: string): void { this.saved.set(uri, { uri, text }); this.analysis.sourceChanged(uri); }

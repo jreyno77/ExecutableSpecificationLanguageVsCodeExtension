@@ -15,9 +15,32 @@ exports.openPreviewEditor = async function openPreviewEditor(vscode, extensionId
   const initialTabs = new Set(tabs());
   function capturePanels() { for (const tab of tabs()) if (!initialTabs.has(tab) && ownsPanel(tab)) panels.add(tab); }
   const panelTabs = vscode.window.tabGroups.onDidChangeTabs(capturePanels);
+  async function analysisObservation() {
+    const snapshot = document, version = snapshot.version, deadline = Date.now() + 30_000;
+    let diagnosticsProvider;
+    await until(() => (diagnosticsProvider = client.getFeature('textDocument/diagnostic').getProvider(snapshot)?.diagnostics),
+      'The installed preview diagnostic provider is unavailable.', deadline);
+    while (true) {
+      const cancellation = new vscode.CancellationTokenSource();
+      let report;
+      try { report = await diagnosticsProvider.provideDiagnostics(snapshot, undefined, cancellation.token); }
+      catch (error) { if (!(error instanceof vscode.CancellationError)) throw error; }
+      finally { cancellation.dispose(); }
+      if (snapshot !== document || snapshot.isClosed || snapshot.version !== version) throw new Error('The native preview diagnostic observation became obsolete.');
+      if (report?.kind === 'full' && typeof report.resultId === 'string' && report.resultId !== ''
+        && sameDiagnostics(vscode.languages.getDiagnostics(snapshot.uri), report.items)) {
+        return { resultId: report.resultId, diagnosticCount: vscode.languages.getDiagnostics(snapshot.uri).length };
+      }
+      // A saved configuration can advance analysis while a pull is in flight.
+      // Obtain the newest real report rather than waiting for an obsolete one to apply.
+      if (Date.now() >= deadline) throw new Error('The native preview did not produce a current report applied to its complete diagnostic collection.');
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+  }
   async function observation() {
+    const analysis = await analysisObservation();
     return { uri: document.uri.toString(), version: document.version, text: document.getText(), dirty: document.isDirty,
-      savedText: await fs.readFile(document.uri.fsPath, 'utf8') };
+      savedText: await fs.readFile(document.uri.fsPath, 'utf8'), ...analysis };
   }
   async function closePanel() {
     capturePanels();
@@ -80,6 +103,12 @@ exports.openPreviewEditor = async function openPreviewEditor(vscode, extensionId
     throw error;
   }
 };
+function sameDiagnostics(actual, expected) {
+  const packet = diagnostic => ({ message: diagnostic.message, severity: diagnostic.severity, source: diagnostic.source,
+    code: typeof diagnostic.code === 'object' ? diagnostic.code.value : diagnostic.code,
+    range: [diagnostic.range.start.line, diagnostic.range.start.character, diagnostic.range.end.line, diagnostic.range.end.character] });
+  return JSON.stringify(actual.map(packet)) === JSON.stringify(expected.map(packet));
+}
 async function until(predicate, explanation, deadline = Date.now() + 30_000) {
   while (!await predicate()) {
     if (Date.now() >= deadline) throw new Error(typeof explanation === 'function' ? explanation() : explanation);

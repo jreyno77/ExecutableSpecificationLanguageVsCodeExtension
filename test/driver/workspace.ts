@@ -30,6 +30,8 @@ import { OutputTab } from "../../src/core/OutputTab.js";
 import { SourceDocument } from "../../src/core/SourceDocument.js";
 import { OutputPreviewsRecording } from './output-previews.js';
 import type { NativePreviewCase } from './vscode/native-preview.js';
+import { ConnectionConfiguration } from "../../src/core/ConnectionConfiguration.js";
+
 export class WorkspaceDriver {
   private nativeCompletionRecording!: NativeCompletionRecording;
   private sourceCompletionRecording!: SourceCompletionRecording;
@@ -1749,5 +1751,33 @@ async convertedTypeStart(request: number, index: number): Promise<number> {
 
 async convertedTypeEnd(request: number, index: number): Promise<number> {
     return this.completionConversionRecording.edit(request, index).range.end.character;
+  }
+
+async changeSemanticConfiguration(configuration: ConnectionConfiguration): Promise<void> {
+    this.analysisRecording.configurationChanged(configuration);
+  }
+
+async clearSemanticConfiguration(): Promise<void> {
+    this.analysisRecording.configurationChanged(undefined);
+  }
+
+async semanticProblemAtPublication(uri: string, publication: number): Promise<string> {
+    return this.analysisRecording.semanticProblemAtPublication(uri, publication).code;
+  }
+
+async checkedAtPublication(uri: string, publication: number): Promise<boolean> {
+    return this.analysisRecording.atPublication(uri, publication).report.compilation?.value !== undefined;
+  }
+
+async nativePreviewBeforeConfigurationStatus(): Promise<string> {
+    return await this.nativePreview.beforeConfigurationStatus();
+  }
+
+async nativePreviewEntryVersionUnchanged(): Promise<boolean> {
+    return await this.nativePreview.entryVersionUnchanged();
+  }
+
+async nativePreviewHasDiagnostics(): Promise<boolean> {
+    return await this.nativePreview.hasDiagnostics();
   }
 }

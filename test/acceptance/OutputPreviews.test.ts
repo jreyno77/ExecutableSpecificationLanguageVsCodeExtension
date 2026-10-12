@@ -16,6 +16,17 @@ test("show three registered outputs from the current unsaved text", async ({ wor
   await workspace.expectTargetsPreserved();
 });
 
+/* @expec-test "ceed3fd9-2879-4634-919a-fd1764424e7b" */
+test("a supplied runtime dependency permits the actual authored Markdown preview", async ({ workspace }) => {
+  await workspace.previewAuthoring(workspace.runtimeMarkdown);
+  await workspace.openPreviewSource({ ["uri"]: "file:///workspace/src/view.expec", ["text"]: "component ReactView { requires package \"react\" for runtime }" }, 1);
+  await workspace.settleCurrentPreviews();
+  await workspace.expectCurrentPreviewSource("file:///workspace/src/view.expec", 1);
+  await workspace.expectPreviewStatus("markdown", "ready");
+  await workspace.expectPreviewDocument("markdown", "draft/docs/ReactView.md", "text/markdown", "component ReactView");
+  await workspace.expectTargetsPreserved();
+});
+
 /* @expec-test "f99a7cc1-1d30-4b37-a303-6d00da2a9416" */
 test("a rejected current edit withdraws old successful documents", async ({ workspace }) => {
   await workspace.previewAuthoring(workspace.textOutputs);
