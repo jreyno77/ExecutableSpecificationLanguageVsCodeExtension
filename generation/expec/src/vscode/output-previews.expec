@@ -84,7 +84,9 @@ examples for OutputPreviewHost {
   // an actual newer native analysis resultId at the unchanged source version.
   observation nativePreviewBeforeConfigurationStatus() returns Text
   observation nativePreviewEntryVersionUnchanged() returns Boolean
-  observation nativePreviewDiagnosticCodes() returns List<Text>
+  // Read the complete actual VS Code diagnostics for this owned current entry;
+  // true means any diagnostic exists, after the newer native resultId settles.
+  observation nativePreviewHasDiagnostics() returns Boolean
 
   check expectNativePreviewOutputs(ids: List<Text>) {
     let actual = nativePreviewOutputIds()
@@ -156,13 +158,13 @@ examples for OutputPreviewHost {
   check expectNativePackagePreviewRecovered(source: Text) {
     let previous = nativePreviewBeforeConfigurationStatus()
     let unchangedVersion = nativePreviewEntryVersionUnchanged()
-    let codes = nativePreviewDiagnosticCodes()
+    let hasDiagnostics = nativePreviewHasDiagnostics()
     let saved = nativePreviewSavedText()
     let open = nativePreviewOpenText()
     let dirty = nativePreviewSourceDirty()
     assert previous == "blocked"
     assert unchangedVersion == true
-    assert codes == []
+    assert hasDiagnostics == false
     assert saved == source
     assert open == source
     assert dirty == false
