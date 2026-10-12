@@ -32,6 +32,8 @@ import { OutputPreviewsRecording } from './output-previews.js';
 import type { NativePreviewCase } from './vscode/native-preview.js';
 import { ConnectionConfiguration } from "../../src/core/ConnectionConfiguration.js";
 import { ConnectionOutputChoice } from "../../src/core/ConnectionOutputChoice.js";
+import { ConnectionOutputGuidance } from "../../src/core/ConnectionOutputGuidance.js";
+
 
 
 export class WorkspaceDriver {
@@ -1929,5 +1931,41 @@ async sidebarOwnedTreesUnchanged(): Promise<boolean> {
 
 async sidebarPreviewDocumentIncludes(id: string, path: string, text: string): Promise<boolean> {
     throw new Error("Not implemented: workspace.sidebarPreviewDocumentIncludes");
+  }
+
+async inspectConnectionGuidance(): Promise<void> {
+    throw new Error("Not implemented: workspace.inspectConnectionGuidance");
+  }
+
+async disposeConnectionController(): Promise<void> {
+    throw new Error("Not implemented: workspace.disposeConnectionController");
+  }
+
+async connectionGuidanceAvailable(query: number): Promise<boolean> {
+    throw new Error("Not implemented: workspace.connectionGuidanceAvailable");
+  }
+
+async connectionGuidanceRequiresEntries(query: number): Promise<boolean> {
+    throw new Error("Not implemented: workspace.connectionGuidanceRequiresEntries");
+  }
+
+async connectionGuidanceHasProject(query: number): Promise<boolean> {
+    throw new Error("Not implemented: workspace.connectionGuidanceHasProject");
+  }
+
+async connectionGuidanceOutputs(query: number): Promise<Array<ConnectionOutputGuidance>> {
+    throw new Error("Not implemented: workspace.connectionGuidanceOutputs");
+  }
+
+async connectionGuidanceMatchesSavedSnapshot(query: number): Promise<boolean> {
+    throw new Error("Not implemented: workspace.connectionGuidanceMatchesSavedSnapshot");
+  }
+
+async connectionGuidancePublications(query: number): Promise<number> {
+    throw new Error("Not implemented: workspace.connectionGuidancePublications");
+  }
+
+async connectionGuidanceSaves(query: number): Promise<number> {
+    throw new Error("Not implemented: workspace.connectionGuidanceSaves");
   }
 }

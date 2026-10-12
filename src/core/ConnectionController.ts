@@ -11,6 +11,8 @@ import type { ConnectionConfiguration } from "./ConnectionConfiguration.js";
 import type { ConnectionWorkFeedback } from "./ConnectionWorkFeedback.js";
 
 import type { ConnectionOutputChoice } from "./ConnectionOutputChoice.js";
+import type { ConnectionGuidance } from "./ConnectionGuidance.js";
+
 
 
 
@@ -230,5 +232,13 @@ reconnect(): void {
      */
 deleteConnection(): void {
         throw new Error("Not implemented: ConnectionController.deleteConnection");
+    }
+
+/**
+     * Unverified implementation obligation.
+     * Return synchronous detached immutable facts prepared from the current captured saved snapshot and its already validated configuration. Missing metadata has requiresEntries true and hasProject false. Existing valid metadata keeps its build, has requiresEntries false and hasProject exactly when its validated project exists. A requested unsaved target is not saved project metadata. Invalid metadata, no captured selection or a disposed lifetime returns absence. List configured outputs first in actual authored order with configured true and no suggestedDirectory, then eligible new typescript, uml and markdown IDs not already configured with configured false and suggestions '.', 'diagrams' and 'docs'. Suggestions are core-owned extension setup policy, not SDK defaults. Do not expose or reconstruct retained options; createConnection preserves their actual saved values. Return file, exact text or absence, and writable from the same captured snapshot, including dirty write safety. Caller mutation cannot alter earlier or future facts. Prepare facts when the saved configuration changes; this query performs no parsing, validation, connector work, reads, state publication, observer notification or persistence. It does not change session suspension or generation opt-in.
+     */
+guidance(): ConnectionGuidance | undefined {
+        throw new Error("Not implemented: ConnectionController.guidance");
     }
 }

@@ -224,3 +224,46 @@ test("deleting a connection removes only project metadata and withdraws work", a
   await workspace.expectSavedConnectionSettings("1.2.3", "[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"phases\":[\"runtime\"],\"version\":\"1.0.0\"}]");
   await workspace.expectConnectionTreesUntouched();
 });
+
+/* @expec-test "c55044fa-6212-418c-9159-5993bc6842e2" */
+test("guidance distinguishes missing metadata from an unsaved proposed connection", async ({ workspace }) => {
+  await workspace.missingConnectionWorkspace(true);
+  await workspace.keepConnectionSource("src/model.expec", "type Book {}");
+  await workspace.inspectConnection();
+  await workspace.createProjectConnection("alpha", workspace.simpleConnectionOutputs, workspace.connectionEntries);
+  await workspace.inspectConnectionGuidance();
+  await workspace.expectConnectionGuidance(1, true, false, workspace.freshGuidanceOutputs);
+  await workspace.expectGuidanceSavedSnapshot(1);
+  await workspace.expectGuidanceNoEffects(1);
+  await workspace.expectSaveRequests(1);
+  await workspace.expectUnwrittenConfiguration();
+});
+
+/* @expec-test "81017081-d974-48a9-8c83-235bab35a970" */
+test("guidance retains configured profile order and only suggests genuinely new profiles", async ({ workspace }) => {
+  await workspace.connectionWorkspace(workspace.retainedConnectionSettings, true);
+  await workspace.inspectConnection();
+  await workspace.inspectConnectionGuidance();
+  await workspace.expectConnectionGuidance(1, false, true, workspace.retainedGuidanceOutputs);
+  await workspace.expectGuidanceSavedSnapshot(1);
+  await workspace.expectGuidanceNoEffects(1);
+  await workspace.expectSaveRequests(0);
+});
+
+/* @expec-test "25378f7c-b870-4489-a91e-f8a58846f20b" */
+test("invalid metadata and disposed selection withdraw earlier usable guidance", async ({ workspace }) => {
+  await workspace.connectionWorkspace(workspace.alphaConfiguration, true);
+  await workspace.inspectConnection();
+  await workspace.inspectConnectionGuidance();
+  await workspace.replaceConnectionConfiguration("{\"project\":");
+  await workspace.inspectConnectionGuidance();
+  await workspace.disposeConnectionController();
+  await workspace.inspectConnectionGuidance();
+  await workspace.expectGuidanceAvailability(1, true);
+  await workspace.expectGuidanceAvailability(2, false);
+  await workspace.expectGuidanceAvailability(3, false);
+  await workspace.expectGuidanceNoEffects(1);
+  await workspace.expectGuidanceNoEffects(2);
+  await workspace.expectGuidanceNoEffects(3);
+  await workspace.expectSaveRequests(0);
+});

@@ -5,6 +5,8 @@ import { SourceDocument } from "../../src/core/SourceDocument.js";
 import { OutputTab } from "../../src/core/OutputTab.js";
 import { ConnectionConfiguration } from "../../src/core/ConnectionConfiguration.js";
 import { ConnectionOutputChoice } from "../../src/core/ConnectionOutputChoice.js";
+import { ConnectionOutputGuidance } from "../../src/core/ConnectionOutputGuidance.js";
+
 
 
 export class Workspace {
@@ -2949,4 +2951,72 @@ readonly sidebarRetainedOutputs: Array<ConnectionOutputChoice> = [{ ["id"]: "typ
 readonly managedShop: string = "{\"formatVersion\":1,\"version\":\"1.2.3\",\"project\":{\"root\":\"shop\"},\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"sourceRoot\":\".\",\"directory\":\".\",\"configFile\":\"tsconfig.json\"}}],\"packages\":[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"version\":\"1.0.0\",\"phases\":[\"runtime\"]}]}";
 
 readonly previewShop: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"shop\"},\"build\":{\"entries\":[\"src/model.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"docs\"}}]}";
+
+async inspectConnectionGuidance(): Promise<void> {
+    return await this.driver.inspectConnectionGuidance();
+  }
+
+async disposeConnectionController(): Promise<void> {
+    return await this.driver.disposeConnectionController();
+  }
+
+async connectionGuidanceAvailable(query: number): Promise<boolean> {
+    return await this.driver.connectionGuidanceAvailable(query);
+  }
+
+async connectionGuidanceRequiresEntries(query: number): Promise<boolean> {
+    return await this.driver.connectionGuidanceRequiresEntries(query);
+  }
+
+async connectionGuidanceHasProject(query: number): Promise<boolean> {
+    return await this.driver.connectionGuidanceHasProject(query);
+  }
+
+async connectionGuidanceOutputs(query: number): Promise<Array<ConnectionOutputGuidance>> {
+    return await this.driver.connectionGuidanceOutputs(query);
+  }
+
+async connectionGuidanceMatchesSavedSnapshot(query: number): Promise<boolean> {
+    return await this.driver.connectionGuidanceMatchesSavedSnapshot(query);
+  }
+
+async connectionGuidancePublications(query: number): Promise<number> {
+    return await this.driver.connectionGuidancePublications(query);
+  }
+
+async connectionGuidanceSaves(query: number): Promise<number> {
+    return await this.driver.connectionGuidanceSaves(query);
+  }
+
+async expectConnectionGuidance(query: number, requiresEntries: boolean, hasProject: boolean, outputs: Array<ConnectionOutputGuidance>): Promise<void> {
+    const available = await this.driver.connectionGuidanceAvailable(query);
+    expectData(available, true);
+    const actualEntries = await this.driver.connectionGuidanceRequiresEntries(query);
+    const actualProject = await this.driver.connectionGuidanceHasProject(query);
+    const actualOutputs = await this.driver.connectionGuidanceOutputs(query);
+    expectData(actualEntries, requiresEntries);
+    expectData(actualProject, hasProject);
+    expectData(actualOutputs, outputs);
+  }
+
+async expectGuidanceSavedSnapshot(query: number): Promise<void> {
+    const matches = await this.driver.connectionGuidanceMatchesSavedSnapshot(query);
+    expectData(matches, true);
+  }
+
+async expectGuidanceNoEffects(query: number): Promise<void> {
+    const publications = await this.driver.connectionGuidancePublications(query);
+    const saves = await this.driver.connectionGuidanceSaves(query);
+    expectData(publications, 0);
+    expectData(saves, 0);
+  }
+
+async expectGuidanceAvailability(query: number, expected: boolean): Promise<void> {
+    const available = await this.driver.connectionGuidanceAvailable(query);
+    expectData(available, expected);
+  }
+
+readonly freshGuidanceOutputs: Array<ConnectionOutputGuidance> = [{ ["id"]: "typescript", ["configured"]: false, ["suggestedDirectory"]: "." }, { ["id"]: "uml", ["configured"]: false, ["suggestedDirectory"]: "diagrams" }, { ["id"]: "markdown", ["configured"]: false, ["suggestedDirectory"]: "docs" }];
+
+readonly retainedGuidanceOutputs: Array<ConnectionOutputGuidance> = [{ ["id"]: "typescript", ["configured"]: true }, { ["id"]: "java", ["configured"]: true }, { ["id"]: "uml", ["configured"]: false, ["suggestedDirectory"]: "diagrams" }, { ["id"]: "markdown", ["configured"]: false, ["suggestedDirectory"]: "docs" }];
 }
