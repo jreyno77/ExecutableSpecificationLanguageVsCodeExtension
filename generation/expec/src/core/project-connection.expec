@@ -21,6 +21,19 @@ type ConnectionOutputChoice {
   directory: Text?
 }
 
+type ConnectionOutputGuidance {
+  id: Text
+  configured: Boolean
+  suggestedDirectory: Text?
+}
+
+type ConnectionGuidance {
+  configuration: ConnectionConfiguration
+  requiresEntries: Boolean
+  hasProject: Boolean
+  outputs: List<ConnectionOutputGuidance>
+}
+
 interface ConnectionWorkFeedback {
   public configurationChanged
   capability configurationChanged(configuration: ConnectionConfiguration?) returns Nothing {
@@ -45,10 +58,13 @@ component ConnectionController {
   requires package "vitest" for test
 
   construction(feedback: ConnectionFeedback)
-  public configurationChanged, chooseProject, observeWork, createConnection, disconnect, reconnect, deleteConnection, targetChanged, saveFailed, dispose
+  public configurationChanged, chooseProject, observeWork, guidance, createConnection, disconnect, reconnect, deleteConnection, targetChanged, saveFailed, dispose
 
   capability observeWork(feedback: ConnectionWorkFeedback) returns Nothing {
     promises "Attach one replaceable work observer without changing this controller's constructor or requiring metadata-only callers to attach one. Immediately deliver the current active saved snapshot or absence. Replacing an observer withdraws the previous observer first; disposal withdraws and releases it. Capture observer identity and controller revision around every callback. Reentrant replacement, disconnect, configuration changes or disposal cannot subsequently deliver old active work or overwrite newer state. Host callback failures remain observable; do not swallow them or skip owned cleanup. The actual extension assembly attaches its one existing GenerationHost through this operation, rather than routing generation through preview feedback."
+  }
+  capability guidance() returns ConnectionGuidance? {
+    promises "Return synchronous detached immutable facts prepared from the current captured saved snapshot and its already validated configuration. Missing metadata has requiresEntries true and hasProject false. Existing valid metadata keeps its build, has requiresEntries false and hasProject exactly when its validated project exists. A requested unsaved target is not saved project metadata. Invalid metadata, no captured selection or a disposed lifetime returns absence. List configured outputs first in actual authored order with configured true and no suggestedDirectory, then eligible new typescript, uml and markdown IDs not already configured with configured false and suggestions '.', 'diagrams' and 'docs'. Suggestions are core-owned extension setup policy, not SDK defaults. Do not expose or reconstruct retained options; createConnection preserves their actual saved values. Return file, exact text or absence, and writable from the same captured snapshot, including dirty write safety. Caller mutation cannot alter earlier or future facts. Prepare facts when the saved configuration changes; this query performs no parsing, validation, connector work, reads, state publication, observer notification or persistence. It does not change session suspension or generation opt-in."
   }
 
   capability configurationChanged(snapshot: ConnectionConfiguration) returns Nothing {
@@ -103,6 +119,16 @@ examples for ConnectionController {
     { id: "typescript" }, { id: "java" }, { id: "markdown", directory: "docs" }
   ]
   fixture retainedConnectionSettings: Text = "{\"formatVersion\":1,\"version\":\"1.2.3\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"sourceRoot\":\".\",\"directory\":\".\",\"configFile\":\"tsconfig.json\"}},{\"id\":\"java\",\"options\":{\"directory\":\"java\",\"package\":\"example.library\"}}],\"packages\":[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"version\":\"1.0.0\",\"phases\":[\"runtime\"]}],\"project\":{\"root\":\"./alpha\"}}"
+  fixture freshGuidanceOutputs: List<ConnectionOutputGuidance> = [
+    { id: "typescript", configured: false, suggestedDirectory: "." },
+    { id: "uml", configured: false, suggestedDirectory: "diagrams" },
+    { id: "markdown", configured: false, suggestedDirectory: "docs" }
+  ]
+  fixture retainedGuidanceOutputs: List<ConnectionOutputGuidance> = [
+    { id: "typescript", configured: true }, { id: "java", configured: true },
+    { id: "uml", configured: false, suggestedDirectory: "diagrams" },
+    { id: "markdown", configured: false, suggestedDirectory: "docs" }
+  ]
 
   setup connectionWorkspace(configuration: Text, writable: Boolean) returns Nothing
   setup missingConnectionWorkspace(writable: Boolean) returns Nothing
@@ -121,6 +147,18 @@ examples for ConnectionController {
   // Create actual authored/manual fixture files, then record their owned-tree baseline.
   action keepConnectionSource(path: Text, text: Text) returns Nothing
   action keepConnectionTargetFile(name: Text, path: Text, text: Text) returns Nothing
+  // Record the actual synchronous returned value and feedback counts around each query.
+  action inspectConnectionGuidance() returns Nothing
+  action disposeConnectionController() returns Nothing
+  observation connectionGuidanceAvailable(query: Number) returns Boolean
+  observation connectionGuidanceRequiresEntries(query: Number) returns Boolean
+  observation connectionGuidanceHasProject(query: Number) returns Boolean
+  observation connectionGuidanceOutputs(query: Number) returns List<ConnectionOutputGuidance>
+  // Compare returned file/text/writable with the owned input filename, real saved
+  // bytes or real absence, and setup write safety, never another product reply.
+  observation connectionGuidanceMatchesSavedSnapshot(query: Number) returns Boolean
+  observation connectionGuidancePublications(query: Number) returns Number
+  observation connectionGuidanceSaves(query: Number) returns Number
   observation connectionWorkProjectName() returns Text
   observation connectionSavedText() returns Text
   observation connectionSavedEntries() returns List<Text>
@@ -219,6 +257,30 @@ examples for ConnectionController {
   check expectConnectionTreesUntouched() {
     let unchanged = connectionOwnedTreesUnchanged()
     assert unchanged == true
+  }
+  check expectConnectionGuidance(query: Number, requiresEntries: Boolean, hasProject: Boolean, outputs: List<ConnectionOutputGuidance>) {
+    let available = connectionGuidanceAvailable(query)
+    assert available == true
+    let actualEntries = connectionGuidanceRequiresEntries(query)
+    let actualProject = connectionGuidanceHasProject(query)
+    let actualOutputs = connectionGuidanceOutputs(query)
+    assert actualEntries == requiresEntries
+    assert actualProject == hasProject
+    assert actualOutputs == outputs
+  }
+  check expectGuidanceSavedSnapshot(query: Number) {
+    let matches = connectionGuidanceMatchesSavedSnapshot(query)
+    assert matches == true
+  }
+  check expectGuidanceNoEffects(query: Number) {
+    let publications = connectionGuidancePublications(query)
+    let saves = connectionGuidanceSaves(query)
+    assert publications == 0
+    assert saves == 0
+  }
+  check expectGuidanceAvailability(query: Number, expected: Boolean) {
+    let available = connectionGuidanceAvailable(query)
+    assert available == expected
   }
 
   scenario "a missing configuration does not claim a connection" {
@@ -405,5 +467,42 @@ examples for ConnectionController {
     then expectSavedConnectionOutput("java", "{\"directory\":\"java\",\"package\":\"example.library\"}")
     then expectSavedConnectionSettings("1.2.3", "[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"phases\":[\"runtime\"],\"version\":\"1.0.0\"}]")
     then expectConnectionTreesUntouched()
+  }
+  scenario "guidance distinguishes missing metadata from an unsaved proposed connection" {
+    given missingConnectionWorkspace(true)
+    when keepConnectionSource("src/model.expec", "type Book {}")
+    when inspectConnection()
+    when createProjectConnection("alpha", simpleConnectionOutputs, connectionEntries)
+    when inspectConnectionGuidance()
+    then expectConnectionGuidance(1, true, false, freshGuidanceOutputs)
+    then expectGuidanceSavedSnapshot(1)
+    then expectGuidanceNoEffects(1)
+    then expectSaveRequests(1)
+    then expectUnwrittenConfiguration()
+  }
+  scenario "guidance retains configured profile order and only suggests genuinely new profiles" {
+    given connectionWorkspace(retainedConnectionSettings, true)
+    when inspectConnection()
+    when inspectConnectionGuidance()
+    then expectConnectionGuidance(1, false, true, retainedGuidanceOutputs)
+    then expectGuidanceSavedSnapshot(1)
+    then expectGuidanceNoEffects(1)
+    then expectSaveRequests(0)
+  }
+  scenario "invalid metadata and disposed selection withdraw earlier usable guidance" {
+    given connectionWorkspace(alphaConfiguration, true)
+    when inspectConnection()
+    when inspectConnectionGuidance()
+    when replaceConnectionConfiguration("{\"project\":")
+    when inspectConnectionGuidance()
+    when disposeConnectionController()
+    when inspectConnectionGuidance()
+    then expectGuidanceAvailability(1, true)
+    then expectGuidanceAvailability(2, false)
+    then expectGuidanceAvailability(3, false)
+    then expectGuidanceNoEffects(1)
+    then expectGuidanceNoEffects(2)
+    then expectGuidanceNoEffects(3)
+    then expectSaveRequests(0)
   }
 }
