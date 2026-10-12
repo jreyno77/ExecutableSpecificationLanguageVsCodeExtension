@@ -31,6 +31,8 @@ import { SourceDocument } from "../../src/core/SourceDocument.js";
 import { OutputPreviewsRecording } from './output-previews.js';
 import type { NativePreviewCase } from './vscode/native-preview.js';
 import { ConnectionConfiguration } from "../../src/core/ConnectionConfiguration.js";
+import { ConnectionOutputChoice } from "../../src/core/ConnectionOutputChoice.js";
+
 
 export class WorkspaceDriver {
   private nativeCompletionRecording!: NativeCompletionRecording;
@@ -1779,5 +1781,153 @@ async nativePreviewEntryVersionUnchanged(): Promise<boolean> {
 
 async nativePreviewHasDiagnostics(): Promise<boolean> {
     return await this.nativePreview.hasDiagnostics();
+  }
+
+async attachConnectionWorkObserver(): Promise<void> {
+    throw new Error("Not implemented: workspace.attachConnectionWorkObserver");
+  }
+
+async createProjectConnection(name: string, outputs: Array<ConnectionOutputChoice>, entries: Array<string>): Promise<void> {
+    throw new Error("Not implemented: workspace.createProjectConnection");
+  }
+
+async disconnectProjectConnection(): Promise<void> {
+    throw new Error("Not implemented: workspace.disconnectProjectConnection");
+  }
+
+async reconnectProjectConnection(): Promise<void> {
+    throw new Error("Not implemented: workspace.reconnectProjectConnection");
+  }
+
+async deleteProjectConnection(): Promise<void> {
+    throw new Error("Not implemented: workspace.deleteProjectConnection");
+  }
+
+async keepConnectionSource(path: string, text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.keepConnectionSource");
+  }
+
+async keepConnectionTargetFile(name: string, path: string, text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.keepConnectionTargetFile");
+  }
+
+async openConnectionActivityBar(): Promise<void> {
+    throw new Error("Not implemented: workspace.openConnectionActivityBar");
+  }
+
+async openSidebarConnectionMenu(): Promise<void> {
+    throw new Error("Not implemented: workspace.openSidebarConnectionMenu");
+  }
+
+async editSidebarConnection(): Promise<void> {
+    throw new Error("Not implemented: workspace.editSidebarConnection");
+  }
+
+async guideNewSidebarConnection(directory: string, outputs: Array<ConnectionOutputChoice>, entries: Array<string>): Promise<void> {
+    throw new Error("Not implemented: workspace.guideNewSidebarConnection");
+  }
+
+async cancelNewSidebarConnectionAtDestination(directory: string, outputs: Array<string>): Promise<void> {
+    throw new Error("Not implemented: workspace.cancelNewSidebarConnectionAtDestination");
+  }
+
+async disconnectSidebarConnection(): Promise<void> {
+    throw new Error("Not implemented: workspace.disconnectSidebarConnection");
+  }
+
+async reconnectSidebarConnection(): Promise<void> {
+    throw new Error("Not implemented: workspace.reconnectSidebarConnection");
+  }
+
+async deleteSidebarConnection(confirmed: boolean): Promise<void> {
+    throw new Error("Not implemented: workspace.deleteSidebarConnection");
+  }
+
+async keepSidebarSource(path: string, text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.keepSidebarSource");
+  }
+
+async keepSidebarTargetFile(directory: string, path: string, text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.keepSidebarTargetFile");
+  }
+
+async previewSidebarSource(path: string): Promise<void> {
+    throw new Error("Not implemented: workspace.previewSidebarSource");
+  }
+
+async connectionWorkProjectName(): Promise<string> {
+    throw new Error("Not implemented: workspace.connectionWorkProjectName");
+  }
+
+async connectionSavedText(): Promise<string> {
+    throw new Error("Not implemented: workspace.connectionSavedText");
+  }
+
+async connectionSavedEntries(): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.connectionSavedEntries");
+  }
+
+async connectionSavedOutputIds(): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.connectionSavedOutputIds");
+  }
+
+async connectionSavedOutputOptions(id: string): Promise<string> {
+    throw new Error("Not implemented: workspace.connectionSavedOutputOptions");
+  }
+
+async connectionSavedVersion(): Promise<string> {
+    throw new Error("Not implemented: workspace.connectionSavedVersion");
+  }
+
+async connectionSavedPackages(): Promise<string> {
+    throw new Error("Not implemented: workspace.connectionSavedPackages");
+  }
+
+async connectionOwnedTreesUnchanged(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.connectionOwnedTreesUnchanged");
+  }
+
+async sidebarActivityBarVisible(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.sidebarActivityBarVisible");
+  }
+
+async sidebarSelectedConfigurationVisible(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.sidebarSelectedConfigurationVisible");
+  }
+
+async sidebarVisibleConnectionActions(): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.sidebarVisibleConnectionActions");
+  }
+
+async sidebarEditingSelectedConfiguration(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.sidebarEditingSelectedConfiguration");
+  }
+
+async sidebarSavedEntries(): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.sidebarSavedEntries");
+  }
+
+async sidebarSavedOutputIds(): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.sidebarSavedOutputIds");
+  }
+
+async sidebarSavedOutputOptions(id: string): Promise<string> {
+    throw new Error("Not implemented: workspace.sidebarSavedOutputOptions");
+  }
+
+async sidebarSavedVersion(): Promise<string> {
+    throw new Error("Not implemented: workspace.sidebarSavedVersion");
+  }
+
+async sidebarSavedPackages(): Promise<string> {
+    throw new Error("Not implemented: workspace.sidebarSavedPackages");
+  }
+
+async sidebarOwnedTreesUnchanged(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.sidebarOwnedTreesUnchanged");
+  }
+
+async sidebarPreviewDocumentIncludes(id: string, path: string, text: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.sidebarPreviewDocumentIncludes");
   }
 }
