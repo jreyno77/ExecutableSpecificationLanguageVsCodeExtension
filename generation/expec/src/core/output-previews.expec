@@ -59,7 +59,9 @@ component OutputPreviews {
 // Strong acceptance examples assemble the real DocumentAnalysis with captured
 // in-memory DocumentSources, real OutputPreviews and actual shipped registrations.
 // Driver feedback fans each real report into previews and records actual full views.
-// Source actions reach DocumentAnalysis; selection/configuration actions reach core.
+// Source actions reach DocumentAnalysis. The same saved configuration snapshot
+// reaches OutputPreviews and DocumentAnalysis.configurationChanged, just as native
+// assembly does; each consumer independently uses the existing ConfigurationReader.
 // settleCurrentPreviews waits for the actual current feedback, not an input copy.
 // Observations locate actual returned path/media/content or parsed actual SVG labels;
 // they never parse .expec text or derive expected declarations from fixture names.
@@ -84,6 +86,7 @@ examples for OutputPreviews {
   fixture threeOutputs: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"uml\",\"options\":{\"directory\":\"draft/uml\",\"views\":[\"structure\"]}},{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\"}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}"
   fixture textOutputs: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\"}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}"
   fixture typeScriptOnly: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\"}}]}"
+  fixture runtimeMarkdown: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]}]}"
 
   setup previewAuthoring(configuration: Text) returns Nothing
   setup gatedPreviewAuthoring(configuration: Text, id: Text) returns Nothing
@@ -199,6 +202,15 @@ examples for OutputPreviews {
     then expectPreviewDocument("typescript", "draft/types/Book.ts", "text/typescript", "title: number;")
     then expectPreviewDocument("markdown", "draft/docs/Book.md", "text/markdown", "type Book")
     then expectPreviewSvgLabel("uml", "draft/uml/structure.svg", "Book")
+    then expectTargetsPreserved()
+  }
+  scenario "a supplied runtime dependency permits the actual authored Markdown preview" {
+    given previewAuthoring(runtimeMarkdown)
+    when openPreviewSource({ uri: "file:///workspace/src/view.expec", text: "component ReactView { requires package \"react\" for runtime }" }, 1)
+    when settleCurrentPreviews()
+    then expectCurrentPreviewSource("file:///workspace/src/view.expec", 1)
+    then expectPreviewStatus("markdown", "ready")
+    then expectPreviewDocument("markdown", "draft/docs/ReactView.md", "text/markdown", "component ReactView")
     then expectTargetsPreserved()
   }
 

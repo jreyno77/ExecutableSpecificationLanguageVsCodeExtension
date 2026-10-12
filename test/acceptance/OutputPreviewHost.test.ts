@@ -57,6 +57,17 @@ test("saving output configuration changes the open preview without refresh", asy
   await workspace.expectNativePreviewText("markdown", "revised/docs/Book.md", "text/markdown", "type Book");
 });
 
+/* @expec-test "5cbab2c0-5987-4856-b0f7-271a54aa52d6" */
+test("saving the selected runtime package phase clears the warning and previews the unchanged source", async ({ workspace }) => {
+  await workspace.previewEditor("component ReactView { requires package \"react\" for runtime }", workspace.testPackagePreview);
+  await workspace.showOutputPreviews();
+  await workspace.savePreviewConfiguration(workspace.runtimePackagePreview);
+  await workspace.selectPreviewOutput("markdown");
+  await workspace.selectPreviewDocument("draft/docs/ReactView.md");
+  await workspace.expectNativePreviewText("markdown", "draft/docs/ReactView.md", "text/markdown", "component ReactView");
+  await workspace.expectNativePackagePreviewRecovered("component ReactView { requires package \"react\" for runtime }");
+});
+
 /* @expec-test "1399b29f-0105-4c47-9248-b19d48744339" */
 test("read a large real diagram at normal scale and navigate its viewport", async ({ workspace }) => {
   await workspace.previewEditor(workspace.largeBookSource, workspace.configuredPreviews);

@@ -44,6 +44,8 @@ component OutputPreviewHost {
 examples for OutputPreviewHost {
   fixture configuredPreviews: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"uml\",\"options\":{\"directory\":\"draft/uml\",\"views\":[\"structure\"]}},{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\"}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}"
   fixture revisedPreviews: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"revised/docs\"}}]}"
+  fixture testPackagePreview: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"test\"]}]}"
+  fixture runtimePackagePreview: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]}]}"
   fixture largeBookSource: Text = "type Book { title: Text }\ntype Shelf1 { book: Book }\ntype Shelf2 { book: Book }\ntype Shelf3 { book: Book }\ntype Shelf4 { book: Book }\ntype Shelf5 { book: Book }\ntype Shelf6 { book: Book }\ntype Shelf7 { book: Book }\ntype Shelf8 { book: Book }\ntype Shelf9 { book: Book }\ntype Shelf10 { book: Book }\ntype Shelf11 { book: Book }\ntype Shelf12 { book: Book }\ntype Shelf13 { book: Book }\ntype Shelf14 { book: Book }\ntype Shelf15 { book: Book }\ntype Shelf16 { book: Book }\ntype Shelf17 { book: Book }\ntype Shelf18 { book: Book }\ntype Shelf19 { book: Book }\ntype Shelf20 { book: Book }"
 
   setup previewEditor(initialText: Text, configuration: Text) returns Nothing
@@ -78,6 +80,13 @@ examples for OutputPreviewHost {
   observation nativePreviewOpenText() returns Text
   observation nativePreviewSourceDirty() returns Boolean
   observation nativePreviewFilesUnchanged() returns Boolean
+  // Record the real panel status before the saved configuration write, and await
+  // an actual newer native analysis resultId at the unchanged source version.
+  observation nativePreviewBeforeConfigurationStatus() returns Text
+  observation nativePreviewEntryVersionUnchanged() returns Boolean
+  // Read the complete actual VS Code diagnostics for this owned current entry;
+  // true means any diagnostic exists, after the newer native resultId settles.
+  observation nativePreviewHasDiagnostics() returns Boolean
 
   check expectNativePreviewOutputs(ids: List<Text>) {
     let actual = nativePreviewOutputIds()
@@ -146,6 +155,20 @@ examples for OutputPreviewHost {
     let actual = nativePreviewZoomHistory()
     assert actual == history
   }
+  check expectNativePackagePreviewRecovered(source: Text) {
+    let previous = nativePreviewBeforeConfigurationStatus()
+    let unchangedVersion = nativePreviewEntryVersionUnchanged()
+    let hasDiagnostics = nativePreviewHasDiagnostics()
+    let saved = nativePreviewSavedText()
+    let open = nativePreviewOpenText()
+    let dirty = nativePreviewSourceDirty()
+    assert previous == "blocked"
+    assert unchangedVersion == true
+    assert hasDiagnostics == false
+    assert saved == source
+    assert open == source
+    assert dirty == false
+  }
 
   scenario "read actual configured outputs from an unsaved edit without writing generated files" {
     given previewEditor("type Book { title: Text }", configuredPreviews)
@@ -193,6 +216,15 @@ examples for OutputPreviewHost {
     then expectNativePreviewPriorOutputs(["uml", "typescript", "markdown"])
     then expectNativePreviewOutputs(["markdown"])
     then expectNativePreviewText("markdown", "revised/docs/Book.md", "text/markdown", "type Book")
+  }
+  scenario "saving the selected runtime package phase clears the warning and previews the unchanged source" {
+    given previewEditor("component ReactView { requires package \"react\" for runtime }", testPackagePreview)
+    when showOutputPreviews()
+    when savePreviewConfiguration(runtimePackagePreview)
+    when selectPreviewOutput("markdown")
+    when selectPreviewDocument("draft/docs/ReactView.md")
+    then expectNativePreviewText("markdown", "draft/docs/ReactView.md", "text/markdown", "component ReactView")
+    then expectNativePackagePreviewRecovered("component ReactView { requires package \"react\" for runtime }")
   }
   scenario "read a large real diagram at normal scale and navigate its viewport" {
     given previewEditor(largeBookSource, configuredPreviews)

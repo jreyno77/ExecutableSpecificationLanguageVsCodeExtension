@@ -3,6 +3,8 @@ import { expectData, comparisonEqual, finiteNumber } from "./comparison.js";
 import { WorkspaceDriver } from "../driver/workspace.js";
 import { SourceDocument } from "../../src/core/SourceDocument.js";
 import { OutputTab } from "../../src/core/OutputTab.js";
+import { ConnectionConfiguration } from "../../src/core/ConnectionConfiguration.js";
+
 export class Workspace {
   constructor(private readonly driver: WorkspaceDriver) {}
   readonly document: SourceDocument = { ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book { title: Text }" };
@@ -2634,4 +2636,71 @@ async expectNoConvertedTypeItems(request: number): Promise<void> {
     const count = await this.driver.convertedTypeCount(request);
     expectData(count, 0);
   }
+
+async changeSemanticConfiguration(configuration: ConnectionConfiguration): Promise<void> {
+    return await this.driver.changeSemanticConfiguration(configuration);
+  }
+
+async clearSemanticConfiguration(): Promise<void> {
+    return await this.driver.clearSemanticConfiguration();
+  }
+
+async semanticProblemAtPublication(uri: string, publication: number): Promise<string> {
+    return await this.driver.semanticProblemAtPublication(uri, publication);
+  }
+
+async checkedAtPublication(uri: string, publication: number): Promise<boolean> {
+    return await this.driver.checkedAtPublication(uri, publication);
+  }
+
+async nativePreviewBeforeConfigurationStatus(): Promise<string> {
+    return await this.driver.nativePreviewBeforeConfigurationStatus();
+  }
+
+async nativePreviewEntryVersionUnchanged(): Promise<boolean> {
+    return await this.driver.nativePreviewEntryVersionUnchanged();
+  }
+
+async nativePreviewHasDiagnostics(): Promise<boolean> {
+    return await this.driver.nativePreviewHasDiagnostics();
+  }
+
+async expectEarlierPackageProblem(uri: string, publication: number): Promise<void> {
+    const code = await this.driver.semanticProblemAtPublication(uri, publication);
+    const checked = await this.driver.checkedAtPublication(uri, publication);
+    expectData(code, "unavailable-package");
+    expectData(checked, false);
+  }
+
+async expectEarlierCheckedPackageSource(uri: string, publication: number): Promise<void> {
+    const checked = await this.driver.checkedAtPublication(uri, publication);
+    expectData(checked, true);
+  }
+
+async expectNativePackagePreviewRecovered(source: string): Promise<void> {
+    const previous = await this.driver.nativePreviewBeforeConfigurationStatus();
+    const unchangedVersion = await this.driver.nativePreviewEntryVersionUnchanged();
+    const hasDiagnostics = await this.driver.nativePreviewHasDiagnostics();
+    const saved = await this.driver.nativePreviewSavedText();
+    const open = await this.driver.nativePreviewOpenText();
+    const dirty = await this.driver.nativePreviewSourceDirty();
+    expectData(previous, "blocked");
+    expectData(unchangedVersion, true);
+    expectData(hasDiagnostics, false);
+    expectData(saved, source);
+    expectData(open, source);
+    expectData(dirty, false);
+  }
+
+readonly packageView: SourceDocument = { ["uri"]: "file:///workspace/src/view.expec", ["text"]: "component ReactView { requires package \"react\" for runtime }" };
+
+readonly runtimePackages: ConnectionConfiguration = { ["file"]: "C:/workspace/expec.json", ["text"]: "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]}]}", ["writable"]: true };
+
+readonly testPackages: ConnectionConfiguration = { ["file"]: "C:/workspace/expec.json", ["text"]: "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"test\"]}]}", ["writable"]: true };
+
+readonly runtimeMarkdown: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]}]}";
+
+readonly testPackagePreview: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"test\"]}]}";
+
+readonly runtimePackagePreview: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]}]}";
 }
