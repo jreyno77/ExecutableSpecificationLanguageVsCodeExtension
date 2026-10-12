@@ -1,4 +1,5 @@
 use SourceDocument from "./workspace.expec"
+use ConnectionConfiguration from "./project-connection.expec"
 
 // The language's existing SyntaxDiagnostic: category, explanation, primaryRange
 // and relatedRanges. Locations count Unicode scalars; no VS Code/LSP types live here.
@@ -48,7 +49,12 @@ component DocumentAnalysis {
   requires package "vitest" for test
 
   construction(feedback: DocumentFeedback, sources: DocumentSources)
-  public opened, changed, closed, sourceChanged
+  public opened, changed, closed, sourceChanged, configurationChanged
+
+  capability configurationChanged(configuration: ConnectionConfiguration?) returns Nothing {
+    promises "Receive the current selected saved configuration snapshot or absence. Validate its supplied text through the public ConfigurationReader with shipped output profiles, then capture only validated Configuration.packages aliases and phases as the existing SourceComposer's DependencyPackage inputs. Missing text, invalid configuration, switching manifests or withdrawing selection replaces the prior catalog; never retain old supplied packages after an invalid or absent snapshot. Do not use writable as package availability or read unsaved configuration buffers; ConnectionSidebar supplies its actual saved-text policy. These are supplied compiler configuration facts, not proof of package installation, native exports, external declaration models, runtime behavior or generation readiness. Keep genuinely unsupplied aliases and missing phases as the language's actual findings. Do not infer packages from imports, folder names, node_modules or another project."
+    promises "A changed catalog invalidates current open analyses and republishes their exact retained unsaved sources at unchanged editor versions through the same SourceComposer, Compiler and Inspection/Resolution publication. Reuse unchanged parsed sources and saved dependency snapshots. Retain the validated catalog for ordinary source edits rather than revalidating configuration per edit. Preserve current document lifetimes and guard reentrant source/configuration/feedback changes so older work cannot publish with an obsolete catalog. Validation or publication exceptions surface; they are not empty success. Existing configuration consumers retain actual validation explanations. This operation never acquires project/package code, scans, installs, generates, saves or writes; it does not require connected-target verification."
+  }
 
   capability opened(source: SourceDocument, version: Number) returns Nothing {
     promises "Start an open document lifetime from this exact supplied snapshot. Use one retained LangiumReader and Compiler; compose accepted source models through the existing SourceComposer. Resolve authored source locators relative to their owner URI and obtain only required source snapshots through DocumentSources. Absolute URIs remain usable; a relative locator without a hierarchical owner, including untitled, remains an unavailable-module finding without guessing a workspace or throwing a URL-base error. Open unsaved text overrides saved text. Cache parsing by exact text, including rejected text; never reuse a previous accepted model after invalid edits. Publish real syntax and compiler findings without generating, installing packages or requiring a project connection. No runtime package facts are invented; unavailable prerequisites remain explicit. Treat URIs as identity. Reject invalid noninteger or negative versions with RangeError before changing state."
@@ -235,6 +241,38 @@ examples for DocumentAnalysis {
     text: "type Magazine { title: Text }"
   }
 
+  fixture packageView: SourceDocument = {
+    uri: "file:///workspace/src/view.expec",
+    text: "component ReactView { requires package \"react\" for runtime }"
+  }
+  fixture runtimePackages: ConnectionConfiguration = {
+    file: "C:/workspace/expec.json",
+    text: "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]}]}",
+    writable: true
+  }
+  fixture testPackages: ConnectionConfiguration = {
+    file: "C:/workspace/expec.json",
+    text: "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"test\"]}]}",
+    writable: true
+  }
+
+  // Forward real saved snapshots to this same analysis. Historical observations
+  // read actual recorded Compilation reports, never recompute package policy.
+  action changeSemanticConfiguration(configuration: ConnectionConfiguration) returns Nothing
+  action clearSemanticConfiguration() returns Nothing
+  observation semanticProblemAtPublication(uri: Text, publication: Number) returns Text
+  observation checkedAtPublication(uri: Text, publication: Number) returns Boolean
+  check expectEarlierPackageProblem(uri: Text, publication: Number) {
+    let code = semanticProblemAtPublication(uri, publication)
+    let checked = checkedAtPublication(uri, publication)
+    assert code == "unavailable-package"
+    assert checked == false
+  }
+  check expectEarlierCheckedPackageSource(uri: Text, publication: Number) {
+    let checked = checkedAtPublication(uri, publication)
+    assert checked == true
+  }
+
   check expectSemanticProblem(uri: Text, code: Text, line: Number, column: Number, endColumn: Number) {
     let actualCode = semanticProblemCode(uri)
     let count = semanticProblemCount(uri)
@@ -361,5 +399,45 @@ examples for DocumentAnalysis {
     given semanticAnalysis()
     when openSemanticSource({ uri: "untitled:Draft", text: "component Store { requires package \"storage\" for runtime }" }, 1)
     then expectSemanticProblem("untitled:Draft", "unavailable-package", 1, 36, 45)
+  }
+  scenario "a supplied saved runtime alias permits authored checking without proving installation" {
+    given semanticAnalysis()
+    when changeSemanticConfiguration(runtimePackages)
+    when openSemanticSource(packageView, 1)
+    when changeSemanticSource({ uri: packageView.uri, text: "component ReactScreen { requires package \"react\" for runtime }" }, 2)
+    then expectCheckedSource(packageView.uri)
+    then expectSemanticPublications(packageView.uri, 2, 2)
+  }
+  scenario "a configured test alias does not satisfy a runtime requirement" {
+    given semanticAnalysis()
+    when changeSemanticConfiguration(testPackages)
+    when openSemanticSource(packageView, 1)
+    then expectSemanticProblem(packageView.uri, "unavailable-package", 1, 40, 47)
+  }
+  scenario "saving supplied package facts rechecks an open document without editing its version" {
+    given semanticAnalysis()
+    when openSemanticSource(packageView, 3)
+    when changeSemanticConfiguration(runtimePackages)
+    then expectEarlierPackageProblem(packageView.uri, 1)
+    then expectCheckedSource(packageView.uri)
+    then expectSemanticPublications(packageView.uri, 2, 3)
+  }
+  scenario "switched invalid and absent saved configurations cannot reuse the previous package catalog" {
+    given semanticAnalysis()
+    when changeSemanticConfiguration(runtimePackages)
+    when openSemanticSource(packageView, 5)
+    when changeSemanticConfiguration({ file: "C:/workspace/another.json", text: "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[]}", writable: true })
+    when changeSemanticConfiguration(runtimePackages)
+    when changeSemanticConfiguration({ file: runtimePackages.file, text: "{", writable: true })
+    when changeSemanticConfiguration(runtimePackages)
+    when clearSemanticConfiguration()
+    then expectEarlierCheckedPackageSource(packageView.uri, 1)
+    then expectEarlierPackageProblem(packageView.uri, 2)
+    then expectEarlierCheckedPackageSource(packageView.uri, 3)
+    then expectEarlierPackageProblem(packageView.uri, 4)
+    then expectEarlierCheckedPackageSource(packageView.uri, 5)
+    then expectEarlierPackageProblem(packageView.uri, 6)
+    then expectSemanticProblem(packageView.uri, "unavailable-package", 1, 40, 47)
+    then expectSemanticPublications(packageView.uri, 6, 5)
   }
 }

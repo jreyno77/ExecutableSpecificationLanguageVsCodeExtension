@@ -20,7 +20,8 @@ export type DiagnosticObservation = {
 export type DiagnosticMiddlewareObservation = { cancellationError: boolean; nextCalls: number; runtime: { node: string; vscode: string } };
 
 export type SidebarObservation = { readonly status: string; readonly project: string; readonly explanation: string; readonly saved?: string; readonly unsaved?: string };
-export type PreviewEditorObservation = { readonly uri: string; readonly version: number; readonly text: string; readonly dirty: boolean; readonly savedText: string };
+export type PreviewEditorObservation = { readonly uri: string; readonly version: number; readonly text: string; readonly dirty: boolean; readonly savedText: string;
+  readonly resultId: string; readonly diagnosticCount: number };
 
 export type GenerationEditorObservation = {
   uri: string; version: number; text: string; dirty: boolean; savedText: string; configurationFile: string;
@@ -187,7 +188,9 @@ export class VsCodeSession {
     const value = await this.request(operation, values);
     if (!value || typeof value !== 'object' || !('uri' in value) || typeof value.uri !== 'string' || !('version' in value) || !Number.isInteger(value.version)
       || !('text' in value) || typeof value.text !== 'string' || !('dirty' in value) || typeof value.dirty !== 'boolean'
-      || !('savedText' in value) || typeof value.savedText !== 'string') throw new Error('The native host returned an invalid preview editor observation.');
+      || !('savedText' in value) || typeof value.savedText !== 'string'
+      || !('resultId' in value) || typeof value.resultId !== 'string' || value.resultId === ''
+      || !('diagnosticCount' in value) || !Number.isInteger(value.diagnosticCount) || Number(value.diagnosticCount) < 0) throw new Error('The native host returned an invalid preview editor observation.');
     return value as PreviewEditorObservation;
   }
 

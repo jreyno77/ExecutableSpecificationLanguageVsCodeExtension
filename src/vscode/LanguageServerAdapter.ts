@@ -83,6 +83,8 @@ export class LanguageServerAdapter {
     private canRefresh = false;
     private warnedWatchSupport = false;
     private reportSequence = 0;
+    private configurationRevision = 0;
+    private readonly publicationTokens = new Map<string, object>();
     private started = false;
     private disposed = false;
     constructor(connection: Connection, sources: DocumentSources) {
@@ -97,12 +99,23 @@ export class LanguageServerAdapter {
      * Register native LSP initialization and document events once, using TextDocuments to reconstruct incremental text. Feed actual open/change/close snapshots and versions to core DocumentAnalysis. Opening must check exactly once despite TextDocuments also emitting a content-change event. Core owns checking and version/lifetime policy; this adapter owns protocol registration and translation. Register standard LSP document diagnostic pull with inter-file dependencies and no workspace diagnostic enumeration, and negotiate UTF-16 positions. Register standard LSP watched-file notifications for requested dependency URIs, including currently missing files, using native relative-pattern registration. Core chooses relevant invalidation; forward creation/change/deletion to sourceChanged. Reconcile capture-to-watch gaps by rechecking after each newly established registration. Retain registrations only for dependency URIs requested by current open entries, and dispose them when unneeded or on shutdown. Unsupported native watch capabilities remain an observable limitation rather than a promised live update. Do not scan or compile in the adapter. Register native preview selection/configuration notifications and forward them to one core OutputPreviews instance using its default shipped registrations. Its feedback emits only plain PreviewPublication values through the native channel. Do not construct another reader/compiler or inspect output models. Advertise definitionProvider and register standard textDocument/definition once. Obtain the current TextDocuments snapshot, then delegate coordinate conversion and the query to SourceDefinitionAdapter with one core SourceNavigation. Missing/cancelled/currently unavailable documents return no location. The adapter never chooses targets or rechecks source. Advertise hoverProvider and register standard textDocument/hover once. Obtain the current TextDocuments snapshot and delegate to SourceHoverAdapter using one core SourceHover; missing, cancelled or unavailable snapshots return absence. Hover uses the same existing analysis publications as diagnostics and navigation, without another reader/compiler.
      * Advertise documentSymbolProvider and register standard textDocument/documentSymbol once. Use the existing current TextDocuments snapshot and delegate to one SourceOutlineAdapter with one core DocumentOutline. Missing, cancelled, disposed or currently unavailable documents have no outline. Preserve one shared DocumentAnalysis and its current source/version/lifetime; no extra analysis, declaration walk or project connection is created for this request.
      * Advertise completionProvider without trigger characters or resolve support and register standard textDocument/completion once. Use the actual current TextDocuments entry and delegate to one SourceCompletionAdapter with one core SourceCompletion. Cancelled, missing or disposed requests return an empty list. Reuse the same existing DocumentAnalysis publication; do not parse, resolve, acquire, generate or construct a second analysis for completion.
+     * Capture each existing saved preview-configuration notification's exact file/text/writable scalars or absence and advance an owned latest-notification identity. Forward that captured snapshot first to the same OutputPreviews.configurationChanged to invalidate old preview work and prepare selection/options, then to the same DocumentAnalysis.configurationChanged so its new reports drive that configuration. Recheck the notification identity and adapter lifetime between forwards: a synchronous newer notification or disposal from preview feedback prevents the older snapshot from restoring package facts. Preserve currentness after reentrant analysis/feedback as well. Keep selection withdrawal and saved-text behavior; native callback exceptions remain observable. Never validate JSON in this adapter or wait for a connected target before supplying authored package facts. Configuration changes refresh current semantic reports at unchanged editor versions through the one existing analysis; no second reader/compiler, native package inspection, installation, project capture, file scan or new report identity field is introduced.
      */
     start(): void {
         if (this.started || this.disposed) return;
         this.started = true;
         this.subscriptions.push(
-            this.connection.onNotification(previewChannel.configuration, (value: { configuration?: ConnectionConfiguration }) => { if (!this.disposed) this.previews.configurationChanged(value.configuration); }),
+            this.connection.onNotification(previewChannel.configuration, (value: { configuration?: ConnectionConfiguration }) => {
+                if (this.disposed) return;
+                const revision = ++this.configurationRevision;
+                const configuration = value.configuration;
+                const snapshot = configuration === undefined ? undefined : Object.freeze({
+                    file: configuration.file, ...(configuration.text === undefined ? {} : { text: configuration.text }),
+                    writable: configuration.writable,
+                });
+                this.previews.configurationChanged(snapshot);
+                if (!this.disposed && this.configurationRevision === revision) this.analysis.configurationChanged(snapshot);
+            }),
             this.connection.onNotification(previewChannel.selection, (value: { uri?: string }) => { if (!this.disposed) this.previews.selected(value.uri); }),
             this.connection.onInitialize(({ capabilities }) => {
                 const watches = capabilities.workspace?.didChangeWatchedFiles;
@@ -163,11 +176,14 @@ export class LanguageServerAdapter {
      */
     publish(source: SourceDocument, version: number, report: DocumentReport): void {
         if (this.disposed) return;
+        const token = {};
+        this.publicationTokens.set(source.uri, token);
         this.navigation.published(source, version, report);
         this.hover.published(source, version, report);
         this.outline.published(source, version, report);
         this.completion.published(source, version, report);
         this.previews.published(source, version, report);
+        if (this.disposed || this.publicationTokens.get(source.uri) !== token) return;
         const snapshots = new Map(report.sources.map(snapshot => [snapshot.uri, snapshot]));
         snapshots.set(source.uri, source);
         const positions = new Map<string, { document: TextDocument; offsets: number[] }>();
@@ -236,6 +252,7 @@ export class LanguageServerAdapter {
      * End this same SourceCompletion lifetime through closed(uri); later completion requests cannot use its earlier facts.
      */
     clear(uri: string): void {
+        this.publicationTokens.delete(uri);
         this.navigation.closed(uri);
         this.hover.closed(uri);
         this.outline.closed(uri);
@@ -265,6 +282,7 @@ export class LanguageServerAdapter {
         release(() => this.previews.dispose());
         for (const uri of this.documents.keys()) release(() => this.analysis.closed(uri));
         this.reports.clear();
+        this.publicationTokens.clear();
         for (const watch of this.watches.values()) release(() => watch.registration?.dispose());
         this.watches.clear();
         this.unsupportedWatches.clear();

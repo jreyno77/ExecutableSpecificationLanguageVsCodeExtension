@@ -22,6 +22,9 @@ export class NativePreviewCase {
   private readonly visited = new Map<string, RenderedPreview>();
   private beforeEdit = '';
   private beforeConfiguration: string[] = [];
+  private beforeConfigurationState = '';
+  private configurationSourceVersion: number | undefined;
+  private configurationResultId: string | undefined;
   private closedText = '';
   private readonly zooms: number[] = [];
   private overflowObserved = false;
@@ -62,7 +65,12 @@ export class NativePreviewCase {
     if (this.frame && !this.frame.isDetached()) await this.settled();
   }
   async saveConfiguration(text: string): Promise<void> {
-    this.beforeConfiguration = (await this.settled()).ids;
+    const previous = await this.settled();
+    this.beforeConfiguration = previous.ids;
+    this.beforeConfigurationState = previous.status;
+    const analysis = await this.nativeObservation();
+    this.configurationSourceVersion = analysis.version;
+    this.configurationResultId = analysis.resultId;
     this.visited.clear();
     this.editor = await this.session!.savePreviewConfiguration(this.id, text);
     // Output observations wait on the actual new product DOM; no local parsing predicts the tabs.
@@ -126,6 +134,11 @@ export class NativePreviewCase {
   observedStatus(id: string, path: string): string { return this.observed(id, path).status; }
   beforeEditStatus(): string { return this.beforeEdit; }
   beforeConfigurationIds(): string[] { return [...this.beforeConfiguration]; }
+  beforeConfigurationStatus(): string { return this.beforeConfigurationState; }
+  async entryVersionUnchanged(): Promise<boolean> {
+    return (await this.configurationAnalysis()).version === this.configurationSourceVersion;
+  }
+  async hasDiagnostics(): Promise<boolean> { return (await this.configurationAnalysis()).diagnosticCount > 0; }
   closedTextIncludes(text: string): boolean { return this.closedText.includes(text); }
   zoomHistory(): number[] { return [...this.zooms]; }
   async documentCount(): Promise<number> { return (await this.settled()).paths.length; }
@@ -144,6 +157,18 @@ export class NativePreviewCase {
     const value = this.visited.get(key(id, path));
     if (!value || value.uri !== this.editor?.uri || value.version !== this.editor.version) throw new Error('No current actually visited preview document: ' + id + '/' + path);
     return value;
+  }
+  private async configurationAnalysis(): Promise<PreviewEditorObservation> {
+    const previousId = this.configurationResultId, version = this.configurationSourceVersion;
+    if (previousId === undefined || version === undefined) throw new Error('No actual saved preview configuration transition was recorded.');
+    const deadline = Date.now() + 30_000;
+    while (true) {
+      const actual = await this.nativeObservation();
+      if (actual.version !== version) throw new Error('The preview source version changed while observing saved package recovery.');
+      if (actual.resultId !== previousId) return actual;
+      if (Date.now() >= deadline) throw new Error('The actual native analysis identity did not advance after the saved package configuration.');
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
   }
   private async nativeObservation(): Promise<PreviewEditorObservation> {
     await this.open(); return this.editor = await this.session!.observePreviewEditor(this.id);
