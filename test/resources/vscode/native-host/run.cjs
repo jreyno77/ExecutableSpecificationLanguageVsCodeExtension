@@ -218,7 +218,7 @@ if (require.main === module) {
       await fs.writeFile(request.receiptPath, JSON.stringify({ executable }));
     } else if (request.command === 'session') {
       const { spawn } = require('node:child_process');
-      const child = spawn(request.executable, [...profile, request.workspaceDirectory, '--new-window',
+      const child = spawn(request.executable, [...profile, request.workspaceDirectory, '--new-window', '--no-sandbox',
         '--extensionDevelopmentPath=' + __dirname, '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust',
         '--disable-gpu', '--disable-telemetry', '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0'],
         { env: { ...process.env, EXPEC_NATIVE_REQUEST: requestPath }, windowsHide: true, stdio: 'inherit' });

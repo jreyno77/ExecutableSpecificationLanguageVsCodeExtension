@@ -65,6 +65,7 @@ exports.openConnectionSidebar = async function openConnectionSidebar(vscode, ext
   }
   async function manage(action) {
     if (disposed) throw new Error('The owned native sidebar case is disposed.');
+    const previous = await observation(), before = revision;
     if (action.kind === 'activityBar') await vscode.commands.executeCommand('workbench.view.extension.expec');
     else if (action.kind === 'editConnection') await vscode.commands.executeCommand('expec.editConnection');
     else if (action.kind === 'newConnection') {
@@ -89,7 +90,12 @@ exports.openConnectionSidebar = async function openConnectionSidebar(vscode, ext
       await vscode.commands.executeCommand('expec.showOutputPreviews');
       await until(() => { capturePanels(); return [...panels].some(tab => tab.isActive); }, 'The actual owned preview panel did not open.');
     } else throw new Error('Unsupported native sidebar management action.');
-    return observation();
+    const current = await observation();
+    if (current.saved !== previous.saved) {
+      await settled(before);
+      return observation();
+    }
+    return current;
   }
   async function changeFile(uri, operation, relevant) {
     const before = revision, afterEvent = events.length;

@@ -7,7 +7,11 @@ import { NativeCleanupError, ownTemporaryDirectory, removeOwnedDirectory } from 
 import { ConnectionSidebarCase } from '../../driver/vscode/connection-sidebar.js';
 
 const { openConnectionSidebar } = createRequire(import.meta.url)('../../resources/vscode/native-host/connection-sidebar.cjs') as {
-  openConnectionSidebar(vscode: unknown, id: string, setup: unknown): Promise<{ observation(): Promise<{ project: string; saved?: string }>; dispose(): Promise<void> }>;
+  openConnectionSidebar(vscode: unknown, id: string, setup: unknown): Promise<{
+    observation(): Promise<{ status: string; project: string; saved?: string }>;
+    manage(action: { kind: string }): Promise<{ status: string; project: string; saved?: string; unsaved?: string; explanation: string }>;
+    dispose(): Promise<void>;
+  }>;
 };
 const shop = '{"project":{"root":"shop"}}', library = '{"project":{"root":"library"}}';
 const owned: Array<{ directory: string; sidebar: { dispose(): Promise<void> } }> = [];
@@ -20,13 +24,16 @@ function gate() {
 
 // This records only native provider/event mechanics. Real file bytes are read;
 // connection policy is exercised separately through the real installed product.
-async function sidebarHost(failWatcherDisposal = false) {
+async function sidebarHost(failWatcherDisposal = false, deleteOutcome?: 'changed' | 'cancelled' | 'refused' | 'error') {
   const directory = await ownTemporaryDirectory('expec-sidebar-observation-');
   const file = join(directory, 'expec.json'), resetFile = join(directory, 'reset.json');
   await writeFile(file, shop);
   const released: string[] = []; let failCleanup = false, failResetRead = false;
   const subscriptions = new Set<() => void>(), fileSubscriptions = new Set<(uri: { fsPath: string; toString(): string }) => void>();
-  let child = { configurationFile: file, project: 'shop' }, itemGate: ReturnType<typeof gate> | undefined, readGate: ReturnType<typeof gate> | undefined;
+  type RecordedRow = { configurationFile: string; project: string; status?: string; explanation?: string };
+  let child: RecordedRow = { configurationFile: file, project: 'shop' }, itemGate: ReturnType<typeof gate> | undefined, readGate: ReturnType<typeof gate> | undefined;
+  let awaitingDeletedRead = false, publishedDeletion!: () => void;
+  const deletionPublication = new Promise<void>(resolve => { publishedDeletion = resolve; });
   const publish = () => { for (const receive of subscriptions) receive(); };
   const provider = {
     start(filename: string) { child = { configurationFile: filename, project: filename === file ? 'shop' : '' }; publish(); queueMicrotask(publish); },
@@ -34,7 +41,9 @@ async function sidebarHost(failWatcherDisposal = false) {
     async getTreeItem(captured: typeof child) {
       const held = itemGate; itemGate = undefined;
       if (held) { held.enter(); await held.wait; }
-      return { contextValue: captured.project ? 'connected' : 'unconfigured', description: captured.project ? join(directory, captured.project) : undefined, tooltip: 'Observed native row.' };
+      return { contextValue: captured.status ?? (captured.project ? 'connected' : 'unconfigured'),
+        description: captured.project ? join(directory, captured.project) : undefined,
+        tooltip: captured.explanation ?? 'Observed native row.' };
     },
     onDidChangeTreeData(receive: () => void) { subscriptions.add(receive); return { dispose: () => { released.push('tree'); subscriptions.delete(receive); } }; },
   };
@@ -43,12 +52,28 @@ async function sidebarHost(failWatcherDisposal = false) {
   const vscode = {
     extensions: { getExtension: () => ({ activate: async () => ({ connectionTreeProvider: provider }) }) },
     Uri: { file: uri }, RelativePattern: class { constructor(readonly base: unknown, readonly pattern: string) {} },
+    commands: { async executeCommand(name: string) {
+      if (name !== 'expec.deleteConnection' || !deleteOutcome) throw new Error('Unexpected recorded native command.');
+      if (deleteOutcome === 'cancelled' || deleteOutcome === 'refused') return;
+      await writeFile(file, '{"outputs":[]}');
+      awaitingDeletedRead = true;
+    } },
     window: { tabGroups: { all: [] } },
-    workspace: { textDocuments: [], createFileSystemWatcher: () => ({ onDidCreate: watched('create'), onDidChange: watched('change'), onDidDelete: watched('delete'), dispose() { released.push('watcher'); if (failCleanup) throw new Error('Native watcher cleanup failed.'); } }),
+    workspace: { textDocuments: deleteOutcome === 'refused' ? [{ uri: uri(file), isDirty: true, getText: () => '{"project":{"root":"unsaved"}}' }] : [],
+      createFileSystemWatcher: () => ({ onDidCreate: watched('create'), onDidChange: watched('change'), onDidDelete: watched('delete'), dispose() { released.push('watcher'); if (failCleanup) throw new Error('Native watcher cleanup failed.'); } }),
       fs: {
         async readFile(resource: ReturnType<typeof uri>) {
           const held = resource.fsPath === file ? readGate : undefined; if (held) { readGate = undefined; held.enter(); await held.wait; }
-          return readFile(resource.fsPath);
+          const bytes = await readFile(resource.fsPath);
+          if (resource.fsPath === file && awaitingDeletedRead) {
+            awaitingDeletedRead = false;
+            setImmediate(() => {
+              child = { configurationFile: file, project: '', ...(deleteOutcome === 'error'
+                ? { status: 'unavailable', explanation: 'Native manifest confirmation failed.' } : {}) };
+              publish(); publishedDeletion();
+            });
+          }
+          return bytes;
         },
         async writeFile(resource: ReturnType<typeof uri>, bytes: Uint8Array) {
           await writeFile(resource.fsPath, bytes); for (const receive of fileSubscriptions) receive(resource);
@@ -60,12 +85,46 @@ async function sidebarHost(failWatcherDisposal = false) {
   owned.push({ directory, sidebar });
   released.length = 0;
   return { sidebar, released, failCleanup: () => { failCleanup = failWatcherDisposal; }, failResetRead: () => { failResetRead = true; },
+    deletionPublication,
     holdItem: () => itemGate = gate(), holdSavedRead: () => readGate = gate(),
     async replaceSaved() { await writeFile(file, library); child = { configurationFile: file, project: 'library' }; publish(); },
   };
 }
 
 describe('current installed sidebar observations', () => {
+  it('waits for the native publication after actual deletion bytes instead of returning the previous connected row', async () => {
+    const host = await sidebarHost(false, 'changed');
+    try {
+      const actual = await host.sidebar.manage({ kind: 'delete' });
+      expect(actual.saved).toBe('{"outputs":[]}');
+      expect(actual.status).toBe('unconfigured');
+      expect(actual.project).toBe('');
+    } finally { await host.deletionPublication; }
+  });
+
+  it('returns the actual published error after changed bytes rather than waiting for a successful state', async () => {
+    const host = await sidebarHost(false, 'error');
+    try {
+      const actual = await host.sidebar.manage({ kind: 'delete' });
+      expect(actual.saved).toBe('{"outputs":[]}');
+      expect(actual.status).toBe('unavailable');
+      expect(actual.explanation).toBe('Native manifest confirmation failed.');
+    } finally { await host.deletionPublication; }
+  });
+
+  it('returns the real unchanged row and saved bytes when the native command is cancelled', async () => {
+    const host = await sidebarHost(false, 'cancelled');
+    const actual = await host.sidebar.manage({ kind: 'delete' });
+    expect(actual).toMatchObject({ status: 'connected', project: 'shop', saved: shop });
+  });
+
+  it('retains real saved and dirty buffer facts when the native command refuses a dirty configuration', async () => {
+    const host = await sidebarHost(false, 'refused');
+    const actual = await host.sidebar.manage({ kind: 'delete' });
+    expect(actual).toMatchObject({ status: 'connected', project: 'shop', saved: shop,
+      unsaved: '{"project":{"root":"unsaved"}}' });
+  });
+
   it('retries a stale native TreeItem instead of pairing it with newer saved bytes', async () => {
     const host = await sidebarHost(), held = host.holdItem();
     const observation = host.sidebar.observation();
