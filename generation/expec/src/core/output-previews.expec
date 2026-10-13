@@ -11,13 +11,14 @@ type PreviewPublication {
   uri: Text?
   version: Number?
   tabs: List<OutputTab>
+  blocked: Boolean?
   `message`: Text?
 }
 
 interface PreviewFeedback {
   public present
   capability present(publication: PreviewPublication) returns Nothing {
-    promises "Present this complete plain-data view in order. URI/version identify its authored source for the title and observations. Tabs have unique configured IDs, labels, status, ordered UTF-8 documents and any actual explanation. Whole-view message explains absent/invalid configuration or selection. This accepted view is authoritative; host/UI adapters do not compare report revisions or implement another freshness policy. Keep the latest complete accepted presentation for native ready replay. No model, Specification, native buffer, function or Error crosses transport."
+    promises "Present this complete plain-data view in order. URI/version identify its authored source for the title and observations. Tabs have unique configured IDs, labels, status, ordered UTF-8 documents and any actual explanation. Whole-view message explains absent/invalid configuration or selection. Optional blocked is true only for an actual rejected configuration; it gives the UI a truthful whole-view blocked presentation while all old tabs/documents remain withdrawn. Absence of tabs or a general message is not proof of failure. This accepted view is authoritative; host/UI adapters do not compare report revisions or implement another freshness policy. Keep the latest complete accepted presentation for native ready replay. No model, Specification, native buffer, function or Error crosses transport."
   }
 }
 
@@ -38,7 +39,7 @@ component OutputPreviews {
   public configurationChanged, selected, published, closed, dispose
 
   capability configurationChanged(configuration: ConnectionConfiguration?) returns Nothing {
-    promises "Capture this current saved manifest or absence and advance private currentness before further work. Prepare the real Outputs registry and ConfigurationReader from supplied registrations, or shipped built-ins when absent. An explicit list replaces built-ins. Validate through ConfigurationReader without discovering files. Missing/invalid configuration withdraws old tabs with its actual explanation. Preserve configured output IDs/order/options; duplicate IDs remain a configuration error. Changed options replace queued requests. Valid outputs may preview without a project or with an unavailable target; target availability is not authored-preview readiness. Use this absolute native manifest filename as OutputContext.manifestLocation. Do not install, capture targets, rewrite configuration or request generation."
+    promises "Capture this current saved manifest or absence and advance private currentness before further work. Prepare the real Outputs registry and ConfigurationReader from supplied registrations, or shipped built-ins when absent. An explicit list replaces built-ins. Validate through ConfigurationReader without discovering files. Missing/invalid configuration withdraws old tabs with its actual explanation. An actual rejected ConfigurationReader result also publishes whole-view blocked true; selection absence, waiting and an empty configured output set do not invent that failure marker. Preserve configured output IDs/order/options; duplicate IDs remain a configuration error. Changed options replace queued requests. Valid outputs may preview without a project or with an unavailable target; target availability is not authored-preview readiness. Use this absolute native manifest filename as OutputContext.manifestLocation. Do not install, capture targets, rewrite configuration or request generation."
   }
   capability selected(uri: Text?) returns Nothing {
     promises "Select the exact authored document URI or absence, advancing private currentness. Retain current reports for open documents so switching selections requires no recompile. A selected document without a current report has a visible waiting explanation. A preview panel taking focus is not a new authored selection. Selection replaces queued requests and cannot let a previous document's completion restore old content."
