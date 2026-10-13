@@ -33,6 +33,10 @@ import type { SourceOutlineAdapter } from "./SourceOutlineAdapter.js";
 import type { SourceCompletion } from "../core/SourceCompletion.js";
 
 import type { SourceCompletionAdapter } from "./SourceCompletionAdapter.js";
+import type { SourceReferences } from "../core/SourceReferences.js";
+
+import type { SourceReferenceAdapter } from "./SourceReferenceAdapter.js";
+
 
 
 
@@ -59,6 +63,8 @@ import type { SourceCompletionAdapter } from "./SourceCompletionAdapter.js";
  * Depends on: SourceOutlineAdapter
  * Depends on: SourceCompletion
  * Depends on: SourceCompletionAdapter
+ * Depends on: SourceReferences
+ * Depends on: SourceReferenceAdapter
  */
 export class LanguageServerAdapter {
     private readonly connection: Connection;
@@ -101,6 +107,7 @@ export class LanguageServerAdapter {
      * Advertise documentSymbolProvider and register standard textDocument/documentSymbol once. Use the existing current TextDocuments snapshot and delegate to one SourceOutlineAdapter with one core DocumentOutline. Missing, cancelled, disposed or currently unavailable documents have no outline. Preserve one shared DocumentAnalysis and its current source/version/lifetime; no extra analysis, declaration walk or project connection is created for this request.
      * Advertise completionProvider without trigger characters or resolve support and register standard textDocument/completion once. Use the actual current TextDocuments entry and delegate to one SourceCompletionAdapter with one core SourceCompletion. Cancelled, missing or disposed requests return an empty list. Reuse the same existing DocumentAnalysis publication; do not parse, resolve, acquire, generate or construct a second analysis for completion.
      * Capture each existing saved preview-configuration notification's exact file/text/writable scalars or absence and advance an owned latest-notification identity. Forward that captured snapshot first to the same OutputPreviews.configurationChanged to invalidate old preview work and prepare selection/options, then to the same DocumentAnalysis.configurationChanged so its new reports drive that configuration. Recheck the notification identity and adapter lifetime between forwards: a synchronous newer notification or disposal from preview feedback prevents the older snapshot from restoring package facts. Preserve currentness after reentrant analysis/feedback as well. Keep selection withdrawal and saved-text behavior; native callback exceptions remain observable. Never validate JSON in this adapter or wait for a connected target before supplying authored package facts. Configuration changes refresh current semantic reports at unchanged editor versions through the one existing analysis; no second reader/compiler, native package inspection, installation, project capture, file scan or new report identity field is introduced.
+     * Advertise referencesProvider and register standard textDocument/references once. Use the current TextDocuments snapshot and delegate to one SourceReferenceAdapter with one core SourceReferences, preserving context.includeDeclaration. Missing, cancelled, disposed or currently unavailable documents return no locations. A successful presentation returns only its standard Location list through LSP. Keep its captured coverage as a point-in-time snapshot with this request lifetime, exact native analysis resultId and URI/version. Through standard connection.window.showInformationMessage display 'Reference search covers captured sources only; workspace importers were not scanned.' with a 'Show coverage' action, without delaying the Location response until a user chooses. When that choice settles, recheck the same document lifetime/version, analysis resultId, request cancellation, disposal and latest search before presenting a second standard information message listing the actual coveredUris and prerequisite entries. Entry version alone cannot identify a replacement import report; stale/superseded choices do nothing. Keep native request failures observable. No custom coverage protocol, QuickPick API, Inspection, NodeId or compiler model crosses transport. This search covers only the requester and reachable captured imports/includes, never reverse workspace importers or an undiscovered workspace.
      */
     start(): void {
         if (this.started || this.disposed) return;
@@ -180,6 +187,7 @@ export class LanguageServerAdapter {
      * Retain real syntax and compiler errors whose primary source URI matches this document in its current native pull cache. Foreign primary findings remain in the raw Compilation and output log; an open imported document receives its own entry analysis. Never attach a foreign primary range to the requesting document. Convert each scalar range with the captured text for that range's exact URI, including cross-file related information. Preserve messages and codes. Keep nonlocated problems and deferred requirements observable in the language-client output log without inventing editor positions. Replace old feedback, including an empty full report when findings clear. Give each accepted publication an opaque analysis resultId; editor version alone cannot identify changed imports. Request the SDK diagnostic refresh after dependent feedback changes. Never reparse, generate or make semantic decisions here. Forward this same captured source/version/report to core OutputPreviews before reducing it to native diagnostic data; preserve ordinary diagnostic publication and dependency-watch behavior. Forward this same current source/version/report to one core SourceNavigation before native conversion. Forward this same current source/version/report to one core SourceHover before native conversion, including same-version replacement reports after imported edits. No Inspection or Specification crosses the protocol boundary.
      * Forward the same current captured source/version/report to DocumentOutline before answering native symbol requests. A replacement or rejected report replaces its earlier tree even at the same editor version; transport only plain native symbols, never Inspection or a compiler model.
      * Forward this same current captured source/version/report to SourceCompletion before native conversion, including same-version replacement after imported edits and rejected reports that withdraw old completion facts. Transport only plain native CompletionItems; Inspection and Resolution stay within core.
+     * Forward this same current captured source/version/report to SourceReferences before native reference conversion, including same-version dependency replacements and rejected reports. Do not create another reader, resolver, compiler, file scan or reference model.
      */
     publish(source: SourceDocument, version: number, report: DocumentReport): void {
         if (this.disposed) return;
@@ -280,6 +288,7 @@ export class LanguageServerAdapter {
      * Remove the closed document from the pull-response cache. Native document diagnostic pull owns editor close cleanup; never resurrect a cached response from an earlier lifetime. Forward this closed URI to core OutputPreviews so pending work and selected content from the closed lifetime are withdrawn. End the same core SourceNavigation and SourceHover report lifetimes through closed(uri).
      * End this same DocumentOutline lifetime through closed(uri); later requests cannot use the closed document's tree.
      * End this same SourceCompletion lifetime through closed(uri); later completion requests cannot use its earlier facts.
+     * End this same SourceReferences lifetime through closed(uri) and invalidate later coverage actions from that closed lifetime. A visible summary is a historical snapshot, not a claim of current coverage.
      */
     clear(uri: string): void {
         this.publicationTokens.delete(uri);
@@ -296,6 +305,7 @@ export class LanguageServerAdapter {
      * Remove owned subscriptions, end tracked document lifetimes and prevent further diagnostic publication. Repeated disposal is harmless. Leave connection/process shutdown to the native server entry point. Dispose core OutputPreviews, invalidating pending output work; started renderer callbacks retain their own asynchronous cleanup obligation. Dispose SourceNavigation and its retained reports; later definition requests cannot use old targets. Dispose SourceHover; later hover requests cannot retain earlier meaning.
      * Release the owned document-symbol registration once and dispose DocumentOutline. Later callbacks cannot publish or return a retained tree.
      * Release the owned completion registration once and dispose SourceCompletion. Later callbacks cannot publish or return retained suggestions.
+     * Release the owned reference registration and invalidate owned asynchronous coverage choices once, dispose SourceReferences and prevent later callbacks from returning old matches or presenting retained coverage.
      */
     dispose(): void {
         if (this.disposed) return;
