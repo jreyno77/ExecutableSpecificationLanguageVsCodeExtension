@@ -74,13 +74,32 @@ export class ConnectionSidebarCase {
   }
   disconnect(): Promise<void> { return this.manage({ kind: 'disconnect' }); }
   reconnect(): Promise<void> { return this.manage({ kind: 'reconnect' }); }
-  deleteConnection(confirmed: boolean): Promise<void> {
-    return this.dialogCommand({ kind: 'delete' }, async page => {
-      const dialog = page.getByRole('dialog').filter({ hasText: 'Delete the project connection from ' + join(this.directory!, 'expec.json') });
-      if (!await dialog.isVisible()) return false;
-      await dialog.getByRole('button', { name: confirmed ? 'Delete Connection' : 'Cancel', exact: true }).click({ timeout: 10_000 });
-      return true;
-    });
+  async deleteConnection(confirmed: boolean): Promise<void> {
+    const before = this.actual; let clicked = false;
+    try {
+      await this.dialogCommand({ kind: 'delete' }, async page => {
+        const dialog = page.getByRole('dialog').filter({ hasText: 'Delete the project connection from ' + join(this.directory!, 'expec.json') });
+        if (!await dialog.isVisible()) return false;
+        await dialog.getByRole('button', { name: confirmed ? 'Delete Connection' : 'Cancel', exact: true }).click({ timeout: 10_000 });
+        clicked = true;
+        return true;
+      });
+    } finally {
+      if (confirmed && this.actual?.status !== 'unconfigured') {
+        try {
+          const after = this.actual as (SidebarObservation & { nativeDelete?: unknown }) | undefined;
+          console.error('Actual installed Delete Connection observation failed: ' + JSON.stringify({
+            expectedFile: join(this.directory!, 'expec.json'), clicked,
+            nativeDelete: after?.nativeDelete,
+            beforeStatus: before?.status, status: after?.status, explanation: after?.explanation?.slice(0, 1500),
+            savedChanged: before && after ? before.saved !== after.saved : null,
+            savedBefore: before?.saved?.slice(0, 3000), saved: after?.saved?.slice(0, 3000),
+            dirty: after ? after.unsaved !== undefined : null, unsaved: after?.unsaved?.slice(0, 1000), activeFile: after?.activeFile,
+            ui: await this.sidebarFacts(await this.workbench()),
+          }).slice(0, 12_000));
+        } catch (error) { try { console.error('Delete Connection diagnostics unavailable: ' + String(error).slice(0, 300)); } catch {} }
+      }
+    }
   }
   async keepSource(path: string, text: string): Promise<void> {
     if (!path.endsWith('.expec')) throw new Error('Keep an actual authored .expec source.');
@@ -171,21 +190,49 @@ export class ConnectionSidebarCase {
   }
   async selectedConfigurationVisible(): Promise<boolean> {
     const page = await this.workbench(), view = page.locator('[id="workbench.view.extension.expec"]'), file = join(this.directory!, 'expec.json');
-    if (!await view.isVisible() || !(await view.innerText()).includes(basename(file))) return false;
+    const failed = async (branch: string, facts: Record<string, unknown>) => {
+      try {
+        console.error('Actual selected configuration visibility failed: ' + JSON.stringify({
+          branch, expectedFile: file, ...facts, ui: await this.sidebarFacts(page),
+        }).slice(0, 12_000));
+      } catch (error) { try { console.error('Selected configuration diagnostics unavailable: ' + String(error).slice(0, 300)); } catch {} }
+      return false;
+    };
+    if (!await view.isVisible()) return failed('view-absent', {});
+    const initialText = await view.innerText();
+    if (!initialText.includes(basename(file))) return failed('manifest-name-absent', { initialText: initialText.slice(0, 1500) });
     const row = view.getByRole('treeitem').filter({ hasText: basename(file) }).first();
     const bounds = await row.boundingBox();
-    if (!bounds) return false;
+    if (!bounds) return failed('row-bounds-absent', { initialText: initialText.slice(0, 1500), bounds });
     // A dismissed native hover stays suppressed while its pointer remains on the row.
-    await page.mouse.move(bounds.x + bounds.width + 1, bounds.y + bounds.height + 1);
+    const exitedPointer = { x: bounds.x + bounds.width + 1, y: bounds.y + bounds.height + 1 };
+    await page.mouse.move(exitedPointer.x, exitedPointer.y);
     await row.hover();
     const deadline = Date.now() + 3_000;
+    let visible = initialText, hover: string[] = [], polls = 0;
     while (Date.now() < deadline) {
-      const visible = await view.innerText();
-      const hover = await page.locator('.monaco-hover:visible').allTextContents();
+      visible = await view.innerText();
+      hover = await page.locator('.monaco-hover:visible').allTextContents(); polls++;
       if ([visible, ...hover].some(text => text.includes(file))) return true;
       await new Promise(resolve => setTimeout(resolve, 20));
     }
-    return false;
+    return failed('hover-deadline', { initialText: initialText.slice(0, 1500), visible: visible.slice(0, 1500),
+      hover: hover.slice(0, 4).map(text => text.slice(0, 1500)), bounds, exitedPointer, polls });
+  }
+  private async sidebarFacts(page: Page): Promise<unknown> {
+    try {
+      return await page.evaluate(() => {
+        const bounds = (node: Element) => { const box = node.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width, height: box.height }; };
+        const view = document.querySelector('[id="workbench.view.extension.expec"]');
+        return { url: location.href.slice(0, 1000), title: document.title.slice(0, 300), focus: document.hasFocus(),
+          activeElement: document.activeElement?.outerHTML.slice(0, 600), viewport: { width: innerWidth, height: innerHeight, pixelRatio: devicePixelRatio },
+          view: view ? { text: view.textContent?.slice(0, 1500), bounds: bounds(view) } : null,
+          hovers: [...document.querySelectorAll('.monaco-hover')].slice(0, 4).map(node => ({ text: node.textContent?.slice(0, 1500), bounds: bounds(node) })),
+          dialogs: [...document.querySelectorAll('[role="dialog"]')].slice(0, 4).map(node => ({ text: node.textContent?.slice(0, 1500), bounds: bounds(node) })),
+          notifications: [...document.querySelectorAll('.notification-list-item')].slice(0, 4).map(node => ({ text: node.textContent?.slice(0, 1000), bounds: bounds(node) })),
+        };
+      });
+    } catch (error) { return { unavailable: String(error).slice(0, 300) }; }
   }
   visibleConnectionActions(): string[] {
     if (!this.menuActions) throw new Error('Open the actual connection context menu before observing its actions.');

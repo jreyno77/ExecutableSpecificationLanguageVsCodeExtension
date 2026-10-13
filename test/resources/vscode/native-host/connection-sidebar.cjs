@@ -3,7 +3,8 @@ const { preparedWorkspaceWatch } = require('./diagnostic-document.cjs');
 
 // Native observations use the installed, registered provider and real host events.
 exports.openConnectionSidebar = async function openConnectionSidebar(vscode, extensionId, setup) {
-  const client = await vscode.extensions.getExtension(extensionId)?.activate();
+  const extension = vscode.extensions.getExtension(extensionId);
+  const client = await extension?.activate();
   const provider = client?.connectionTreeProvider;
   if (!provider || typeof provider.start !== 'function' || typeof provider.getChildren !== 'function'
     || typeof provider.getTreeItem !== 'function' || typeof provider.onDidChangeTreeData !== 'function') {
@@ -66,6 +67,8 @@ exports.openConnectionSidebar = async function openConnectionSidebar(vscode, ext
   async function manage(action) {
     if (disposed) throw new Error('The owned native sidebar case is disposed.');
     const previous = await observation(), before = revision;
+    let deletion;
+    const diagnosed = actual => deletion ? { ...actual, nativeDelete: { ...deletion, observedRevision: revision, savedChanged: actual.saved !== previous.saved } } : actual;
     if (action.kind === 'activityBar') await vscode.commands.executeCommand('workbench.view.extension.expec');
     else if (action.kind === 'editConnection') await vscode.commands.executeCommand('expec.editConnection');
     else if (action.kind === 'newConnection') {
@@ -73,7 +76,15 @@ exports.openConnectionSidebar = async function openConnectionSidebar(vscode, ext
     } else if (action.kind === 'disconnect') await vscode.commands.executeCommand('expec.disconnectConnection');
     else if (action.kind === 'reconnect') await vscode.commands.executeCommand('expec.reconnectConnection');
     else if (action.kind === 'delete') {
-      await vscode.commands.executeCommand('expec.deleteConnection');
+      deletion = { beforeRevision: before, startedAt: Date.now() };
+      try {
+        const appName = vscode.env?.appName, mode = extension?.extensionMode;
+        if (typeof appName === 'string') deletion.appName = appName.slice(0, 300);
+        if (typeof mode === 'number') deletion.extensionMode = mode;
+      }
+      catch (error) { deletion.hostFactsUnavailable = String(error).slice(0, 300); }
+      try { await vscode.commands.executeCommand('expec.deleteConnection'); }
+      finally { deletion.completedRevision = revision; deletion.completedAt = Date.now(); }
     } else if (action.kind === 'previewSource') {
       const uri = ownedSource(action.source), initialTabs = new Set(vscode.window.tabGroups.all.flatMap(group => group.tabs));
       const capturePanels = () => {
@@ -93,9 +104,9 @@ exports.openConnectionSidebar = async function openConnectionSidebar(vscode, ext
     const current = await observation();
     if (current.saved !== previous.saved) {
       await settled(before);
-      return observation();
+      return diagnosed(await observation());
     }
-    return current;
+    return diagnosed(current);
   }
   async function changeFile(uri, operation, relevant) {
     const before = revision, afterEvent = events.length;
