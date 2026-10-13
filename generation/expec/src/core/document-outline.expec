@@ -19,8 +19,6 @@ type SourceOutline {
 
 component DocumentOutline {
   requires package "expec" for runtime
-  requires package "typescript" for build
-  requires package "vitest" for test
 
   construction()
   public published, closed, symbols, dispose

@@ -24,7 +24,7 @@ export class DocumentOutlineRecording {
       this.outlines.published(source, version, report);
     },
     clear: uri => { this.reports.delete(uri); this.outlines.closed(uri); },
-  }, { read: uri => { this.acquisitions++; return this.saved.get(uri); } });
+  }, { localPath: () => undefined, read: uri => { this.acquisitions++; return this.saved.get(uri); } });
 
   static create(): DocumentOutlineRecording {
     const recording = new DocumentOutlineRecording();

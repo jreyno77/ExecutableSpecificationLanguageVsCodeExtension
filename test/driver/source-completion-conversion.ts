@@ -11,7 +11,7 @@ export class SourceCompletionConversion {
   private readonly analysis = new DocumentAnalysis({
     publish: (source, version, report) => this.completion.published(source, version, report),
     clear: uri => this.completion.closed(uri),
-  }, { read: () => undefined });
+  }, { localPath: () => undefined, read: () => undefined });
   private readonly document: TextDocument;
   private readonly adapter: SourceCompletionAdapter;
   private readonly replies: Array<readonly CompletionItem[]> = [];

@@ -11,9 +11,6 @@ import type { CompletionItem } from "vscode-languageserver";
  * Unverified implementation obligation.
  * Requires package: language-server (runtime)
  * Requires package: language-server-document (runtime)
- * Requires package: typescript (build)
- * Requires package: vitest (test)
- * Requires package: vscode-test-electron (test)
  * Depends on: SourceCompletion
  */
 export class SourceCompletionAdapter {

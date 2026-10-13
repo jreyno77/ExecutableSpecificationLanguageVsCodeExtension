@@ -1,3 +1,4 @@
+import { FileScopes } from './file-scopes.js';
 import { NativeCompletionRecording } from './vscode/native-completion.js';
 import { SourceCompletionRecording } from './source-completion.js';
 import { SourceCompletionConversion } from './source-completion-conversion.js';
@@ -37,6 +38,7 @@ import { ConnectionOutputGuidance } from "../../src/core/ConnectionOutputGuidanc
 
 
 export class WorkspaceDriver {
+  private scopeFiles!: FileScopes;
   private nativeCompletionRecording!: NativeCompletionRecording;
   private sourceCompletionRecording!: SourceCompletionRecording;
   private completionConversionRecording!: SourceCompletionConversion;
@@ -1970,5 +1972,124 @@ async connectionGuidancePublications(query: number): Promise<number> {
 
 async connectionGuidanceSaves(query: number): Promise<number> {
     return await this.connectionRecording.guidanceSaves(query);
+  }
+
+async scopedSourceComparison(configuration: ConnectionConfiguration, sourcePath: string, text: string): Promise<void> {
+    this.scopeFiles = await FileScopes.comparison(configuration, sourcePath, text);
+  }
+
+async scopeFileDirectory(): Promise<void> {
+    this.scopeFiles = await FileScopes.open();
+  }
+
+async semanticSourcePath(uri: string, path: string): Promise<void> {
+    this.analysisRecording.sourcePath(uri, path);
+  }
+
+async tryMutatingSemanticRequirements(uri: string, publication: number): Promise<void> {
+    const rows = this.analysisRecording.atPublication(uri, publication).report.requirements;
+    if (!rows?.length) throw new Error('No actual requirements were published.');
+    const before = JSON.stringify(rows);
+    try { rows.splice(0); } catch (error) { if (!(error instanceof TypeError)) throw error; }
+    try { (rows[0]!.at as unknown as { path: unknown[] }).path.splice(0); } catch (error) { if (!(error instanceof TypeError)) throw error; }
+    if (JSON.stringify(rows) !== before) throw new Error('Caller mutation changed published requirements.');
+  }
+
+async compareCapturedAndLiveScopes(): Promise<void> {
+    await this.scopeFiles.compare();
+  }
+
+async previewSourcePath(uri: string, path: string): Promise<void> {
+    this.previewRecording.sourcePath(uri, path);
+  }
+
+async keepScopeSource(path: string, text: string): Promise<void> {
+    await this.scopeFiles.keepSource(path, text);
+  }
+
+async keepScopeFolder(path: string): Promise<void> {
+    await this.scopeFiles.keepFolder(path);
+  }
+
+async keepEscapingScopeLink(linkPath: string, outsidePath: string, text: string): Promise<void> {
+    await this.scopeFiles.keepEscapingLink(linkPath, outsidePath, text);
+  }
+
+async queryScopePath(path: string): Promise<void> {
+    await this.scopeFiles.query(path);
+  }
+
+async saveScopedPreviewConfiguration(configuration: string): Promise<void> {
+    await this.nativePreview.saveScopedConfiguration(configuration);
+  }
+
+async observeVisibleScopeWarning(): Promise<void> {
+    await this.nativePreview.observeScopeWarning();
+  }
+
+async semanticRequirementAliases(uri: string, publication: number, phase: string): Promise<Array<string>> {
+    const rows = this.analysisRecording.atPublication(uri, publication).report.requirements;
+    if (!rows) throw new Error('No requirement list was published.');
+    return rows.filter(row => row.sourceId === uri && row.phase === phase).map(row => row.alias);
+  }
+
+async semanticDependencyProblemCode(uri: string, publication: number): Promise<string> {
+    const problem = this.analysisRecording.atPublication(uri, publication).report.dependencyProblems?.[0];
+    if (!problem) throw new Error('No actual dependency problem was published.'); return problem.code;
+  }
+
+async semanticDependencyProblemPath(uri: string, publication: number): Promise<string> {
+    const problem = this.analysisRecording.atPublication(uri, publication).report.dependencyProblems?.[0];
+    if (!problem || problem.at.kind !== 'dependency') throw new Error('No actual dependency path was published.');
+    return JSON.stringify(problem.at.path);
+  }
+
+async semanticDependencyProblemCount(uri: string, publication: number): Promise<number> {
+    const problems = this.analysisRecording.atPublication(uri, publication).report.dependencyProblems;
+    if (!problems) throw new Error('No dependency problem list was published.'); return problems.length;
+  }
+
+async capturedAndLiveRequirementsAgree(): Promise<boolean> {
+    return this.scopeFiles.requirementsAgree();
+  }
+
+async capturedScopeAliases(phase: string): Promise<Array<string>> {
+    return this.scopeFiles.capturedAliases(phase);
+  }
+
+async liveScopeAliases(phase: string): Promise<Array<string>> {
+    return this.scopeFiles.liveAliases(phase);
+  }
+
+async scopedComparisonFilesUnchanged(): Promise<boolean> {
+    return this.scopeFiles.filesUnchanged();
+  }
+
+async previewBeforeScopeStatus(id: string): Promise<string> {
+    return this.previewRecording.earlier(id).status;
+  }
+
+async queriedScopePath(): Promise<string | undefined> {
+    return this.scopeFiles.queriedPath();
+  }
+
+async queriedScopePathAvailable(): Promise<boolean> {
+    return this.scopeFiles.available();
+  }
+
+async queriedScopeFileExists(): Promise<boolean> {
+    return this.scopeFiles.queriedFileExists();
+  }
+
+async scopeQueryFilesUnchanged(): Promise<boolean> {
+    return this.scopeFiles.filesUnchanged();
+  }
+
+async nativeScopeWarningIncludes(text: string): Promise<boolean> {
+    return this.nativePreview.scopeWarningIncludes(text);
+  }
+
+async nativeScopeWarningMatches(code: string, path: string): Promise<boolean> {
+    return this.nativePreview.scopeWarningMatches(code, path);
   }
 }

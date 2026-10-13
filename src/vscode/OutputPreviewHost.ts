@@ -15,12 +15,6 @@ import type { PreviewPublication } from "../core/PreviewPublication.js";
 /**
  * Unverified implementation obligation.
  * Requires package: language-client (runtime)
- * Requires package: vscode-types (build)
- * Requires package: node-types (build)
- * Requires package: typescript (build)
- * Requires package: vite (build)
- * Requires package: vscode-test-electron (test)
- * Requires package: playwright (test)
  * Depends on: OutputTabs
  */
 export class OutputPreviewHost {

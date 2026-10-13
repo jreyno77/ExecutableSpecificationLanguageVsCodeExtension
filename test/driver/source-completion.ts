@@ -27,7 +27,7 @@ export class SourceCompletionRecording {
       this.completion.published(source, version, report);
     },
     clear: uri => this.completion.closed(uri),
-  }, { read: uri => { this.acquisitions++; return this.saved.get(uri); } });
+  }, { localPath: () => undefined, read: uri => { this.acquisitions++; return this.saved.get(uri); } });
 
   static create(): SourceCompletionRecording {
     const recording = new SourceCompletionRecording();

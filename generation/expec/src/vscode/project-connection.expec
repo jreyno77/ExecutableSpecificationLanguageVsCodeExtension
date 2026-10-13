@@ -5,10 +5,7 @@ use VsCodeExtensionContext from "./live-diagnostics.expec"
 // Caller assembly selects one explicit local configuration filename. The sidebar
 // never discovers configurations or invents a successful connection from a path.
 component ConnectionSidebar {
-  requires package "vscode-types" for build
-  requires package "node-types" for build
   requires package "expec" for runtime
-  requires package "vscode-test-electron" for test
   depends on ConnectionController
 
   construction(context: VsCodeExtensionContext, previews: PreviewConfigurationFeedback)

@@ -5,11 +5,6 @@ use VsCodeExtensionContext from "./live-diagnostics.expec"
 // The coordinator runs beside this native adapter; only plain child IPC values
 // cross processes. Live diagnostics/previews retain their established LSP flow.
 component GenerationHost {
-  requires package "vscode-types" for build
-  requires package "node-types" for build
-  requires package "typescript" for build
-  requires package "vite" for build
-  requires package "vscode-test-electron" for test
   depends on GenerationOnSave
 
   construction(context: VsCodeExtensionContext, worker: GenerationWorker)

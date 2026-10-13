@@ -13,6 +13,9 @@ opaque type SourceInspection
 // The exact public SDK Resolution supplied to Compiler and this same Inspection.
 // Keep this core evidence opaque; no native transport exposes its model.
 opaque type SourceResolution
+// Existing public SDK facts, including their manifest/source-mapping origins.
+opaque type ScopedPackageRequirement
+opaque type DependencyDiagnostic
 
 type DocumentReport {
   syntax: List<SyntaxProblem>
@@ -21,12 +24,17 @@ type DocumentReport {
   resolution: SourceResolution?
   sources: List<SourceDocument>
   dependencies: List<Text>
+  requirements: List<ScopedPackageRequirement>?
+  dependencyProblems: List<DependencyDiagnostic>?
 }
 
 interface DocumentSources {
-  public read
+  public read, localPath
   capability read(uri: Text) returns SourceDocument? {
     promises "Return the current saved text with this exact URI, or absence when unavailable. Do not discover projects, install dependencies or substitute empty text. Unexpected acquisition errors surface. Core overrides this saved snapshot with an open document's unsaved text."
+  }
+  capability localPath(uri: Text, manifestFile: Text) returns Text? {
+    promises "Return the verified portable source path relative to this selected manifest's directory, using the exact supplied source URI and native root/file ancestry facts. A named unsaved file under verified existing ancestors can have a path without reading or creating its contents. A foreign route, unsupported URI, unavailable root or route escaping the verified root has no local path; never strip a URI prefix or guess ownership from declarations, folders, generated destinations or build.sourceRoots. A nested source root cannot shorten the primary manifest-relative path. Core supplies its exact captured sourceId separately. Unexpected provider errors surface. This query does not scan, install, capture a connected project or write."
   }
 }
 
@@ -34,6 +42,7 @@ interface DocumentFeedback {
   public publish, clear
 
   capability publish(source: SourceDocument, version: Number, report: DocumentReport) returns Nothing {
+    promises "Every DocumentAnalysis publication includes detached immutable requirements and dependencyProblems lists prepared through the public requirementsFor and ConfigurationReader. Keep the compiler Compilation unchanged; configuration and source-ownership findings retain their actual dependency origins separately. Output-profile findings unknown-output and invalid-output-options with their actual manifest outputs origins belong to the consumer's actual output registry and are excluded from dependencyProblems; no validated package catalog or scope rows are recovered from that rejected configuration. Empty lists mean no effective scoped obligations or findings, not proof of installation. The additive optional report fields support older supplied-report consumers; this analysis always supplies both. Caller mutation cannot change an earlier or current report."
     promises "Publish the report for this exact immutable snapshot and version. Preserve actual reader diagnostics and the complete compiler result, including nonlocated problems and deferred requirements. Compilation is absent for rejected entry syntax. Inspection is absent for rejected entry syntax; otherwise it is a public QueryInspection over the same SourceComposer Resolution.model passed to Compiler, captured once without another resolution pass. It preserves bound, invalid and deferred reference facts even when Compilation has problems or no Specification. Never retain an older Inspection after rejection. Sources are the captured texts used for located findings; dependencies are exact source URIs requested, including unavailable imports. An empty diagnostic result replaces previous problems; absence of problems alone does not establish compilation success."
     promises "Retain that exact immutable SourceComposer Resolution in this report, captured once and passed to Compiler and the same QueryInspection before publication. Resolution is absent for rejected entry syntax; never retain an earlier accepted resolution after rejection. Current independently bound facts remain usable despite unrelated compiler problems or absent Specification. Completion consumes this same core evidence without another resolution pass; no Resolution or model crosses the native protocol boundary."
   }
@@ -45,8 +54,6 @@ interface DocumentFeedback {
 
 component DocumentAnalysis {
   requires package "expec" for runtime
-  requires package "typescript" for build
-  requires package "vitest" for test
 
   construction(feedback: DocumentFeedback, sources: DocumentSources)
   public opened, changed, closed, sourceChanged, configurationChanged
@@ -54,6 +61,7 @@ component DocumentAnalysis {
   capability configurationChanged(configuration: ConnectionConfiguration?) returns Nothing {
     promises "Receive the current selected saved configuration snapshot or absence. Validate its supplied text through the public ConfigurationReader with shipped output profiles, then capture only validated Configuration.packages aliases and phases as the existing SourceComposer's DependencyPackage inputs. Missing text, invalid configuration, switching manifests or withdrawing selection replaces the prior catalog; never retain old supplied packages after an invalid or absent snapshot. Do not use writable as package availability or read unsaved configuration buffers; ConnectionSidebar supplies its actual saved-text policy. These are supplied compiler configuration facts, not proof of package installation, native exports, external declaration models, runtime behavior or generation readiness. Keep genuinely unsupplied aliases and missing phases as the language's actual findings. Do not infer packages from imports, folder names, node_modules or another project."
     promises "A changed catalog invalidates current open analyses and republishes their exact retained unsaved sources at unchanged editor versions through the same SourceComposer, Compiler and Inspection/Resolution publication. Reuse unchanged parsed sources and saved dependency snapshots. Retain the validated catalog for ordinary source edits rather than revalidating configuration per edit. Preserve current document lifetimes and guard reentrant source/configuration/feedback changes so older work cannot publish with an obsolete catalog. Validation or publication exceptions surface; they are not empty success. Existing configuration consumers retain actual validation explanations. This operation never acquires project/package code, scans, installs, generates, saves or writes; it does not require connected-target verification."
+    promises "Retain the validated requirements metadata with the same catalog, and include the selected manifest filename and effective scope metadata in configuration currentness even when aliases/phases are unchanged. Prepare requirementsFor over the actual captured workspace source identities and provider-supplied local paths; no resolver, synthetic model or implicit runtime imports are added. Project obligations apply to supplied workspace sources even when a foreign or untitled source has no local path; folder/exact-file obligations require verified local paths. Do not treat acquired external declaration models as workspace sources. Invalid or absent configuration withdraws earlier rows/catalog and publishes the actual configuration findings; failed scope preparation publishes no old rows. A relevant saved scope change rechecks retained unsaved text at the same editor version. Cache source ownership between text edits; invalidate it after a selected configuration change or relevant source-route notification, guard reentrant provider/feedback callbacks, and never run SourceLoader or connected native capture on each keystroke."
   }
 
   capability opened(source: SourceDocument, version: Number) returns Nothing {
@@ -69,6 +77,7 @@ component DocumentAnalysis {
   }
   capability sourceChanged(uri: Text) returns Nothing {
     promises "Invalidate a requested saved source after creation, change or deletion and recheck affected open entries even when their editor version is unchanged. Ignore unrelated URIs and saved changes hidden by an authoritative open snapshot. Reuse unchanged parsed snapshots and read only the invalidated source plus newly required imports. Track missing imports too, and terminate cyclic import acquisition. Preserve other documents and previous reports; do not let reentrant older work replace current feedback."
+    promises "When folder/file scopes are in use, a relevant file-route notification also invalidates the cached local-path fact, including for authoritative open unsaved text. Recheck the same retained snapshot if its effective scope ownership changed; do not replace that text with saved bytes. Include actually queried ownership URIs in dependencies so the existing native watch boundary can invalidate them. Unrelated notifications cannot trigger a scan or reset another document's facts."
   }
 }
 
@@ -440,4 +449,176 @@ examples for DocumentAnalysis {
     then expectSemanticProblem(packageView.uri, "unavailable-package", 1, 40, 47)
     then expectSemanticPublications(packageView.uri, 6, 5)
   }
+
+  // These are real DocumentAnalysis reports and requirementsFor results. The
+  // recording source provider supplies independently authored ownership facts;
+  // it never classifies scope results or derives expectations from the manifest.
+  fixture scopedView: SourceDocument = {
+    uri: "file:///workspace/src/ui/view.expec",
+    text: "component ReactView { requires package \"react\" for runtime }"
+  }
+  fixture scopedTools: ConnectionConfiguration = {
+    file: "C:/workspace/expec.json",
+    text: "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/ui/view.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/ui\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"src/ui/view.expec\",\"test\":[\"playwright\"]}]}}",
+    writable: true
+  }
+
+  fixture movedFolderTools: ConnectionConfiguration = {
+    file: "C:/workspace/expec.json",
+    text: "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/ui/view.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/core\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"src/ui/view.expec\",\"test\":[\"playwright\"]}]}}",
+    writable: true
+  }
+
+  fixture unknownScopedAlias: ConnectionConfiguration = {
+    file: "C:/workspace/expec.json",
+    text: "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/ui/view.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/ui\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"unreached/view.expec\",\"test\":[\"storage\"]}]}}",
+    writable: true
+  }
+
+  fixture wrongScopedPhase: ConnectionConfiguration = {
+    file: "C:/workspace/expec.json",
+    text: "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/ui/view.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/ui\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"unreached/view.expec\",\"test\":[\"react\"]}]}}",
+    writable: true
+  }
+
+  action semanticSourcePath(uri: Text, path: Text) returns Nothing
+  action tryMutatingSemanticRequirements(uri: Text, publication: Number) returns Nothing
+  observation semanticRequirementAliases(uri: Text, publication: Number, phase: Text) returns List<Text>
+  observation semanticDependencyProblemCode(uri: Text, publication: Number) returns Text
+  observation semanticDependencyProblemPath(uri: Text, publication: Number) returns Text
+  observation semanticDependencyProblemCount(uri: Text, publication: Number) returns Number
+  // The comparison owns a tiny actual manifest/source, uses SourceLoader and the
+  // native FileSources ownership query, then feeds that same unsaved source to
+  // live analysis. It compares actual rows/origins and does not install anything.
+  setup scopedSourceComparison(configuration: ConnectionConfiguration, sourcePath: Text, text: Text) returns Nothing
+  action compareCapturedAndLiveScopes() returns Nothing
+  observation capturedAndLiveRequirementsAgree() returns Boolean
+  observation capturedScopeAliases(phase: Text) returns List<Text>
+  observation liveScopeAliases(phase: Text) returns List<Text>
+  observation scopedComparisonFilesUnchanged() returns Boolean
+
+  check expectScopedRequirements(uri: Text, publication: Number, phase: Text, aliases: List<Text>) {
+    let actual = semanticRequirementAliases(uri, publication, phase)
+    assert actual == aliases
+  }
+  check expectScopeProblem(uri: Text, publication: Number, code: Text, path: Text) {
+    let actualCode = semanticDependencyProblemCode(uri, publication)
+    let actualPath = semanticDependencyProblemPath(uri, publication)
+    let count = semanticDependencyProblemCount(uri, publication)
+    assert actualCode == code
+    assert actualPath == path
+    assert count == 1
+  }
+  check expectNoScopeProblems(uri: Text, publication: Number) {
+    let count = semanticDependencyProblemCount(uri, publication)
+    assert count == 0
+  }
+  check expectCapturedAndLiveScopes() {
+    let same = capturedAndLiveRequirementsAgree()
+    let capturedBuild = capturedScopeAliases("build")
+    let liveBuild = liveScopeAliases("build")
+    let capturedRuntime = capturedScopeAliases("runtime")
+    let liveRuntime = liveScopeAliases("runtime")
+    let capturedTest = capturedScopeAliases("test")
+    let liveTest = liveScopeAliases("test")
+    let unchanged = scopedComparisonFilesUnchanged()
+    assert same == true
+    assert capturedBuild == ["typescript"]
+    assert liveBuild == ["typescript"]
+    assert capturedRuntime == ["react"]
+    assert liveRuntime == ["react"]
+    assert capturedTest == ["vitest", "playwright"]
+    assert liveTest == ["vitest", "playwright"]
+    assert unchanged == true
+  }
+
+  scenario "a current UI source inherits shared tools folder runtime and its exact file test driver" {
+    given semanticAnalysis()
+    when semanticSourcePath(scopedView.uri, "src/ui/view.expec")
+    when changeSemanticConfiguration(scopedTools)
+    when openSemanticSource(scopedView, 4)
+    then expectScopedRequirements(scopedView.uri, 1, "build", ["typescript"])
+    then expectScopedRequirements(scopedView.uri, 1, "runtime", ["react"])
+    then expectScopedRequirements(scopedView.uri, 1, "test", ["vitest", "playwright"])
+    then expectNoScopeProblems(scopedView.uri, 1)
+    then expectCheckedSource(scopedView.uri)
+  }
+  scenario "a sibling folder does not inherit a prefix-matching UI scope or another file's driver" {
+    given semanticAnalysis()
+    when semanticSourcePath("file:///workspace/src/ui-other/view.expec", "src/ui-other/view.expec")
+    when changeSemanticConfiguration(scopedTools)
+    when openSemanticSource({ uri: "file:///workspace/src/ui-other/view.expec", text: "type Book { title: Text }" }, 1)
+    then expectScopedRequirements("file:///workspace/src/ui-other/view.expec", 1, "build", ["typescript"])
+    then expectScopedRequirements("file:///workspace/src/ui-other/view.expec", 1, "runtime", [])
+    then expectScopedRequirements("file:///workspace/src/ui-other/view.expec", 1, "test", ["vitest"])
+    then expectCheckedSource("file:///workspace/src/ui-other/view.expec")
+  }
+  scenario "foreign and untitled snapshots use shared tools without invented folder ownership" {
+    given semanticAnalysis()
+    when changeSemanticConfiguration(scopedTools)
+    when openSemanticSource({ uri: "file:///elsewhere/src/ui/view.expec", text: "type Book {}" }, 1)
+    when openSemanticSource({ uri: "untitled:Draft", text: "type Draft {}" }, 1)
+    then expectScopedRequirements("file:///elsewhere/src/ui/view.expec", 1, "build", ["typescript"])
+    then expectScopedRequirements("file:///elsewhere/src/ui/view.expec", 1, "runtime", [])
+    then expectScopedRequirements("untitled:Draft", 1, "build", ["typescript"])
+    then expectScopedRequirements("untitled:Draft", 1, "runtime", [])
+    then expectCheckedSource("file:///elsewhere/src/ui/view.expec")
+    then expectCheckedSource("untitled:Draft")
+  }
+  scenario "saved scope replacement rechecks unchanged unsaved text and preserves earlier rows" {
+    given semanticAnalysis()
+    when semanticSourcePath(scopedView.uri, "src/ui/view.expec")
+    when changeSemanticConfiguration(scopedTools)
+    when openSemanticSource(scopedView, 7)
+    when changeSemanticConfiguration(movedFolderTools)
+    when tryMutatingSemanticRequirements(scopedView.uri, 1)
+    then expectScopedRequirements(scopedView.uri, 1, "runtime", ["react"])
+    then expectScopedRequirements(scopedView.uri, 2, "runtime", [])
+    then expectScopedRequirements(scopedView.uri, 2, "test", ["vitest", "playwright"])
+    then expectSemanticPublications(scopedView.uri, 2, 7)
+    then expectCheckedSource(scopedView.uri)
+  }
+  scenario "an invalid declared alias withdraws old scope rows and catalog with its actual manifest origin" {
+    given semanticAnalysis()
+    when semanticSourcePath(scopedView.uri, "src/ui/view.expec")
+    when changeSemanticConfiguration(scopedTools)
+    when openSemanticSource(scopedView, 5)
+    when changeSemanticConfiguration(unknownScopedAlias)
+    then expectScopedRequirements(scopedView.uri, 1, "runtime", ["react"])
+    then expectScopedRequirements(scopedView.uri, 2, "runtime", [])
+    then expectScopeProblem(scopedView.uri, 2, "unknown-package-alias", "[\"manifest\",\"C:/workspace/expec.json\",\"requirements\",\"files\",0,\"test\",0]")
+    then expectSemanticProblem(scopedView.uri, "unavailable-package", 1, 40, 47)
+    then expectSemanticPublications(scopedView.uri, 2, 5)
+  }
+  scenario "a wrong phase in an unreached file scope is still an honest located configuration failure" {
+    given semanticAnalysis()
+    when changeSemanticConfiguration(wrongScopedPhase)
+    when openSemanticSource({ uri: "untitled:Draft", text: "type Draft {}" }, 2)
+    then expectScopeProblem("untitled:Draft", 1, "unavailable-package", "[\"manifest\",\"C:/workspace/expec.json\",\"requirements\",\"files\",0,\"test\",0]")
+    then expectScopedRequirements("untitled:Draft", 1, "build", [])
+  }
+  scenario "a malformed supplied ownership path refuses scope facts without changing actual compilation" {
+    given semanticAnalysis()
+    when semanticSourcePath(scopedView.uri, "src/ui/../view.expec")
+    when changeSemanticConfiguration(scopedTools)
+    when openSemanticSource(scopedView, 3)
+    then expectScopeProblem(scopedView.uri, 1, "invalid-dependency-input", "[\"sources\",0,\"localPath\"]")
+    then expectScopedRequirements(scopedView.uri, 1, "runtime", [])
+    then expectCheckedSource(scopedView.uri)
+  }
+  scenario "a named unsaved source uses supplied verified ancestry without needing saved source contents" {
+    given semanticAnalysis()
+    when semanticSourcePath("file:///workspace/src/ui/new.expec", "src/ui/new.expec")
+    when changeSemanticConfiguration(scopedTools)
+    when openSemanticSource({ uri: "file:///workspace/src/ui/new.expec", text: "component NewView { requires package \"react\" for runtime }" }, 1)
+    then expectScopedRequirements("file:///workspace/src/ui/new.expec", 1, "runtime", ["react"])
+    then expectScopedRequirements("file:///workspace/src/ui/new.expec", 1, "test", ["vitest"])
+    then expectCheckedSource("file:///workspace/src/ui/new.expec")
+  }
+  scenario "live checking and the real source loader prepare the same owned scope obligations" {
+    given scopedSourceComparison(scopedTools, "src/ui/view.expec", "component ReactView { requires package \"react\" for runtime }")
+    when compareCapturedAndLiveScopes()
+    then expectCapturedAndLiveScopes()
+  }
+
 }

@@ -92,10 +92,6 @@ interface GenerationWorker {
 // installed runCli does not itself enforce the declared >=24.19.0 <25 Node range.
 component NodeGenerationWorker {
   requires package "expec" for runtime
-  requires package "node-types" for build
-  requires package "typescript" for build
-  requires package "vite" for build
-  requires package "vitest" for test
 
   construction(nodeExecutable: Text, entry: Text)
   public start, cancel, dispose
@@ -113,9 +109,6 @@ component NodeGenerationWorker {
 
 component GenerationOnSave {
   requires package "expec" for runtime
-  requires package "node-types" for build
-  requires package "typescript" for build
-  requires package "vitest" for test
 
   construction(worker: GenerationWorker, files: GenerationFiles, feedback: GenerationFeedback)
   public configurationChanged, sourceSaved, editorChanged, dispose

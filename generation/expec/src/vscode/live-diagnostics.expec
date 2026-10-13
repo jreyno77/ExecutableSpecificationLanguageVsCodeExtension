@@ -19,7 +19,6 @@ component LanguageServerAdapter {
   requires package "language-server" for runtime
   requires package "language-server-document" for runtime
   requires package "expec" for runtime
-  requires package "typescript" for build
   depends on DocumentAnalysis
   depends on OutputPreviews
   depends on SourceNavigation
@@ -41,6 +40,7 @@ component LanguageServerAdapter {
     promises "Capture each existing saved preview-configuration notification's exact file/text/writable scalars or absence and advance an owned latest-notification identity. Forward that captured snapshot first to the same OutputPreviews.configurationChanged to invalidate old preview work and prepare selection/options, then to the same DocumentAnalysis.configurationChanged so its new reports drive that configuration. Recheck the notification identity and adapter lifetime between forwards: a synchronous newer notification or disposal from preview feedback prevents the older snapshot from restoring package facts. Preserve currentness after reentrant analysis/feedback as well. Keep selection withdrawal and saved-text behavior; native callback exceptions remain observable. Never validate JSON in this adapter or wait for a connected target before supplying authored package facts. Configuration changes refresh current semantic reports at unchanged editor versions through the one existing analysis; no second reader/compiler, native package inspection, installation, project capture, file scan or new report identity field is introduced."
   }
   capability publish(source: SourceDocument, version: Number, report: DocumentReport) returns Nothing {
+    promises "Preserve current scope findings separately from source diagnostics. Show actual dependencyProblems through standard visible LSP window warnings, including code/message and the selected manifest or supplied-mapping JSON-path origin. Do not invent source ranges for dependency origins or mutate Compilation. Deduplicate unchanged warnings for the same current saved configuration/finding so ordinary typing cannot flood notifications; changed, invalid or withdrawn configuration must not reuse an old warning as current evidence. The same current report still reaches previews before native projection."
     promises "Retain real syntax and compiler errors whose primary source URI matches this document in its current native pull cache. Foreign primary findings remain in the raw Compilation and output log; an open imported document receives its own entry analysis. Never attach a foreign primary range to the requesting document. Convert each scalar range with the captured text for that range's exact URI, including cross-file related information. Preserve messages and codes. Keep nonlocated problems and deferred requirements observable in the language-client output log without inventing editor positions. Replace old feedback, including an empty full report when findings clear. Give each accepted publication an opaque analysis resultId; editor version alone cannot identify changed imports. Request the SDK diagnostic refresh after dependent feedback changes. Never reparse, generate or make semantic decisions here. Forward this same captured source/version/report to core OutputPreviews before reducing it to native diagnostic data; preserve ordinary diagnostic publication and dependency-watch behavior. Forward this same current source/version/report to one core SourceNavigation before native conversion. Forward this same current source/version/report to one core SourceHover before native conversion, including same-version replacement reports after imported edits. No Inspection or Specification crosses the protocol boundary."
     promises "Forward the same current captured source/version/report to DocumentOutline before answering native symbol requests. A replacement or rejected report replaces its earlier tree even at the same editor version; transport only plain native symbols, never Inspection or a compiler model."
     promises "Forward this same current captured source/version/report to SourceCompletion before native conversion, including same-version replacement after imported edits and rejected reports that withdraw old completion facts. Transport only plain native CompletionItems; Inspection and Resolution stay within core."
@@ -58,21 +58,17 @@ component LanguageServerAdapter {
 }
 
 component FileSources {
-  requires package "node-types" for build
-  requires package "typescript" for build
-  public read
+  public read, localPath
   capability read(uri: Text) returns SourceDocument? {
     promises "Adapt a local file URI to its current UTF-8 saved text for DocumentSources. Missing files and unsupported URI schemes return absence. Other filesystem errors surface. Do not scan folders, acquire packages, cache business state or replace open editor text."
+  }
+  capability localPath(uri: Text, manifestFile: Text) returns Text? {
+    promises "Adapt the exact file URI and selected absolute manifest filename into a verified primary manifest-directory-relative path through native path/ancestry identity APIs. Use portable / separators, preserve literal case/name, and never derive ownership by textual URI-prefix subtraction or from a generated target. Verify existing root/ancestors and ordinary file routes; a named unsaved file may use a verified existing parent without reading, creating or requiring its contents. Reject symlink escapes and alias routes that cannot establish the same source identity; unavailable or outside-root routes and nonfile/untitled URIs have no local path. A nested build.sourceRoots does not replace the primary root; an additional outside root cannot gain a guessed folder scope. Other filesystem errors surface. Core caches/invalidate these supplied facts; this native adapter adds no scope policy, configuration parser, whole-project discovery, installation or writes."
   }
 }
 
 component EditorLanguageSupport {
   requires package "language-client" for runtime
-  requires package "vscode-types" for build
-  requires package "typescript" for build
-  requires package "vite" for build
-  requires package "vitest" for test
-  requires package "vscode-test-electron" for test
   depends on LanguageServerAdapter
 
   construction(context: VsCodeExtensionContext, client: NativeLanguageClient)
@@ -264,5 +260,58 @@ examples for EditorLanguageSupport {
     when saveImportedText("type Book { title: Text }")
     then expectResolvedEditorProblem()
     then expectUnchangedEntryVersion()
+  }
+}
+
+// These are small real filesystem callers of FileSources.localPath, without an
+// extension launch or SourceLoader/project capture. Setup owns an ordinary empty
+// manifest directory; queries inspect the actual URI made from the supplied path.
+examples for FileSources {
+  setup scopeFileDirectory() returns Nothing
+  action keepScopeSource(path: Text, text: Text) returns Nothing
+  action keepScopeFolder(path: Text) returns Nothing
+  // Own a second tiny directory/file and point this root's link/junction at it.
+  // Baselines cover both owned trees and the link before the query; no skip can
+  // claim that a textual-prefix route proves canonical ownership.
+  action keepEscapingScopeLink(linkPath: Text, outsidePath: Text, text: Text) returns Nothing
+  action queryScopePath(path: Text) returns Nothing
+  observation queriedScopePath() returns Text?
+  observation queriedScopePathAvailable() returns Boolean
+  observation queriedScopeFileExists() returns Boolean
+  observation scopeQueryFilesUnchanged() returns Boolean
+  check expectNativeScopePath(path: Text) {
+    let actual = queriedScopePath()
+    let unchanged = scopeQueryFilesUnchanged()
+    assert actual == path
+    assert unchanged == true
+  }
+  check expectNamedSourceNotCreated() {
+    let exists = queriedScopeFileExists()
+    assert exists == false
+  }
+  check expectNoNativeScopePath() {
+    let available = queriedScopePathAvailable()
+    let unchanged = scopeQueryFilesUnchanged()
+    assert available == false
+    assert unchanged == true
+  }
+  scenario "native source ownership keeps the primary root path through nested folders" {
+    given scopeFileDirectory()
+    when keepScopeSource("src/ui/view.expec", "type Book {}")
+    when queryScopePath("src/ui/view.expec")
+    then expectNativeScopePath("src/ui/view.expec")
+  }
+  scenario "native ownership permits a named unsaved source without creating its contents" {
+    given scopeFileDirectory()
+    when keepScopeFolder("src/ui")
+    when queryScopePath("src/ui/new.expec")
+    then expectNativeScopePath("src/ui/new.expec")
+    then expectNamedSourceNotCreated()
+  }
+  scenario "a native link escaping the authoring root has no guessed local scope" {
+    given scopeFileDirectory()
+    when keepEscapingScopeLink("src/escape", "view.expec", "type Outside { title: Text }")
+    when queryScopePath("src/escape/view.expec")
+    then expectNoNativeScopePath()
   }
 }

@@ -17,8 +17,6 @@ const declarationKinds = ['capability', 'function', 'setup', 'action', 'observat
 /**
  * Unverified implementation obligation.
  * Requires package: expec (runtime)
- * Requires package: typescript (build)
- * Requires package: vitest (test)
  */
 export class SourceHover {
     private readonly documents = new Map<string, HoverDocument>();

@@ -10,7 +10,7 @@ function recordedAnalysis() {
   const analysis = new DocumentAnalysis({
     publish: (source, version, report) => { publications.push({ source, version, problems: report.syntax }); },
     clear: uri => { clears.push(uri); },
-  }, { read: () => undefined });
+  }, { localPath: () => undefined, read: () => undefined });
   return { analysis, publications, clears };
 }
 
@@ -64,7 +64,7 @@ describe('current document feedback at the reader and publication boundaries', (
     const analysis = new DocumentAnalysis({
       publish: (source, version, report) => { publications.push({ source, version, problems: report.syntax }); throw failure; },
       clear: () => {},
-    }, { read: () => undefined });
+    }, { localPath: () => undefined, read: () => undefined });
     let thrown: unknown;
     try { analysis.opened({ uri: 'untitled:Draft', text: 'type Draft {}' }, 1); } catch (error) { thrown = error; }
     expect(thrown).toBe(failure);
@@ -80,6 +80,7 @@ describe('semantic source capture and current feedback', () => {
     const saved = new Map([[first.uri, first], [second.uri, second]]);
     const reads: string[] = [], reports: DocumentReport[] = [];
     const analysis = new DocumentAnalysis({ publish: (_source, _version, report) => { reports.push(report); }, clear: () => {} }, {
+      localPath: () => undefined,
       read: uri => { reads.push(uri); return saved.get(uri); },
     });
     const reading = vi.spyOn(LangiumReader.prototype, 'read');
@@ -97,7 +98,7 @@ describe('semantic source capture and current feedback', () => {
     const uri = 'file:///workspace/book.expec';
     let saved = { uri, text: 'type Book { title: Text }' };
     const reports: DocumentReport[] = [];
-    const analysis = new DocumentAnalysis({ publish: (_source, _version, report) => { reports.push(report); }, clear: () => {} }, { read: () => saved });
+    const analysis = new DocumentAnalysis({ publish: (_source, _version, report) => { reports.push(report); }, clear: () => {} }, { localPath: () => undefined, read: () => saved });
     analysis.opened({ uri: 'file:///workspace/basket.expec', text: 'use Book from "./book.expec"\ntype Basket { book: Book }' }, 1);
     saved = { uri, text: 'type Book {' };
     analysis.sourceChanged(uri);
@@ -112,6 +113,7 @@ describe('semantic source capture and current feedback', () => {
   it('rejects a source provider that returns another URI without publishing false feedback', () => {
     const reports: DocumentReport[] = [];
     const analysis = new DocumentAnalysis({ publish: (_source, _version, report) => { reports.push(report); }, clear: () => {} }, {
+      localPath: () => undefined,
       read: () => ({ uri: 'file:///other/book.expec', text: 'type Book {}' }),
     });
     expect(() => analysis.opened({ uri: 'file:///workspace/basket.expec', text: 'use Book from "./book.expec"\ntype Basket { book: Book }' }, 1)).toThrow(TypeError);
@@ -125,6 +127,7 @@ describe('semantic source capture and current feedback', () => {
     const reports: DocumentReport[] = [];
     let firstRead = true;
     const analysis = new DocumentAnalysis({ publish: (_source, _version, report) => { reports.push(report); }, clear: () => {} }, {
+      localPath: () => undefined,
       read: () => {
         if (firstRead) { firstRead = false; analysis.sourceChanged(uri); return old; }
         return latest;
@@ -141,7 +144,7 @@ describe('semantic source capture and current feedback', () => {
 
 it('releases a closed source capture before a later independent open lifetime', () => {
   let latest: DocumentReport | undefined;
-  const analysis = new DocumentAnalysis({ publish: (_source, _version, report) => { latest = report; }, clear: () => {} }, { read: () => undefined });
+  const analysis = new DocumentAnalysis({ publish: (_source, _version, report) => { latest = report; }, clear: () => {} }, { localPath: () => undefined, read: () => undefined });
   const source = { uri: 'untitled:Draft', text: 'type Draft {}' };
   const reading = vi.spyOn(LangiumReader.prototype, 'read');
   try {

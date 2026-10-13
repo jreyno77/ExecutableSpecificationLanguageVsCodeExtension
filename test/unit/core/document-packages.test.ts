@@ -10,7 +10,7 @@ const testOnly = { ...runtime, text: runtime.text.replace('["runtime"]', '["test
 
 function authoring() {
   const reports: DocumentReport[] = [];
-  const analysis = new DocumentAnalysis({ publish: (_source, _version, report) => { reports.push(report); }, clear: () => {} }, { read: () => undefined });
+  const analysis = new DocumentAnalysis({ publish: (_source, _version, report) => { reports.push(report); }, clear: () => {} }, { localPath: () => undefined, read: () => undefined });
   return { analysis, reports };
 }
 
@@ -63,7 +63,7 @@ describe('saved package facts at the live-analysis boundary', () => {
     const analysis = new DocumentAnalysis({ publish: (source, _version, report) => {
       reports.push({ uri: source.uri, report });
       if (changeOnNextPublication) { changeOnNextPublication = false; analysis.configurationChanged(testOnly); }
-    }, clear: () => {} }, { read: () => undefined });
+    }, clear: () => {} }, { localPath: () => undefined, read: () => undefined });
     const second = { uri: 'file:///workspace/second.expec', text: view.text.replace('ReactView', 'OtherView') };
     analysis.opened(view, 1); analysis.opened(second, 1);
     changeOnNextPublication = true;

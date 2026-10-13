@@ -11,8 +11,6 @@ type SourceDefinition {
 
 component SourceNavigation {
   requires package "expec" for runtime
-  requires package "typescript" for build
-  requires package "vitest" for test
 
   construction()
   public published, closed, definition, dispose

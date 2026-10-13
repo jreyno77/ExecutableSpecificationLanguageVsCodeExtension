@@ -25,6 +25,8 @@ export class NativePreviewCase {
   private beforeConfigurationState = '';
   private configurationSourceVersion: number | undefined;
   private configurationResultId: string | undefined;
+  private scopeConfigurationText: string | undefined;
+  private scopeWarning: { text: string; manifestFile: string; uri: string; version: number; resultId: string } | undefined;
   private closedText = '';
   private readonly zooms: number[] = [];
   private overflowObserved = false;
@@ -74,6 +76,51 @@ export class NativePreviewCase {
     this.visited.clear();
     this.editor = await this.session!.savePreviewConfiguration(this.id, text);
     // Output observations wait on the actual new product DOM; no local parsing predicts the tabs.
+  }
+  async saveScopedConfiguration(text: string): Promise<void> {
+    const previous = await this.settled(), deadline = Date.now() + 30_000;
+    await this.saveConfiguration(text);
+    const saved = await readFile(join(this.directory!, 'expec.json'), 'utf8');
+    if (saved !== text) throw new Error('The actual scoped preview configuration did not retain the requested saved bytes.');
+    this.scopeConfigurationText = saved;
+    await this.configurationAnalysis(deadline);
+    // Both reviewed saves change presentation at the same source version.
+    // Observe that actual change rather than accepting the previous ready view.
+    await this.settled(value => presentation(value) !== presentation(previous), deadline);
+  }
+  async observeScopeWarning(): Promise<void> {
+    const deadline = Date.now() + 30_000, analysis = await this.configurationAnalysis(deadline);
+    const manifestFile = join(this.directory!, 'expec.json'), browser = await this.session!.webviewBrowser();
+    const pages = [];
+    for (const context of browser.contexts()) for (const page of context.pages()) {
+      if (await page.locator('.monaco-workbench').count().catch(() => 0)) pages.push(page);
+    }
+    if (pages.length !== 1) throw new Error('Expected the single actual workbench for the owned preview warning.');
+    let visible: string[] = [];
+    while (Date.now() < deadline) {
+      visible = await pages[0]!.locator('.notification-list-item:visible').allTextContents();
+      const owned = visible.filter(text => text.includes(manifestFile) || text.includes(JSON.stringify(manifestFile)));
+      if (owned.length > 1) throw new Error('More than one owned scope warning is visible: ' + JSON.stringify(owned));
+      if (owned.length === 1) {
+        const current = await this.nativeObservation();
+        if (current.uri !== analysis.uri || current.version !== analysis.version
+          || await readFile(manifestFile, 'utf8') !== this.scopeConfigurationText) {
+          throw new Error('The visible scope warning observation became obsolete.');
+        }
+        this.scopeWarning = { text: owned[0]!, manifestFile, uri: current.uri, version: current.version, resultId: current.resultId };
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    throw new Error('No actual owned scope warning became visible for ' + manifestFile + ': ' + JSON.stringify(visible));
+  }
+  scopeWarningIncludes(text: string): boolean { return this.scopeWarning?.text.includes(text) ?? false; }
+  scopeWarningMatches(code: string, path: string): boolean {
+    const warning = this.scopeWarning;
+    return !!warning && warning.manifestFile === join(this.directory!, 'expec.json')
+      && warning.uri === this.editor?.uri && warning.version === this.editor.version
+      && (warning.text.includes(warning.manifestFile) || warning.text.includes(JSON.stringify(warning.manifestFile)))
+      && warning.text.includes(code) && warning.text.includes(path);
   }
   async selectOutput(id: string): Promise<void> {
     const frame = await this.productFrame();
@@ -158,10 +205,9 @@ export class NativePreviewCase {
     if (!value || value.uri !== this.editor?.uri || value.version !== this.editor.version) throw new Error('No current actually visited preview document: ' + id + '/' + path);
     return value;
   }
-  private async configurationAnalysis(): Promise<PreviewEditorObservation> {
+  private async configurationAnalysis(deadline = Date.now() + 30_000): Promise<PreviewEditorObservation> {
     const previousId = this.configurationResultId, version = this.configurationSourceVersion;
     if (previousId === undefined || version === undefined) throw new Error('No actual saved preview configuration transition was recorded.');
-    const deadline = Date.now() + 30_000;
     while (true) {
       const actual = await this.nativeObservation();
       if (actual.version !== version) throw new Error('The preview source version changed while observing saved package recovery.');
@@ -198,12 +244,13 @@ export class NativePreviewCase {
     finally { await cdp.detach(); }
     throw new Error('The installed product did not mount its marked React preview frame. ' + JSON.stringify({ browserVersion: browser.version(), frames, targets }));
   }
-  private async settled(predicate: (value: RenderedPreview) => boolean = () => true): Promise<RenderedPreview> {
-    const frame = await this.productFrame(), deadline = Date.now() + 30_000;
+  private async settled(predicate: (value: RenderedPreview) => boolean = () => true, deadline = Date.now() + 30_000): Promise<RenderedPreview> {
+    const frame = await this.productFrame();
     let last: RenderedPreview | undefined;
     while (Date.now() < deadline) {
       const actual = await frame.evaluate(() => {
         const context = document.querySelector('[data-preview-context]'), panel = document.querySelector('[role="tabpanel"]');
+        const globalExplanation = document.getElementById('preview-message');
         const image = document.querySelector<HTMLImageElement>('img[data-diagram-image]'), viewport = document.querySelector<HTMLElement>('[data-diagram-viewport]');
         const zoomInput = Array.from(document.querySelectorAll('label')).find(label => label.textContent?.trim() === 'Diagram zoom (%)')?.control;
         let svgLabels = '';
@@ -216,8 +263,8 @@ export class NativePreviewCase {
         return { uri: context?.getAttribute('data-source-uri') ?? '', version: Number(context?.getAttribute('data-source-version')),
           ids: Array.from(document.querySelectorAll('[role="tab"][data-output-id]')).map(node => node.getAttribute('data-output-id') ?? ''),
           selectedId: document.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute('data-output-id') ?? '',
-          status: panel?.getAttribute('data-status') ?? '', path: panel?.getAttribute('data-document-path') ?? '', mediaType: panel?.getAttribute('data-media-type') ?? '',
-          text: document.querySelector('[data-output-content]')?.textContent ?? '', explanation: document.querySelector('[data-output-explanation]')?.textContent ?? '',
+          status: panel ? panel.getAttribute('data-status') ?? '' : globalExplanation?.getAttribute('data-status') ?? '', path: panel?.getAttribute('data-document-path') ?? '', mediaType: panel?.getAttribute('data-media-type') ?? '',
+          text: document.querySelector('[data-output-content]')?.textContent ?? '', explanation: document.querySelector('[data-output-explanation]')?.textContent ?? globalExplanation?.textContent ?? '',
           paths: Array.from(document.querySelectorAll('button[data-document-path]')).map(node => node.getAttribute('data-document-path') ?? ''),
           imageDecoded: !!image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0, svgLabels,
           zoom: zoomInput instanceof HTMLInputElement ? zoomInput.valueAsNumber : 0, imageWidth: image?.getBoundingClientRect().width ?? 0,
@@ -245,6 +292,9 @@ export class NativePreviewCase {
     catch (error) { throw new NativeCleanupError('Owned preview editor cleanup is unconfirmed; retained ' + this.directory, { cause: error }); }
     if (this.directory) await removeOwnedDirectory(this.directory);
   }
+}
+function presentation(value: RenderedPreview): string {
+  return JSON.stringify([value.ids, value.selectedId, value.status, value.path, value.mediaType, value.text, value.explanation, value.paths]);
 }
 function key(id: string, path: string): string { return JSON.stringify([id, path]); }
 async function ownedTree(directory: string): Promise<string> {

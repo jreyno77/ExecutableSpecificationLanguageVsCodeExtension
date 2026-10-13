@@ -8,11 +8,6 @@ import type { LanguageClient } from "vscode-languageclient/node";
 /**
  * Unverified implementation obligation.
  * Requires package: language-client (runtime)
- * Requires package: vscode-types (build)
- * Requires package: typescript (build)
- * Requires package: vite (build)
- * Requires package: vitest (test)
- * Requires package: vscode-test-electron (test)
  * Depends on: LanguageServerAdapter
  */
 export class EditorLanguageSupport {

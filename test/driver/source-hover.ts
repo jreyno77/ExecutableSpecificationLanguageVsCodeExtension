@@ -25,7 +25,7 @@ export class SourceHoverRecording {
       this.hoverQueries.published(source, version, report);
     },
     clear: uri => { this.reports.delete(uri); this.hoverQueries.closed(uri); },
-  }, { read: uri => { this.acquisitions++; return this.saved.get(uri); } });
+  }, { localPath: () => undefined, read: uri => { this.acquisitions++; return this.saved.get(uri); } });
 
   static create(): SourceHoverRecording {
     const recording = new SourceHoverRecording();

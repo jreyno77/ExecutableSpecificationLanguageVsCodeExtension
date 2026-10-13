@@ -2,16 +2,16 @@
 // Its export is executable-specification-language/syntax/expec.tmLanguage.json.
 // Copy it under src/vscode/syntax/ with exact source/grammar hash provenance.
 // The language package generates it from the existing Langium grammar.
-// Build/runtime dependency: captured development source cecb20e0256e548336f6f6e5d4cb8cbc3183cfe5, version 0.1.0.
-// Pin generation/tooling/executable-specification-language-cecb20e.tgz with its recorded SHA-512 integrity.
+// Build/runtime dependency: verified main da613b491b339069f70e2c149ea02f2b2b628e86, version 0.1.0-pr.116.
+// Pin generation/tooling/executable-specification-language-da613b4.tgz with its recorded SHA-512 integrity.
 // CORE-36 supplies public typeCandidates over detached facts from this same resolution.
 // Prepare eligible spelling/insertion/target facts during publication, never on requests.
 // This reviewed PROJECT-43 build queries all contract subjects within one captured
 // post-application scope, then verifies freshness before generating tests. It
 // preserves the same output adapter lifetime and all strict evidence checks.
 // Keep the complete SDK/runtime payload, source/test capture and syntax asset.
-// It is development provenance: the language's separate exact-main delivery is
-// held by issue 106; this pin does not claim a verified language package release.
+// Exact-main release pr-116 and its package-delivery record verify this payload.
+// Historical failed builds remain recorded; a passing release does not repair unrelated defects.
 // The project generator need not export this separate language-produced syntax asset.
 // The extension copies it unchanged; it authors no grammar, keyword table or token regex.
 // Plain and quoted names have lexical entity.name.expec scopes, not semantic type claims.

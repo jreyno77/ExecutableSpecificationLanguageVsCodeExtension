@@ -11,11 +11,13 @@ export class DocumentAnalysisRecording {
   private readonly publications: Publication[] = [];
   private readonly clears: string[] = [];
   private invalidVersion = false;
+  private readonly sourcePaths = new Map<string, string>();
+  sourcePath(uri: string, path: string): void { this.sourcePaths.set(uri, path); this.analysis.sourceChanged(uri); }
   private readonly savedSources = new Map<string, SourceDocument>();
   private readonly analysis = new DocumentAnalysis({
     publish: (source, version, report) => { this.publications.push({ source, version, report, problems: report.syntax }); },
     clear: uri => { this.clears.push(uri); },
-  }, { read: uri => this.savedSources.get(uri) });
+  }, { localPath: uri => this.sourcePaths.get(uri), read: uri => this.savedSources.get(uri) });
 
   configurationChanged(configuration: ConnectionConfiguration | undefined): void {
     this.analysis.configurationChanged(configuration);

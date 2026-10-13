@@ -24,7 +24,7 @@ export class SourceNavigationRecording {
       this.navigation.published(source, version, report);
     },
     clear: uri => { this.reports.delete(uri); this.navigation.closed(uri); },
-  }, { read: uri => { this.acquisitions++; return this.saved.get(uri); } });
+  }, { localPath: () => undefined, read: uri => { this.acquisitions++; return this.saved.get(uri); } });
 
   static create(): SourceNavigationRecording {
     const recording = new SourceNavigationRecording();

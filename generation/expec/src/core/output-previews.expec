@@ -11,13 +11,14 @@ type PreviewPublication {
   uri: Text?
   version: Number?
   tabs: List<OutputTab>
+  blocked: Boolean?
   `message`: Text?
 }
 
 interface PreviewFeedback {
   public present
   capability present(publication: PreviewPublication) returns Nothing {
-    promises "Present this complete plain-data view in order. URI/version identify its authored source for the title and observations. Tabs have unique configured IDs, labels, status, ordered UTF-8 documents and any actual explanation. Whole-view message explains absent/invalid configuration or selection. This accepted view is authoritative; host/UI adapters do not compare report revisions or implement another freshness policy. Keep the latest complete accepted presentation for native ready replay. No model, Specification, native buffer, function or Error crosses transport."
+    promises "Present this complete plain-data view in order. URI/version identify its authored source for the title and observations. Tabs have unique configured IDs, labels, status, ordered UTF-8 documents and any actual explanation. Whole-view message explains absent/invalid configuration or selection. Optional blocked is true only for an actual rejected configuration; it gives the UI a truthful whole-view blocked presentation while all old tabs/documents remain withdrawn. Absence of tabs or a general message is not proof of failure. This accepted view is authoritative; host/UI adapters do not compare report revisions or implement another freshness policy. Keep the latest complete accepted presentation for native ready replay. No model, Specification, native buffer, function or Error crosses transport."
   }
 }
 
@@ -33,19 +34,18 @@ interface PreviewConfigurationFeedback {
 
 component OutputPreviews {
   requires package "expec" for runtime
-  requires package "typescript" for build
-  requires package "vitest" for test
 
   construction(feedback: PreviewFeedback, registrations: List<RegisteredOutput>?)
   public configurationChanged, selected, published, closed, dispose
 
   capability configurationChanged(configuration: ConnectionConfiguration?) returns Nothing {
-    promises "Capture this current saved manifest or absence and advance private currentness before further work. Prepare the real Outputs registry and ConfigurationReader from supplied registrations, or shipped built-ins when absent. An explicit list replaces built-ins. Validate through ConfigurationReader without discovering files. Missing/invalid configuration withdraws old tabs with its actual explanation. Preserve configured output IDs/order/options; duplicate IDs remain a configuration error. Changed options replace queued requests. Valid outputs may preview without a project or with an unavailable target; target availability is not authored-preview readiness. Use this absolute native manifest filename as OutputContext.manifestLocation. Do not install, capture targets, rewrite configuration or request generation."
+    promises "Capture this current saved manifest or absence and advance private currentness before further work. Prepare the real Outputs registry and ConfigurationReader from supplied registrations, or shipped built-ins when absent. An explicit list replaces built-ins. Validate through ConfigurationReader without discovering files. Missing/invalid configuration withdraws old tabs with its actual explanation. An actual rejected ConfigurationReader result also publishes whole-view blocked true; selection absence, waiting and an empty configured output set do not invent that failure marker. Preserve configured output IDs/order/options; duplicate IDs remain a configuration error. Changed options replace queued requests. Valid outputs may preview without a project or with an unavailable target; target availability is not authored-preview readiness. Use this absolute native manifest filename as OutputContext.manifestLocation. Do not install, capture targets, rewrite configuration or request generation."
   }
   capability selected(uri: Text?) returns Nothing {
     promises "Select the exact authored document URI or absence, advancing private currentness. Retain current reports for open documents so switching selections requires no recompile. A selected document without a current report has a visible waiting explanation. A preview panel taking focus is not a new authored selection. Selection replaces queued requests and cannot let a previous document's completion restore old content."
   }
   capability published(source: SourceDocument, version: Number, report: DocumentReport) returns Nothing {
+    promises "Actual dependencyProblems in this current report block configured outputs with their real codes/messages and dependency-origin paths, withdrawing old documents even when editor version is unchanged. Do not manufacture a compiler failure or ignore an invalid scoped configuration merely because the unchanged source's Compilation has a Specification. Successful scoped requirements permit ordinary previews using the same checked source; they do not install packages, capture a target or prove native generation readiness. Legacy supplied reports without this additive field have no extra scope findings."
     promises "Receive the real current immutable DocumentAnalysis publication before native diagnostic conversion loses its Compilation. Keep the source/version and complete report inside core; never parse, compile, discover files or rebuild models here. Each publication is a new private report revision even at the same editor version after imported-source changes. Only the selected current report drives previews. Rejected syntax or absent/failed/deferred Compilation blocks configured tabs with actual syntax/compiler codes/messages or requirement reasons/requires and no old documents. From its checked Specification call public Outputs.preview independently for each configured ID/options with captured report source URIs as workspaceModules and the selected manifest filename. Publish pending tabs with no previous documents before starting work; each current completion updates only its tab while others progress. Retain actual document paths/media types/order. Strictly decode supported UTF-8 text media, application/json and image/svg+xml from their exact byte spans; invalid UTF-8 or unsupported binary presentation refuses that output with an explicit unsupported-presentation explanation and no silent replacement. Successful empty documents are ready with No authored documents; refused checks retain actual diagnostic codes/messages or requirement reasons/requires. Provider/contract exceptions are visibly refused rather than fabricated upstream findings or empty success. Status is pending, ready, blocked or refused. Private work currentness covers source lifetime/version, report/configuration/selection revisions and coordinator lifetime; check it after every await and discard stale success/refusal/error. Keep at most one invocation per output ID in flight and only its latest requested report/configuration queued; after settlement render that latest request and skip superseded intermediate edits. Other IDs progress independently. Do not open project adapters, capture a target, plan/apply writes, generate acceptance output, execute scenarios or claim handwritten preservation/write readiness."
   }
   capability closed(uri: Text) returns Nothing {
@@ -418,4 +418,29 @@ examples for OutputPreviews {
     then expectPreviewExplanation("binary", "unsupported-presentation")
     then expectNoPreviewDocuments("binary")
   }
+
+  fixture scopedMarkdown: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/ui\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"src/library.expec\",\"test\":[\"playwright\"]}]}}"
+  // Change an independently supplied source-provider ownership fact and deliver
+  // the actual route invalidation to DocumentAnalysis. Record the prior rendered
+  // status before the action; do not supply a manufactured report to previews.
+  action previewSourcePath(uri: Text, path: Text) returns Nothing
+  observation previewBeforeScopeStatus(id: Text) returns Text
+  check expectPriorScopePreviewReady(id: Text) {
+    let status = previewBeforeScopeStatus(id)
+    assert status == "ready"
+  }
+  scenario "a refused current source scope withdraws preview documents without inventing a compiler error" {
+    given previewAuthoring(scopedMarkdown)
+    when previewSourcePath("file:///workspace/src/library.expec", "src/library.expec")
+    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    when settleCurrentPreviews()
+    when previewSourcePath("file:///workspace/src/library.expec", "src/../library.expec")
+    when settleCurrentPreviews()
+    then expectPriorScopePreviewReady("markdown")
+    then expectPreviewStatus("markdown", "blocked")
+    then expectPreviewExplanation("markdown", "invalid-dependency-input")
+    then expectCurrentPreviewSource("file:///workspace/src/library.expec", 1)
+    then expectTargetsPreserved()
+  }
+
 }

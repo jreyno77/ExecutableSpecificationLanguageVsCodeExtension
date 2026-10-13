@@ -19,9 +19,6 @@ import type { ConnectionGuidance } from "./ConnectionGuidance.js";
 /**
  * Unverified implementation obligation.
  * Requires package: expec (runtime)
- * Requires package: typescript (build)
- * Requires package: node-types (build)
- * Requires package: vitest (test)
  */
 export class ConnectionController {
     constructor(feedback: ConnectionFeedback) {

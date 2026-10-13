@@ -82,3 +82,21 @@ test("read a large real diagram at normal scale and navigate its viewport", asyn
   await workspace.expectNativePreviewZoomHistory([100, 125, 100]);
   await workspace.expectNativePreviewZoom(100);
 });
+
+/* @expec-test "a3823b18-07cb-4be6-9926-2c00ef27f89d" */
+test("saved scope findings are visible and recovery previews the same unsaved source", async ({ workspace }) => {
+  await workspace.previewEditor("component ReactView { requires package \"react\" for runtime }", workspace.scopedSavedPreview);
+  await workspace.showOutputPreviews();
+  await workspace.editPreviewWithoutSaving("component ReactScreen { requires package \"react\" for runtime }");
+  await workspace.selectPreviewOutput("markdown");
+  await workspace.selectPreviewDocument("draft/docs/ReactScreen.md");
+  await workspace.saveScopedPreviewConfiguration(workspace.invalidScopedSavedPreview);
+  await workspace.observeVisibleScopeWarning();
+  await workspace.saveScopedPreviewConfiguration(workspace.scopedSavedPreview);
+  await workspace.selectPreviewOutput("markdown");
+  await workspace.selectPreviewDocument("draft/docs/ReactScreen.md");
+  await workspace.expectVisibleScopeWarning("unavailable-package", "\"requirements\",\"files\",0,\"test\",0");
+  await workspace.expectNativeScopePreviewRecovered();
+  await workspace.expectNativePreviewText("markdown", "draft/docs/ReactScreen.md", "text/markdown", "component ReactScreen");
+  await workspace.expectNativePreviewUnsaved("component ReactView { requires package \"react\" for runtime }", "component ReactScreen { requires package \"react\" for runtime }");
+});

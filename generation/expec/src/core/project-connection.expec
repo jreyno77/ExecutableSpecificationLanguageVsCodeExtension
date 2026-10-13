@@ -53,9 +53,6 @@ interface ConnectionFeedback {
 
 component ConnectionController {
   requires package "expec" for runtime
-  requires package "typescript" for build
-  requires package "node-types" for build
-  requires package "vitest" for test
 
   construction(feedback: ConnectionFeedback)
   public configurationChanged, chooseProject, observeWork, guidance, createConnection, disconnect, reconnect, deleteConnection, targetChanged, saveFailed, dispose
