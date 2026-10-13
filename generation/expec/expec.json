@@ -23,7 +23,9 @@
       "src/core/source-hover.expec",
       "src/vscode/source-hover.expec",
       "src/core/document-outline.expec",
-      "src/vscode/document-outline.expec"
+      "src/vscode/document-outline.expec",
+      "src/core/source-references.expec",
+      "src/vscode/source-references.expec"
     ]
   },
   "outputs": [

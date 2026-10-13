@@ -1,0 +1,193 @@
+use SourceReferences from "../core/source-references.expec"
+use DefinitionTextDocument, DefinitionPosition, DefinitionLocation from "./source-navigation.expec"
+
+// Standard locations stay the LSP response. Plain coverage stays adapter-local;
+// no Inspection, NodeId, compiler model or guessed workspace inventory crosses it.
+type ReferencePresentation {
+  locations: List<DefinitionLocation>
+  coveredUris: List<Text>
+  prerequisites: List<Text>
+}
+
+component SourceReferenceAdapter {
+  requires package "language-server" for runtime
+  requires package "language-server-document" for runtime
+  requires package "typescript" for build
+  requires package "vitest" for test
+  requires package "vscode-test-electron" for test
+  depends on SourceReferences
+
+  construction(references: SourceReferences)
+  public references
+
+  capability references(document: DefinitionTextDocument, position: DefinitionPosition, includeDeclaration: Boolean) returns ReferencePresentation? {
+    promises "Translate this exact current standard TextDocument and LSP UTF-16 position to a Unicode-scalar cursor and call SourceReferences.search once with its URI/version and unchanged includeDeclaration flag. Invalid negative, fractional, out-of-line or surrogate-splitting positions return absence without clamping. Absent core results stay absent. Require the reply's requesting URI/text to equal this document. Validate each actual occurrence's finite nonempty scalar range against its supplied captured source before converting it to standard Location; do not guess from spelling, basename or saved files. Invalid replies return absence rather than a partial fabricated success. Preserve the core's ordered distinct locations and plain coverage/prerequisite lists. This adapter performs only protocol/coordinate conversion, never parsing, resolution, compilation, acquisition, scanning, saving or generation. LanguageServerAdapter owns one standard registration and the shared analysis lifetime."
+  }
+}
+
+// Official native boundaries: ReferenceProvider supplies Location[] and an explicit
+// includeDeclaration context; LSP textDocument/references has the same context.
+// https://code.visualstudio.com/api/references/vscode-api#ReferenceProvider
+// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references
+// Real installed VSIX in the existing reusable native host, with fresh owned files,
+// listeners and tabs per case. Requests call this exported native LanguageClient's
+// standard registered reference feature/provider with includeDeclaration=false;
+// retain its own actual unfiltered reply, not an aggregate from other extensions.
+// Await actual current analysis identity for both the entry and any imported edit.
+// Display positions below are one-based UTF-16. Range observations read real native
+// documents at actual returned ranges and compare exact owned URIs, not basenames.
+// Coverage observations retain the actually visible native summary, click its real
+// Show coverage action and read the second standard information message containing
+// the actual covered URIs/prerequisites. Never synthesize UI from fixture expectations.
+// Closing discards owned dirty buffers/tabs and listeners; complete owned tree
+// paths/kinds/bytes remain unchanged. Cleanup uncertainty retains owned resources
+// and errors instead of deleting them and claiming successful disposal.
+examples for SourceReferenceAdapter {
+  fixture nativeReferencesEntry: Text = "use Book as Novel from \"./book.expec\"\ntype Basket { book: Novel }"
+  fixture nativeReferencesBook: Text = "type Book {}\ntype Shelf { book: Book }"
+  fixture nativeReferencesChangedBook: Text = "type Marker { label: Text = \"📚\" }\n\ntype Book {}\ntype Shelf { book: Book }"
+
+  setup importedReferenceEditor(entry: Text, imported: Text) returns Nothing
+  setup localReferenceEditor(entry: Text) returns Nothing
+  action editReferenceImport(text: Text) returns Nothing
+  action editReferenceEntry(text: Text) returns Nothing
+  action findNativeReferences(line: Number, column: Number) returns Nothing
+  action showNativeReferenceCoverage() returns Nothing
+  observation nativeReferenceCount() returns Number
+  observation nativeReferenceUsesOwnedFile(location: Number, fileName: Text) returns Boolean
+  observation nativeReferenceName(location: Number) returns Text
+  observation nativeReferenceStartLine(location: Number) returns Number
+  observation nativeReferenceStartColumn(location: Number) returns Number
+  observation nativeReferenceEndLine(location: Number) returns Number
+  observation nativeReferenceEndColumn(location: Number) returns Number
+  observation nativeReferenceCoverageMessage() returns Text
+  observation nativeReferenceCoverageIncludesOwnedSource(fileName: Text) returns Boolean
+  observation nativeReferenceCoverageIncludesUnavailable(fileName: Text) returns Boolean
+  observation nativeReferenceCoverageHasPrerequisite(code: Text) returns Boolean
+  observation referenceImportIsDirty() returns Boolean
+  observation referenceEntryIsDirty() returns Boolean
+  observation nativeReferenceFilesUnchanged() returns Boolean
+
+  check expectNativeReferenceCount(count: Number) {
+    let actual = nativeReferenceCount()
+    assert actual == count
+  }
+  check expectNativeReference(location: Number, fileName: Text, name: Text, line: Number, column: Number, endColumn: Number) {
+    let owned = nativeReferenceUsesOwnedFile(location, fileName)
+    let actualName = nativeReferenceName(location)
+    let startLine = nativeReferenceStartLine(location)
+    let startColumn = nativeReferenceStartColumn(location)
+    let endLine = nativeReferenceEndLine(location)
+    let actualEnd = nativeReferenceEndColumn(location)
+    assert owned == true
+    assert actualName == name
+    assert startLine == line
+    assert startColumn == column
+    assert endLine == line
+    assert actualEnd == endColumn
+  }
+  check expectVisibleReferenceCoverage() {
+    let actualMessage = nativeReferenceCoverageMessage()
+    assert actualMessage == "Reference search covers captured sources only; workspace importers were not scanned."
+  }
+  check expectCoveredReferenceFile(fileName: Text) {
+    let actual = nativeReferenceCoverageIncludesOwnedSource(fileName)
+    assert actual == true
+  }
+  check expectUnavailableNativeReferenceFile(fileName: Text) {
+    let actual = nativeReferenceCoverageIncludesUnavailable(fileName)
+    assert actual == true
+  }
+  check expectNativeReferencePrerequisite(code: Text) {
+    let actual = nativeReferenceCoverageHasPrerequisite(code)
+    assert actual == true
+  }
+  check expectReferenceImportDirty() {
+    let actual = referenceImportIsDirty()
+    assert actual == true
+  }
+  check expectReferenceEntryDirty() {
+    let actual = referenceEntryIsDirty()
+    assert actual == true
+  }
+  check expectNativeReferenceFilesUnchanged() {
+    let actual = nativeReferenceFilesUnchanged()
+    assert actual == true
+  }
+
+  scenario "Find References uses the current unsaved imported source and visibly declares its bounded coverage" {
+    given importedReferenceEditor(nativeReferencesEntry, nativeReferencesBook)
+    when editReferenceImport(nativeReferencesChangedBook)
+    when findNativeReferences(2, 22)
+    when showNativeReferenceCoverage()
+    then expectNativeReferenceCount(3)
+    then expectNativeReference(1, "book.expec", "Book", 4, 20, 24)
+    then expectNativeReference(2, "entry.expec", "Book", 1, 5, 9)
+    then expectNativeReference(3, "entry.expec", "Novel", 2, 21, 26)
+    then expectVisibleReferenceCoverage()
+    then expectCoveredReferenceFile("entry.expec")
+    then expectCoveredReferenceFile("book.expec")
+    then expectReferenceImportDirty()
+    then expectNativeReferenceFilesUnchanged()
+  }
+  scenario "known references remain useful while the actual coverage view names an unavailable include" {
+    given localReferenceEditor("type Book {}\ntype Basket { book: Book }")
+    when editReferenceEntry("include \"./missing.expec\"\ntype Book {}\ntype Basket { book: Book }")
+    when findNativeReferences(2, 6)
+    when showNativeReferenceCoverage()
+    then expectNativeReferenceCount(1)
+    then expectNativeReference(1, "entry.expec", "Book", 3, 21, 25)
+    then expectVisibleReferenceCoverage()
+    then expectCoveredReferenceFile("entry.expec")
+    then expectUnavailableNativeReferenceFile("missing.expec")
+    then expectNativeReferencePrerequisite("unavailable-module")
+    then expectReferenceEntryDirty()
+    then expectNativeReferenceFilesUnchanged()
+  }
+
+  // Small real adapter caller, no editor process: standard LSP TextDocument,
+  // real DocumentAnalysis/core and this adapter. Position arguments are passed
+  // literally without driver correction; actual historical replies are recorded.
+  setup referenceConversion(text: Text) returns Nothing
+  action requestConvertedReferences(line: Number, character: Number, includeDeclaration: Boolean) returns Nothing
+  observation hasConvertedReferenceSearch(request: Number) returns Boolean
+  observation convertedReferenceCount(request: Number) returns Number
+  observation convertedReferenceName(request: Number, location: Number) returns Text
+  observation convertedReferenceStartLine(request: Number, location: Number) returns Number
+  observation convertedReferenceStartCharacter(request: Number, location: Number) returns Number
+  observation convertedReferenceEndLine(request: Number, location: Number) returns Number
+  observation convertedReferenceEndCharacter(request: Number, location: Number) returns Number
+
+  check expectConvertedReferenceCount(request: Number, count: Number) {
+    let present = hasConvertedReferenceSearch(request)
+    let actual = convertedReferenceCount(request)
+    assert present == true
+    assert actual == count
+  }
+  check expectConvertedReference(request: Number, location: Number, name: Text, line: Number, character: Number, endCharacter: Number) {
+    let actualName = convertedReferenceName(request, location)
+    let startLine = convertedReferenceStartLine(request, location)
+    let startCharacter = convertedReferenceStartCharacter(request, location)
+    let endLine = convertedReferenceEndLine(request, location)
+    let actualEnd = convertedReferenceEndCharacter(request, location)
+    assert actualName == name
+    assert startLine == line
+    assert startCharacter == character
+    assert endLine == line
+    assert actualEnd == endCharacter
+  }
+  check expectNoConvertedReferenceSearch(request: Number) {
+    let present = hasConvertedReferenceSearch(request)
+    assert present == false
+  }
+
+  scenario "quoted astral references preserve CRLF UTF-16 ranges and reject a split surrogate position" {
+    given referenceConversion("type `📚Book` {}\r\ntype Basket { book: `📚Book` }")
+    when requestConvertedReferences(1, 23, true)
+    when requestConvertedReferences(1, 22, true)
+    then expectConvertedReferenceCount(1, 2)
+    then expectConvertedReference(1, 1, "`📚Book`", 0, 5, 13)
+    then expectConvertedReference(1, 2, "`📚Book`", 1, 20, 28)
+    then expectNoConvertedReferenceSearch(2)
+  }
+}
