@@ -9,7 +9,7 @@ const book = { uri: 'file:///workspace/book.expec', text: 'type Book { title: Te
 function reportFor(source: SourceDocument): DocumentReport {
   let report: DocumentReport | undefined;
   const analysis = new DocumentAnalysis({ publish: (_source, _version, actual) => { report = actual; }, clear: () => {} },
-    { read: () => undefined });
+    { localPath: () => undefined, read: () => undefined });
   analysis.opened(source, 1);
   if (!report) throw new Error('The real analysis did not publish an outline input.');
   return report;
@@ -61,7 +61,7 @@ describe('document outline for its plain caller', () => {
     const reports: DocumentReport[] = [];
     const analysis = new DocumentAnalysis({ publish: (source, version, report) => {
       reports.push(report); outline.published(source, version, report);
-    }, clear: uri => outline.closed(uri) }, { read: uri => saved.get(uri) });
+    }, clear: uri => outline.closed(uri) }, { localPath: () => undefined, read: uri => saved.get(uri) });
     analysis.opened(entry, 1);
     expect(outline.symbols(entry.uri, 1)?.symbols[0].name).toBe('Basket');
     saved.set(book.uri, { ...book, text: 'type Book {' });

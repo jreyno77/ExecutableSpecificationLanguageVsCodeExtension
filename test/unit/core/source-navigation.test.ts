@@ -9,7 +9,7 @@ function reportFor(source: SourceDocument, saved: SourceDocument[] = []): Docume
   let report: DocumentReport | undefined;
   const sources = new Map(saved.map(source => [source.uri, source]));
   const analysis = new DocumentAnalysis({ publish: (_source, _version, actual) => { report = actual; }, clear: () => {} },
-    { read: uri => sources.get(uri) });
+    { localPath: () => undefined, read: uri => sources.get(uri) });
   analysis.opened(source, 1);
   if (!report) throw new Error('The real DocumentAnalysis did not publish a report.');
   return report;

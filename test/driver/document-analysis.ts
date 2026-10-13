@@ -15,7 +15,7 @@ export class DocumentAnalysisRecording {
   private readonly analysis = new DocumentAnalysis({
     publish: (source, version, report) => { this.publications.push({ source, version, report, problems: report.syntax }); },
     clear: uri => { this.clears.push(uri); },
-  }, { read: uri => this.savedSources.get(uri) });
+  }, { localPath: () => undefined, read: uri => this.savedSources.get(uri) });
 
   configurationChanged(configuration: ConnectionConfiguration | undefined): void {
     this.analysis.configurationChanged(configuration);

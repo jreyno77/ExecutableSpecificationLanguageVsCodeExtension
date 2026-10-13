@@ -12,7 +12,7 @@ export class SourceOutlineConversion {
   private readonly analysis = new DocumentAnalysis({
     publish: (source, version, report) => this.outline.published(source, version, report),
     clear: uri => this.outline.closed(uri),
-  }, { read: () => undefined });
+  }, { localPath: () => undefined, read: () => undefined });
   private readonly documents = new Map<number, TextDocument>();
   private readonly adapter: SourceOutlineAdapter;
   constructor(private readonly uri: string, text: string, version: number) {

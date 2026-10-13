@@ -60,7 +60,7 @@ export class OutputPreviewsRecording {
       this.publications.push(structuredClone(publication)); for (const notify of [...this.changed]) notify();
     } }, registrations.map(registration => this.decorate(registration)));
     this.analysis = new DocumentAnalysis({ publish: (source, version, report) => this.previews!.published(source, version, report),
-      clear: uri => this.previews!.closed(uri) }, { read: uri => this.saved.get(uri) });
+      clear: uri => this.previews!.closed(uri) }, { localPath: () => undefined, read: uri => this.saved.get(uri) });
     this.configure(configuration);
   }
   private binary(kind: 'text' | 'binary'): OutputRegistration {

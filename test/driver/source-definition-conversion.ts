@@ -11,7 +11,7 @@ export class SourceDefinitionConversion {
   private readonly analysis = new DocumentAnalysis({
     publish: (source, version, report) => this.navigation.published(source, version, report),
     clear: uri => this.navigation.closed(uri),
-  }, { read: () => undefined });
+  }, { localPath: () => undefined, read: () => undefined });
   private readonly document: TextDocument;
   private readonly adapter: SourceDefinitionAdapter;
   private readonly replies: Array<Location | undefined> = [];
