@@ -294,7 +294,7 @@
     {
       "alias": "expec",
       "name": "npm:executable-specification-language",
-      "version": "0.1.0",
+      "version": "0.1.0-pr.116",
       "phases": [
         "build",
         "runtime"
