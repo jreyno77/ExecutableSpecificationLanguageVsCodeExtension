@@ -2,8 +2,10 @@
 // Its export is executable-specification-language/syntax/expec.tmLanguage.json.
 // Copy it under src/vscode/syntax/ with exact source/grammar hash provenance.
 // The language package generates it from the existing Langium grammar.
-// Build/runtime dependency: captured development source 76afb46f1329a4ae7c80b57b3b34eb3d85722c08, version 0.1.0.
-// Pin generation/tooling/executable-specification-language-76afb46.tgz with its recorded SHA-512 integrity.
+// Build/runtime dependency: captured development source cecb20e0256e548336f6f6e5d4cb8cbc3183cfe5, version 0.1.0.
+// Pin generation/tooling/executable-specification-language-cecb20e.tgz with its recorded SHA-512 integrity.
+// CORE-36 supplies public typeCandidates over detached facts from this same resolution.
+// Prepare eligible spelling/insertion/target facts during publication, never on requests.
 // This reviewed PROJECT-43 build queries all contract subjects within one captured
 // post-application scope, then verifies freshness before generating tests. It
 // preserves the same output adapter lifetime and all strict evidence checks.

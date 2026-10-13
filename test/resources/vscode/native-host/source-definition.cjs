@@ -12,6 +12,7 @@ exports.openSourceDefinition = async function openSourceDefinition(vscode, exten
   let entryReport;
   let locations = [];
   let disposed = false;
+  let completions;
   subscriptions.push(client.getFeature('textDocument/didOpen').onNotificationSent(event => opened.set(event.textDocument, event.params.textDocument.version)));
   subscriptions.push(client.getFeature('textDocument/didChange').onNotificationSent(event => changed.set(event.textDocument, event.params.textDocument.version)));
 
@@ -51,6 +52,13 @@ exports.openSourceDefinition = async function openSourceDefinition(vscode, exten
     if (!await vscode.workspace.applyEdit(edit)) throw new Error('VS Code refused the owned unsaved definition edit.');
     await until(() => changed.get(document) === document.version, 'The actual native source edit was not synchronized.');
   }
+  function completionObserver() {
+    return completions ??= require('./source-completion.cjs').observeCompletions(vscode, client, entry, async () => {
+      const before = entryReport.resultId;
+      await until(() => changed.get(entry) === entry.version, 'The actual completion edit was not synchronized.');
+      entryReport = await currentReport(entry, before);
+    });
+  }
   function observation() {
     const editor = vscode.window.activeTextEditor;
     if (!editor || !entryReport) throw new Error('The native definition observation has no current editor/report.');
@@ -66,6 +74,7 @@ exports.openSourceDefinition = async function openSourceDefinition(vscode, exten
     if (disposed) return;
     disposed = true;
     const failures = [];
+    if (completions) { try { await completions.dispose(); } catch (error) { failures.push(error); } }
     for (const document of documents.values()) {
       try {
         const uri = document.uri.toString();
@@ -91,6 +100,16 @@ exports.openSourceDefinition = async function openSourceDefinition(vscode, exten
     entryReport = await currentReport(entry);
     return {
       observation,
+      async completion(line, character) {
+        if (disposed) throw new Error('The native completion case is disposed.');
+        const actual = await completionObserver().request(line, character);
+        return { ...observation(), ...actual };
+      },
+      async applyCompletion(request, index) {
+        if (disposed) throw new Error('The native completion case is disposed.');
+        const actual = await completionObserver().apply(request, index);
+        return { ...observation(), ...actual };
+      },
       async symbols() {
         if (disposed) throw new Error('The native source case is disposed.');
         const returned = await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider', entry.uri);

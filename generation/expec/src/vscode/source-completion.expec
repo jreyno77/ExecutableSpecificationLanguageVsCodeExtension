@@ -1,0 +1,156 @@
+use SourceCompletion from "../core/source-completion.expec"
+use DefinitionTextDocument, DefinitionPosition from "./source-navigation.expec"
+opaque type NativeCompletionItem
+
+component SourceCompletionAdapter {
+  requires package "language-server" for runtime
+  requires package "language-server-document" for runtime
+  requires package "typescript" for build
+  requires package "vitest" for test
+  requires package "vscode-test-electron" for test
+  depends on SourceCompletion
+  construction(completion: SourceCompletion)
+  public items
+  capability items(document: DefinitionTextDocument, position: DefinitionPosition) returns List<NativeCompletionItem> {
+    promises "Convert this exact standard LSP TextDocument and zero-based UTF-16 Position to one current SourceCompletion query. Invalid, fractional, negative, out-of-line or surrogate-interior positions give an empty list, never a clamped query. Require the reply's captured URI/text to match this document exactly and a finite single-line range containing this requested position. Return standard plain-text CompletionItems labelled by eligible spelling with an exact TextEdit for only the captured final token, using the SDK insertionText unchanged and actual targetName as plain detail. No inferred implementation or validity, snippets, command, additionalTextEdits, resolve handler, trusted Markdown or generated edits. Absence stays an empty list. This adapter owns coordinates and presentation, not scope, parsing, resolution, acquisition, generation or file mutation."
+  }
+}
+
+// Installed cases reuse the one owned VSIX/VS Code host and fresh case-owned sources.
+// Open/edits await actual current native analysis/resultId, including real partial-name
+// problems. One standard executeCompletionItemProvider command invokes the installed
+// client's registered provider. A case-owned public provideCompletionItem middleware
+// wrapper delegates the prior product wrapper and real continuation, returns its exact
+// reply, and records the owned document identity/version/position and actual contribution.
+// Retain the aggregate command reply separately; never filter it by expected labels.
+// Missing/duplicate owned callbacks are observation errors; actual empty replies remain
+// recorded by request number. Native edit observations use real Range/string insertText,
+// not a fictitious textEdit, private converter metadata, snippets or inferred label edits.
+// Apply only that retained edit after verifying the original document identity/version.
+// This proves provider output and standard WorkspaceEdit application, not GUI selection.
+// Observe current text/dirty state, saved bytes and the complete owned path/kind/byte tree.
+// Drain owned observations, restore only the wrapper still owned, revert/close only owned
+// tabs/listeners and retain unconfirmed cleanup. Lines/columns are one-based UTF-16.
+examples for SourceCompletionAdapter {
+  setup completionEditor(text: Text) returns Nothing
+  action requestNativeTypeCompletion(line: Number, column: Number) returns Nothing
+  action editCompletionWithoutSaving(text: Text) returns Nothing
+  action applyNativeTypeSuggestion(request: Number, index: Number) returns Nothing
+  observation nativeTypeSuggestionCount(request: Number) returns Number
+  observation nativeTypeSuggestionLabel(request: Number, index: Number) returns Text
+  observation nativeTypeSuggestionInsertion(request: Number, index: Number) returns Text
+  observation nativeTypeSuggestionStartLine(request: Number, index: Number) returns Number
+  observation nativeTypeSuggestionStartColumn(request: Number, index: Number) returns Number
+  observation nativeTypeSuggestionEndLine(request: Number, index: Number) returns Number
+  observation nativeTypeSuggestionEndColumn(request: Number, index: Number) returns Number
+  observation nativeCompletionOpenText() returns Text
+  observation nativeCompletionSavedText() returns Text
+  observation nativeCompletionOpenIsDirty() returns Boolean
+  observation completionProjectUnchanged() returns Boolean
+
+  check expectNativeTypeSuggestions(request: Number, count: Number) {
+    let actual = nativeTypeSuggestionCount(request)
+    assert actual == count
+  }
+  check expectNativeTypeEdit(request: Number, index: Number, label: Text, insertion: Text, line: Number, start: Number, end: Number) {
+    let actualLabel = nativeTypeSuggestionLabel(request, index)
+    let actualInsertion = nativeTypeSuggestionInsertion(request, index)
+    let actualLine = nativeTypeSuggestionStartLine(request, index)
+    let actualStart = nativeTypeSuggestionStartColumn(request, index)
+    let actualEndLine = nativeTypeSuggestionEndLine(request, index)
+    let actualEnd = nativeTypeSuggestionEndColumn(request, index)
+    assert actualLabel == label
+    assert actualInsertion == insertion
+    assert actualLine == line
+    assert actualStart == start
+    assert actualEndLine == line
+    assert actualEnd == end
+  }
+  check expectNativeCompletionText(current: Text, saved: Text, dirty: Boolean) {
+    let actualCurrent = nativeCompletionOpenText()
+    let actualSaved = nativeCompletionSavedText()
+    let actualDirty = nativeCompletionOpenIsDirty()
+    assert actualCurrent == current
+    assert actualSaved == saved
+    assert actualDirty == dirty
+  }
+  check expectNoCompletionProjectWrites() {
+    let unchanged = completionProjectUnchanged()
+    assert unchanged == true
+  }
+
+  scenario "the installed type provider offers Book and its returned edit changes only the unsaved token" {
+    given completionEditor("type Book {}\ncomponent Store {\n  local type Bookcase {}\n}\ntype Basket { book: Boo }")
+    when requestNativeTypeCompletion(5, 24)
+    when applyNativeTypeSuggestion(1, 1)
+    then expectNativeTypeSuggestions(1, 2)
+    then expectNativeTypeEdit(1, 1, "Book", "Book", 5, 21, 24)
+    then expectNativeTypeEdit(1, 2, "Boolean", "Boolean", 5, 21, 24)
+    then expectNativeCompletionText("type Book {}\ncomponent Store {\n  local type Bookcase {}\n}\ntype Basket { book: Book }", "type Book {}\ncomponent Store {\n  local type Bookcase {}\n}\ntype Basket { book: Boo }", true)
+    then expectNoCompletionProjectWrites()
+  }
+  scenario "an unsaved declaration changes current provider suggestions and rejected text withdraws them" {
+    given completionEditor("type Book {}\ntype Basket { book: Boo }")
+    when requestNativeTypeCompletion(2, 24)
+    when editCompletionWithoutSaving("type Booklet {}\ntype Basket { book: Boo }")
+    when requestNativeTypeCompletion(2, 24)
+    when editCompletionWithoutSaving("type Booklet {}\ntype Basket { book: Boo")
+    when requestNativeTypeCompletion(2, 24)
+    then expectNativeTypeEdit(1, 1, "Book", "Book", 2, 21, 24)
+    then expectNativeTypeEdit(2, 1, "Booklet", "Booklet", 2, 21, 24)
+    then expectNativeTypeSuggestions(3, 0)
+    then expectNativeCompletionText("type Booklet {}\ntype Basket { book: Boo", "type Book {}\ntype Basket { book: Boo }", true)
+    then expectNoCompletionProjectWrites()
+  }
+  scenario "the real provider preserves quoted Unicode names and UTF-16 replacement bounds" {
+    given completionEditor("type `📚Book` {}\r\ntype Basket { book: `📚B` }")
+    when requestNativeTypeCompletion(2, 26)
+    then expectNativeTypeSuggestions(1, 1)
+    then expectNativeTypeEdit(1, 1, "📚Book", "`📚Book`", 2, 21, 26)
+    then expectNoCompletionProjectWrites()
+  }
+
+  // Cheap protocol callers use real DocumentAnalysis/SourceCompletion/TextDocument.
+  // Literal positions are zero-based UTF-16; record actual LSP TextEdit replies by request.
+  // No native process, copied parser, manufactured item or second analysis is used.
+  setup completionConversion(text: Text) returns Nothing
+  action requestConvertedTypeCompletion(line: Number, character: Number) returns Nothing
+  observation convertedTypeCount(request: Number) returns Number
+  observation convertedTypeLabel(request: Number, index: Number) returns Text
+  observation convertedTypeInsertion(request: Number, index: Number) returns Text
+  observation convertedTypeStart(request: Number, index: Number) returns Number
+  observation convertedTypeEnd(request: Number, index: Number) returns Number
+  check expectConvertedTypeEdit(request: Number, label: Text, insertion: Text, start: Number, end: Number) {
+    let count = convertedTypeCount(request)
+    let actualLabel = convertedTypeLabel(request, 1)
+    let actualInsertion = convertedTypeInsertion(request, 1)
+    let actualStart = convertedTypeStart(request, 1)
+    let actualEnd = convertedTypeEnd(request, 1)
+    assert count == 1
+    assert actualLabel == label
+    assert actualInsertion == insertion
+    assert actualStart == start
+    assert actualEnd == end
+  }
+  check expectNoConvertedTypeItems(request: Number) {
+    let count = convertedTypeCount(request)
+    assert count == 0
+  }
+  scenario "protocol completion preserves the whole quoted token after CRLF and an astral character" {
+    given completionConversion("type `📚Book` {}\r\ntype Basket { book: `📚B` }")
+    when requestConvertedTypeCompletion(1, 25)
+    then expectConvertedTypeEdit(1, "📚Book", "`📚Book`", 20, 25)
+  }
+  scenario "malformed native positions cannot clamp into a type suggestion" {
+    given completionConversion("type `📚Book` {}\r\ntype Basket { book: `📚B` }")
+    when requestConvertedTypeCompletion(1, 22)
+    when requestConvertedTypeCompletion(1, 999)
+    when requestConvertedTypeCompletion(1, 25.5)
+    when requestConvertedTypeCompletion(-1, 25)
+    then expectNoConvertedTypeItems(1)
+    then expectNoConvertedTypeItems(2)
+    then expectNoConvertedTypeItems(3)
+    then expectNoConvertedTypeItems(4)
+  }
+}
+

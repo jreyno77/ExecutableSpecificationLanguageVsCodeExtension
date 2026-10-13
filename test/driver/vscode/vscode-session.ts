@@ -20,7 +20,8 @@ export type DiagnosticObservation = {
 export type DiagnosticMiddlewareObservation = { cancellationError: boolean; nextCalls: number; runtime: { node: string; vscode: string } };
 
 export type SidebarObservation = { readonly status: string; readonly project: string; readonly explanation: string; readonly saved?: string; readonly unsaved?: string };
-export type PreviewEditorObservation = { readonly uri: string; readonly version: number; readonly text: string; readonly dirty: boolean; readonly savedText: string };
+export type PreviewEditorObservation = { readonly uri: string; readonly version: number; readonly text: string; readonly dirty: boolean; readonly savedText: string;
+  readonly resultId: string; readonly diagnosticCount: number };
 
 export type GenerationEditorObservation = {
   uri: string; version: number; text: string; dirty: boolean; savedText: string; configurationFile: string;
@@ -43,7 +44,12 @@ export type NativeHoverObservation = NativeDefinitionObservation & {
 export type NativeOutlineSymbol = { name: string; kind: string; range: DiagnosticRange; selectionRange: DiagnosticRange; children: readonly NativeOutlineSymbol[] };
 export type NativeOutlineObservation = NativeDefinitionObservation & { entryText: string; symbols: readonly NativeOutlineSymbol[] };
 
-type Operation = 'definitionOpen' | 'definitionEdit' | 'definitionGoTo' | 'definitionHover' | 'definitionSymbols' | 'definitionDispose' | 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
+export type NativeCompletionObservation = NativeDefinitionObservation & {
+  entryText: string; requestUri: string; requestVersion: number; requestPosition: DiagnosticPosition;
+  items: readonly { label: string; insertion: string; range: DiagnosticRange }[]; aggregate?: unknown;
+};
+export type NativeCompletionDocumentObservation = NativeDefinitionObservation & { entryText: string };
+type Operation = 'definitionOpen' | 'definitionEdit' | 'definitionGoTo' | 'definitionHover' | 'definitionSymbols' | 'definitionCompletion' | 'definitionApplyCompletion' | 'definitionDispose' | 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
 type Pending = { promise: Promise<unknown>; resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> };
 
 /** One owned native host, with only the observations needed by its test consumers. */
@@ -182,7 +188,9 @@ export class VsCodeSession {
     const value = await this.request(operation, values);
     if (!value || typeof value !== 'object' || !('uri' in value) || typeof value.uri !== 'string' || !('version' in value) || !Number.isInteger(value.version)
       || !('text' in value) || typeof value.text !== 'string' || !('dirty' in value) || typeof value.dirty !== 'boolean'
-      || !('savedText' in value) || typeof value.savedText !== 'string') throw new Error('The native host returned an invalid preview editor observation.');
+      || !('savedText' in value) || typeof value.savedText !== 'string'
+      || !('resultId' in value) || typeof value.resultId !== 'string' || value.resultId === ''
+      || !('diagnosticCount' in value) || !Number.isInteger(value.diagnosticCount) || Number(value.diagnosticCount) < 0) throw new Error('The native host returned an invalid preview editor observation.');
     return value as PreviewEditorObservation;
   }
 
@@ -226,6 +234,26 @@ export class VsCodeSession {
       await this.poison(error); throw error;
     }
     return value as NativeHoverObservation;
+  }
+  async completeNativeDefinition(definitionId: string, line: number, character: number): Promise<NativeCompletionObservation> {
+    const value = await this.definitionRequest('definitionCompletion', { definitionId, line, character });
+    const actual = value as Partial<NativeCompletionObservation>;
+    if (typeof actual.entryText !== 'string' || actual.requestUri !== actual.entryUri || actual.requestVersion !== actual.entryVersion
+      || actual.requestPosition?.line !== line || actual.requestPosition?.character !== character
+      || !Array.isArray(actual.items) || !actual.items.every(item => typeof item?.label === 'string'
+        && typeof item.insertion === 'string' && validPosition(item.range?.start) && validPosition(item.range?.end))) {
+      const error = new Error('The native host returned an invalid completion observation.');
+      await this.poison(error); throw error;
+    }
+    return value as NativeCompletionObservation;
+  }
+  async applyNativeDefinitionCompletion(definitionId: string, request: number, index: number): Promise<NativeCompletionDocumentObservation> {
+    const value = await this.definitionRequest('definitionApplyCompletion', { definitionId, request, index });
+    if (typeof (value as Partial<NativeCompletionDocumentObservation>).entryText !== 'string') {
+      const error = new Error('The native host returned an invalid applied completion observation.');
+      await this.poison(error); throw error;
+    }
+    return value as NativeCompletionDocumentObservation;
   }
   async disposeNativeDefinition(definitionId: string): Promise<void> {
     const value = await this.request('definitionDispose', { definitionId });

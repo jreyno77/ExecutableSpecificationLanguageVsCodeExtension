@@ -2,6 +2,7 @@ import { DocumentAnalysis } from '../../src/core/DocumentAnalysis.js';
 import type { SourceDocument } from '../../src/core/SourceDocument.js';
 import type { SyntaxDiagnostic, Compilation, Diagnostic } from 'executable-specification-language';
 import type { DocumentReport } from '../../src/core/DocumentReport.js';
+import type { ConnectionConfiguration } from '../../src/core/ConnectionConfiguration.js';
 
 type Publication = { source: SourceDocument; version: number; problems: SyntaxDiagnostic[]; report: DocumentReport };
 
@@ -15,6 +16,21 @@ export class DocumentAnalysisRecording {
     publish: (source, version, report) => { this.publications.push({ source, version, report, problems: report.syntax }); },
     clear: uri => { this.clears.push(uri); },
   }, { read: uri => this.savedSources.get(uri) });
+
+  configurationChanged(configuration: ConnectionConfiguration | undefined): void {
+    this.analysis.configurationChanged(configuration);
+  }
+  atPublication(uri: string, publication: number): Publication {
+    if (!Number.isInteger(publication) || publication < 1) throw new RangeError('Publication numbers must be positive integers.');
+    const actual = this.publications.filter(packet => packet.source.uri === uri)[publication - 1];
+    if (!actual) throw new Error('No feedback was published for ' + uri + ' at publication ' + publication + '.');
+    return actual;
+  }
+  semanticProblemAtPublication(uri: string, publication: number): Diagnostic {
+    const problem = this.atPublication(uri, publication).report.compilation?.problems[0];
+    if (!problem) throw new Error('No semantic problem was published for ' + uri + ' at publication ' + publication + '.');
+    return problem;
+  }
 
   saved(source: SourceDocument): void {
     this.savedSources.set(source.uri, { uri: source.uri, text: source.text });

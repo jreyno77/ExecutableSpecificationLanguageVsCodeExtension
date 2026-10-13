@@ -211,3 +211,51 @@ test("an unavailable runtime package remains an explicit located problem", async
   await workspace.openSemanticSource({ ["uri"]: "untitled:Draft", ["text"]: "component Store { requires package \"storage\" for runtime }" }, 1);
   await workspace.expectSemanticProblem("untitled:Draft", "unavailable-package", 1, 36, 45);
 });
+
+/* @expec-test "9fd8a573-73ef-43d0-a169-8ecfdec9996d" */
+test("a supplied saved runtime alias permits authored checking without proving installation", async ({ workspace }) => {
+  await workspace.semanticAnalysis();
+  await workspace.changeSemanticConfiguration(workspace.runtimePackages);
+  await workspace.openSemanticSource(workspace.packageView, 1);
+  await workspace.changeSemanticSource({ ["uri"]: (workspace.packageView)["uri"], ["text"]: "component ReactScreen { requires package \"react\" for runtime }" }, 2);
+  await workspace.expectCheckedSource((workspace.packageView)["uri"]);
+  await workspace.expectSemanticPublications((workspace.packageView)["uri"], 2, 2);
+});
+
+/* @expec-test "26993310-3399-47af-9421-ad018190eccc" */
+test("a configured test alias does not satisfy a runtime requirement", async ({ workspace }) => {
+  await workspace.semanticAnalysis();
+  await workspace.changeSemanticConfiguration(workspace.testPackages);
+  await workspace.openSemanticSource(workspace.packageView, 1);
+  await workspace.expectSemanticProblem((workspace.packageView)["uri"], "unavailable-package", 1, 40, 47);
+});
+
+/* @expec-test "597e5373-82b2-4f4d-be48-d1c23978c012" */
+test("saving supplied package facts rechecks an open document without editing its version", async ({ workspace }) => {
+  await workspace.semanticAnalysis();
+  await workspace.openSemanticSource(workspace.packageView, 3);
+  await workspace.changeSemanticConfiguration(workspace.runtimePackages);
+  await workspace.expectEarlierPackageProblem((workspace.packageView)["uri"], 1);
+  await workspace.expectCheckedSource((workspace.packageView)["uri"]);
+  await workspace.expectSemanticPublications((workspace.packageView)["uri"], 2, 3);
+});
+
+/* @expec-test "687b76dc-b5b3-4033-8036-65697fd34d48" */
+test("switched invalid and absent saved configurations cannot reuse the previous package catalog", async ({ workspace }) => {
+  await workspace.semanticAnalysis();
+  await workspace.changeSemanticConfiguration(workspace.runtimePackages);
+  await workspace.openSemanticSource(workspace.packageView, 5);
+  await workspace.changeSemanticConfiguration({ ["file"]: "C:/workspace/another.json", ["text"]: "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[]}", ["writable"]: true });
+  await workspace.changeSemanticConfiguration(workspace.runtimePackages);
+  await workspace.changeSemanticConfiguration({ ["file"]: (workspace.runtimePackages)["file"], ["text"]: "{", ["writable"]: true });
+  await workspace.changeSemanticConfiguration(workspace.runtimePackages);
+  await workspace.clearSemanticConfiguration();
+  await workspace.expectEarlierCheckedPackageSource((workspace.packageView)["uri"], 1);
+  await workspace.expectEarlierPackageProblem((workspace.packageView)["uri"], 2);
+  await workspace.expectEarlierCheckedPackageSource((workspace.packageView)["uri"], 3);
+  await workspace.expectEarlierPackageProblem((workspace.packageView)["uri"], 4);
+  await workspace.expectEarlierCheckedPackageSource((workspace.packageView)["uri"], 5);
+  await workspace.expectEarlierPackageProblem((workspace.packageView)["uri"], 6);
+  await workspace.expectSemanticProblem((workspace.packageView)["uri"], "unavailable-package", 1, 40, 47);
+  await workspace.expectSemanticPublications((workspace.packageView)["uri"], 6, 5);
+});

@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Connection, Disposable, DocumentDiagnosticReport } from 'vscode-languageserver/node';
 import { CancellationToken, CancellationTokenSource } from 'vscode-languageserver/node';
 import { LanguageServerAdapter } from '../../../src/vscode/LanguageServerAdapter.js';
@@ -7,6 +7,9 @@ import type { DocumentSources } from '../../../src/core/DocumentSources.js';
 import type { DocumentReport } from '../../../src/core/DocumentReport.js';
 import type { PreviewPublication } from '../../../src/core/PreviewPublication.js';
 import type { SourceDocument } from '../../../src/core/SourceDocument.js';
+import { DocumentAnalysis } from '../../../src/core/DocumentAnalysis.js';
+import { OutputPreviews } from '../../../src/core/OutputPreviews.js';
+import type { ConnectionConfiguration } from '../../../src/core/ConnectionConfiguration.js';
 
 // A narrow native-connection recorder: the real adapter registers and invokes these
 // protocol operations. It never parses source or supplies an expected compiler answer.
@@ -22,7 +25,7 @@ function recordedServer(sources: DocumentSources = { read: () => undefined }) {
     return { dispose: () => { released.push(name); } };
   };
   const connection = {
-    onInitialize: listen('initialize'), onInitialized: listen('initialized'), onDefinition: listen('definition'), onHover: listen('hover'), onDocumentSymbol: listen('documentSymbols'),
+    onInitialize: listen('initialize'), onInitialized: listen('initialized'), onDefinition: listen('definition'), onHover: listen('hover'), onDocumentSymbol: listen('documentSymbols'), onCompletion: listen('completion'),
     onNotification: (method: string, callback: (params: any) => void) => listen(method)(callback),
     sendNotification: (_method: string, value: PreviewPublication) => { publications.push(value); for (const receive of [...publicationListeners]) receive(); return Promise.resolve(); },
     onDidChangeWatchedFiles: listen('watched'),
@@ -277,7 +280,7 @@ describe('native semantic feedback at its protocol boundary', () => {
     expect(server.pull(source.uri).items).toEqual([]);
     expect(server.pull(source.uri).resultId).toBeUndefined();
     expect(releases).toBe(1);
-    expect(new Set(server.released)).toEqual(new Set(['initialize', 'initialized', 'watched', 'diagnostics', 'opened', 'changed', 'closed', 'willSave', 'willSaveWaitUntil', 'saved', 'expec/previewConfiguration', 'expec/previewSelection', 'definition', 'hover', 'documentSymbols']));
+    expect(new Set(server.released)).toEqual(new Set(['initialize', 'initialized', 'watched', 'diagnostics', 'opened', 'changed', 'closed', 'willSave', 'willSaveWaitUntil', 'saved', 'expec/previewConfiguration', 'expec/previewSelection', 'definition', 'hover', 'documentSymbols', 'completion']));
     expect(() => server.adapter.dispose()).not.toThrow();
   });
 });
@@ -358,4 +361,121 @@ describe('native source definitions at their protocol boundary', () => {
       expect(await server.definition(source.uri, 1, 20)).toBeNull();
     } finally { cancellation.dispose(); server.adapter.dispose(); }
   });
+});
+
+
+const savedPackageConfiguration = (phase: 'runtime' | 'test'): ConnectionConfiguration => ({
+  file: resolve('expec.json'), writable: true,
+  text: JSON.stringify({
+    formatVersion: 1, version: '0.1.0', build: { entries: ['view.expec'] }, outputs: [],
+    packages: [{ alias: 'react', name: 'npm:react', version: '19.3.0', phases: [phase] }],
+  }),
+});
+
+describe('saved package metadata at the native notification boundary', () => {
+  it('clears an actual unavailable package finding at the unchanged document version', () => {
+    const server = recordedServer();
+    const source = { uri: 'file:///workspace/view.expec', text: 'component ReactView { requires package "react" for runtime }' };
+    try {
+      server.open(source);
+      const earlier = server.pull(source.uri);
+      expect(earlier.items.map(item => item.code)).toEqual(['unavailable-package']);
+
+      server.notification('expec/previewConfiguration', { configuration: savedPackageConfiguration('runtime') });
+
+      const current = server.pull(source.uri);
+      expect(current.items).toEqual([]);
+      expect(current.resultId).toBeTruthy();
+      expect(current.resultId).not.toBe(earlier.resultId);
+    } finally { server.adapter.dispose(); }
+  });
+
+  it('keeps the newer runtime catalog after a configuration notification reenters the first preview forward', () => {
+    const server = recordedServer();
+    const source = { uri: 'file:///workspace/view.expec', text: 'component ReactView { requires package "react" for runtime }' };
+    const forwardPreview = OutputPreviews.prototype.configurationChanged;
+    let reentered = false;
+    const preview = vi.spyOn(OutputPreviews.prototype, 'configurationChanged').mockImplementation(function (this: OutputPreviews, configuration) {
+      forwardPreview.call(this, configuration);
+      if (!reentered) {
+        reentered = true;
+        server.notification('expec/previewConfiguration', { configuration: savedPackageConfiguration('runtime') });
+      }
+    });
+    try {
+      server.open(source);
+      const earlier = server.pull(source.uri);
+      expect(earlier.items.map(item => item.code)).toEqual(['unavailable-package']);
+
+      server.notification('expec/previewConfiguration', { configuration: savedPackageConfiguration('test') });
+
+      const current = server.pull(source.uri);
+      expect(current.items).toEqual([]);
+      expect(current.resultId).toBeTruthy();
+      expect(current.resultId).not.toBe(earlier.resultId);
+    } finally { preview.mockRestore(); server.adapter.dispose(); }
+  });
+
+  it('does not forward configuration to analysis after disposal during the first preview forward', () => {
+    const server = recordedServer();
+    const source = { uri: 'file:///workspace/view.expec', text: 'component ReactView { requires package "react" for runtime }' };
+    const forwardPreview = OutputPreviews.prototype.configurationChanged;
+    const analysis = vi.spyOn(DocumentAnalysis.prototype, 'configurationChanged');
+    const preview = vi.spyOn(OutputPreviews.prototype, 'configurationChanged').mockImplementation(function (this: OutputPreviews, configuration) {
+      forwardPreview.call(this, configuration);
+      server.adapter.dispose();
+    });
+    try {
+      server.open(source);
+      expect(server.pull(source.uri).items.map(item => item.code)).toEqual(['unavailable-package']);
+
+      server.notification('expec/previewConfiguration', { configuration: savedPackageConfiguration('runtime') });
+
+      expect(analysis).not.toHaveBeenCalled();
+      expect(server.pull(source.uri)).toEqual({ kind: 'full', resultId: undefined, items: [] });
+    } finally { preview.mockRestore(); analysis.mockRestore(); server.adapter.dispose(); }
+  });
+
+  it('forwards captured configuration scalars when the caller mutates its input during the first preview forward', () => {
+    const server = recordedServer();
+    const source = { uri: 'file:///workspace/view.expec', text: 'component ReactView { requires package "react" for runtime }' };
+    const configuration = savedPackageConfiguration('runtime');
+    const supplied = { ...configuration };
+    const forwardPreview = OutputPreviews.prototype.configurationChanged;
+    const analysis = vi.spyOn(DocumentAnalysis.prototype, 'configurationChanged');
+    const preview = vi.spyOn(OutputPreviews.prototype, 'configurationChanged').mockImplementation(function (this: OutputPreviews, snapshot) {
+      forwardPreview.call(this, snapshot);
+      configuration.file = resolve('another.json');
+      configuration.text = savedPackageConfiguration('test').text;
+      configuration.writable = false;
+    });
+    try {
+      server.open(source);
+      const earlier = server.pull(source.uri);
+      expect(earlier.items.map(item => item.code)).toEqual(['unavailable-package']);
+
+      server.notification('expec/previewConfiguration', { configuration });
+
+      expect(analysis).toHaveBeenCalledExactlyOnceWith(supplied);
+      const current = server.pull(source.uri);
+      expect(current.items).toEqual([]);
+      expect(current.resultId).toBeTruthy();
+      expect(current.resultId).not.toBe(earlier.resultId);
+    } finally { preview.mockRestore(); analysis.mockRestore(); server.adapter.dispose(); }
+  });
+});
+
+it('keeps the newest diagnostic report when preview feedback changes packages during publication', () => {
+  const server = recordedServer();
+  const source = { uri: 'file:///workspace/view.expec', text: 'component ReactView { requires package "react" for runtime }' };
+  server.open(source);
+  const forwardPreview = OutputPreviews.prototype.published;
+  const preview = vi.spyOn(OutputPreviews.prototype, 'published').mockImplementationOnce(function (this: OutputPreviews, document, version, report) {
+    forwardPreview.call(this, document, version, report);
+    server.notification('expec/previewConfiguration', { configuration: savedPackageConfiguration('test') });
+  });
+  try {
+    server.notification('expec/previewConfiguration', { configuration: savedPackageConfiguration('runtime') });
+    expect(server.pull(source.uri).items.map(item => item.code)).toEqual(['unavailable-package']);
+  } finally { preview.mockRestore(); server.adapter.dispose(); }
 });

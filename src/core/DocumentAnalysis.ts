@@ -1,3 +1,6 @@
+import { ConfigurationReader, acceptanceOutput, contractListOutput, javaAcceptanceOutput, javaOutput,
+    kotlinAcceptanceOutput, kotlinOutput, markdownOutput, pythonAcceptanceOutput, pythonOutput, structureListOutput,
+    typescriptOutput, umlOutput, type DependencyPackage } from 'executable-specification-language';
 import { Compiler, LangiumModel, QueryInspection, SourceComposer, type ModuleModel, type ReadResult } from 'executable-specification-language';
 import type { DocumentReport } from './DocumentReport.js';
 
@@ -9,6 +12,8 @@ import { LangiumReader } from 'executable-specification-language';
 import type { DocumentFeedback } from "./DocumentFeedback.js";
 import type { SourceDocument } from "./SourceDocument.js";
 import type { DocumentSources } from "./DocumentSources.js";
+import type { ConnectionConfiguration } from "./ConnectionConfiguration.js";
+
 
 /** Number profile: JavaScript binary64. */
 
@@ -20,6 +25,13 @@ import type { DocumentSources } from "./DocumentSources.js";
  * Requires package: vitest (test)
  */
 export class DocumentAnalysis {
+    private readonly configurationReader = new ConfigurationReader([
+        typescriptOutput, markdownOutput, umlOutput, contractListOutput, structureListOutput,
+        acceptanceOutput, javaOutput, javaAcceptanceOutput, kotlinOutput, kotlinAcceptanceOutput, pythonOutput, pythonAcceptanceOutput,
+    ]);
+    private packages: readonly DependencyPackage[] = [];
+    private packageKey = '[]';
+    private configurationRevision = 0;
     private readonly reader = new LangiumReader();
     private readonly compiler = new Compiler();
     private readonly composer = new SourceComposer((owner, authored) => this.locate(owner, authored));
@@ -160,7 +172,7 @@ export class DocumentAnalysis {
             current();
             const models = [...captures.values()].flatMap(parsed => parsed.model ? [parsed.model] : []);
             const resolution = entry.model
-                ? this.composer.compose(entry.model, { modules: models.slice(1), packages: [] }) : undefined;
+                ? this.composer.compose(entry.model, { modules: models.slice(1), packages: this.packages }) : undefined;
             const compilation = resolution ? this.compiler.compile({ resolution }) : undefined;
             const inspection = resolution ? new QueryInspection(resolution.model) : undefined;
             current();
@@ -168,6 +180,7 @@ export class DocumentAnalysis {
                 syntax: [...captures.values()].flatMap(parsed => parsed.result.status === 'rejected' ? [...parsed.result.diagnostics] : []),
                 ...(compilation === undefined ? {} : { compilation }),
                 ...(inspection === undefined ? {} : { inspection }),
+                ...(resolution === undefined ? {} : { resolution }),
                 sources: [...captures.values()].map(parsed => parsed.source), dependencies: [...dependencies],
             };
             Object.freeze(report.syntax);
@@ -191,5 +204,28 @@ sourceChanged(uri: string): void {
         if (!affected.length) return;
         this.saved.delete(uri);
         this.run(affected);
+    }
+
+/**
+     * Unverified implementation obligation.
+     * Receive the current selected saved configuration snapshot or absence. Validate its supplied text through the public ConfigurationReader with shipped output profiles, then capture only validated Configuration.packages aliases and phases as the existing SourceComposer's DependencyPackage inputs. Missing text, invalid configuration, switching manifests or withdrawing selection replaces the prior catalog; never retain old supplied packages after an invalid or absent snapshot. Do not use writable as package availability or read unsaved configuration buffers; ConnectionSidebar supplies its actual saved-text policy. These are supplied compiler configuration facts, not proof of package installation, native exports, external declaration models, runtime behavior or generation readiness. Keep genuinely unsupplied aliases and missing phases as the language's actual findings. Do not infer packages from imports, folder names, node_modules or another project.
+     * A changed catalog invalidates current open analyses and republishes their exact retained unsaved sources at unchanged editor versions through the same SourceComposer, Compiler and Inspection/Resolution publication. Reuse unchanged parsed sources and saved dependency snapshots. Retain the validated catalog for ordinary source edits rather than revalidating configuration per edit. Preserve current document lifetimes and guard reentrant source/configuration/feedback changes so older work cannot publish with an obsolete catalog. Validation or publication exceptions surface; they are not empty success. Existing configuration consumers retain actual validation explanations. This operation never acquires project/package code, scans, installs, generates, saves or writes; it does not require connected-target verification.
+     */
+configurationChanged(configuration: ConnectionConfiguration | undefined): void {
+        const revision = ++this.configurationRevision;
+        const snapshot = configuration === undefined ? undefined : {
+            file: configuration.file, text: configuration.text, writable: configuration.writable,
+        };
+        const checked = snapshot?.text === undefined ? undefined
+            : this.configurationReader.read({ sourceId: snapshot.file, text: snapshot.text });
+        if (revision !== this.configurationRevision) return;
+        const packages = (checked?.value?.packages ?? []).map(({ alias, phases }) => Object.freeze({
+            alias, phases: Object.freeze([...phases].sort()),
+        })).sort((first, second) => first.alias.localeCompare(second.alias));
+        const key = JSON.stringify(packages);
+        if (key === this.packageKey) return;
+        this.packageKey = key;
+        this.packages = Object.freeze(packages);
+        this.run([...this.documents.values()].map(document => ({ document, revision: ++document.revision })));
     }
 }
