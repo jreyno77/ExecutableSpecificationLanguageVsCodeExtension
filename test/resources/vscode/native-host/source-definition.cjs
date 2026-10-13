@@ -13,6 +13,10 @@ exports.openSourceDefinition = async function openSourceDefinition(vscode, exten
   let locations = [];
   let disposed = false;
   let completions;
+  let referenceRequest;
+  let referenceCancellation;
+  let referenceSequence = 0;
+  const pendingReferences = new Set();
   subscriptions.push(client.getFeature('textDocument/didOpen').onNotificationSent(event => opened.set(event.textDocument, event.params.textDocument.version)));
   subscriptions.push(client.getFeature('textDocument/didChange').onNotificationSent(event => changed.set(event.textDocument, event.params.textDocument.version)));
 
@@ -70,10 +74,73 @@ exports.openSourceDefinition = async function openSourceDefinition(vscode, exten
         return code === undefined ? '' : String(code);
       }) };
   }
+  async function referenceObservation() {
+    const request = referenceRequest;
+    if (disposed || !request) throw new Error('No current owned reference request exists.');
+    for (const snapshot of request.documents) {
+      if (snapshot.document.isClosed || snapshot.document.version !== snapshot.version
+        || !vscode.workspace.textDocuments.some(document => document === snapshot.document))
+        throw new Error('A captured native reference document became obsolete.');
+    }
+    const report = await currentReport(entry);
+    if (disposed || referenceRequest !== request || report.resultId !== request.resultId
+      || entry.version !== request.version || entry.getText() !== request.text)
+      throw new Error('The actual native reference analysis became obsolete.');
+    entryReport = report;
+    return { ...observation(), locations: request.locations, requestUri: entry.uri.toString(), requestVersion: request.version,
+      requestResultId: request.resultId, requestPosition: request.position, includeDeclaration: false };
+  }
+  function references(line, character) {
+    const operation = requestReferences(line, character);
+    pendingReferences.add(operation);
+    void operation.then(() => pendingReferences.delete(operation), () => pendingReferences.delete(operation));
+    return operation;
+  }
+  async function requestReferences(line, character) {
+    if (disposed) throw new Error('The native reference case is disposed.');
+    referenceRequest = undefined;
+    const sequence = ++referenceSequence;
+    await vscode.window.showTextDocument(entry);
+    entryReport = await currentReport(entry);
+    const version = entry.version, text = entry.getText(), resultId = entryReport.resultId;
+    const snapshots = [...documents.values()].map(document => ({ document, version: document.version }));
+    let provider;
+    await until(() => (provider = client.getFeature('textDocument/references').getProvider(entry)), 'The installed native references provider is unavailable.');
+    if (disposed || referenceSequence !== sequence || entry.isClosed || entry.version !== version || entry.getText() !== text)
+      throw new Error('The native reference request became obsolete before provider dispatch.');
+    const cancellation = referenceCancellation = new vscode.CancellationTokenSource();
+    let returned;
+    try { returned = await provider.provideReferences(entry, new vscode.Position(line, character), { includeDeclaration: false }, cancellation.token); }
+    finally { if (referenceCancellation === cancellation) referenceCancellation = undefined; cancellation.dispose(); }
+    if (disposed || referenceSequence !== sequence || entry.isClosed || entry.version !== version || entry.getText() !== text
+      || snapshots.some(snapshot => snapshot.document.isClosed || snapshot.document.version !== snapshot.version))
+      throw new Error('The native reference response became obsolete.');
+    if (returned !== undefined && returned !== null && !Array.isArray(returned)) throw new Error('The installed reference provider returned an invalid list.');
+    const actualLocations = [];
+    for (const value of returned ?? []) {
+      if (!(value.uri instanceof vscode.Uri) || !(value.range instanceof vscode.Range)) throw new Error('The installed reference provider returned an invalid Location.');
+      const target = await vscode.workspace.openTextDocument(value.uri);
+      if (disposed || referenceSequence !== sequence) throw new Error('The owned native reference case ended during location acquisition.');
+      const owned = Object.entries(ownedUris).find(([, uri]) => uri === target.uri.toString());
+      if (owned) documents.set(owned[0], target);
+      if (target.validateRange(value.range).start.compareTo(value.range.start) !== 0
+        || target.validateRange(value.range).end.compareTo(value.range.end) !== 0 || value.range.isEmpty)
+        throw new Error('The installed reference provider returned a range outside its actual native document.');
+      actualLocations.push({ uri: value.uri.toString(), name: target.getText(value.range),
+        range: { start: { line: value.range.start.line, character: value.range.start.character },
+          end: { line: value.range.end.line, character: value.range.end.character } } });
+    }
+    referenceRequest = { version, text, resultId, position: { line, character }, documents: snapshots, locations: actualLocations };
+    return referenceObservation();
+  }
   async function dispose() {
     if (disposed) return;
     disposed = true;
+    referenceSequence++;
+    referenceCancellation?.cancel(); referenceCancellation?.dispose(); referenceCancellation = undefined;
+    referenceRequest = undefined;
     const failures = [];
+    await Promise.allSettled([...pendingReferences]);
     if (completions) { try { await completions.dispose(); } catch (error) { failures.push(error); } }
     for (const document of documents.values()) {
       try {
@@ -100,6 +167,8 @@ exports.openSourceDefinition = async function openSourceDefinition(vscode, exten
     entryReport = await currentReport(entry);
     return {
       observation,
+      references,
+      referenceObservation,
       async completion(line, character) {
         if (disposed) throw new Error('The native completion case is disposed.');
         const actual = await completionObserver().request(line, character);

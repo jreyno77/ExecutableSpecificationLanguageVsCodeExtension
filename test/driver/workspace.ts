@@ -1,3 +1,6 @@
+import { NativeReferencesRecording } from './vscode/native-references.js';
+import { SourceReferencesRecording } from './source-references.js';
+import { SourceReferenceConversion } from './source-reference-conversion.js';
 import { FileScopes } from './file-scopes.js';
 import { NativeCompletionRecording } from './vscode/native-completion.js';
 import { SourceCompletionRecording } from './source-completion.js';
@@ -38,6 +41,11 @@ import { ConnectionOutputGuidance } from "../../src/core/ConnectionOutputGuidanc
 
 
 export class WorkspaceDriver {
+  private nativeReferencesRecording!: NativeReferencesRecording;
+
+  private referenceRecording!: SourceReferencesRecording;
+  private referenceConversionRecording!: SourceReferenceConversion;
+
   private scopeFiles!: FileScopes;
   private nativeCompletionRecording!: NativeCompletionRecording;
   private sourceCompletionRecording!: SourceCompletionRecording;
@@ -2092,4 +2100,146 @@ async nativeScopeWarningIncludes(text: string): Promise<boolean> {
 async nativeScopeWarningMatches(code: string, path: string): Promise<boolean> {
     return this.nativePreview.scopeWarningMatches(code, path);
   }
+
+async sourceReferences(): Promise<void> { this.referenceRecording = SourceReferencesRecording.create(); }
+
+async importedReferenceEditor(entry: string, imported: string): Promise<void> {
+    this.nativeReferencesRecording = await NativeReferencesRecording.open({ 'entry.expec': entry, 'book.expec': imported });
+  }
+
+async localReferenceEditor(entry: string): Promise<void> {
+    this.nativeReferencesRecording = await NativeReferencesRecording.open({ 'entry.expec': entry });
+  }
+
+async referenceConversion(text: string): Promise<void> { this.referenceConversionRecording = new SourceReferenceConversion(text); }
+
+async saveReferenceSource(source: SourceDocument): Promise<void> { this.referenceRecording.savedSource(source); }
+
+async openReferenceSource(source: SourceDocument, version: number): Promise<void> { this.referenceRecording.opened(source, version); }
+
+async changeReferenceSource(source: SourceDocument, version: number): Promise<void> { this.referenceRecording.changed(source, version); }
+
+async closeReferenceSource(uri: string): Promise<void> { this.referenceRecording.closed(uri); }
+
+async disposeReferences(): Promise<void> { this.referenceRecording.disposed(); }
+
+async requestSourceReferences(uri: string, version: number, line: number, column: number, includeDeclaration: boolean): Promise<void> { this.referenceRecording.request(uri, version, line, column, includeDeclaration); }
+
+async rememberReferenceWork(): Promise<void> { this.referenceRecording.rememberWork(); }
+
+async editReferenceImport(text: string): Promise<void> {
+    await this.nativeReferencesRecording.editImport(text);
+  }
+
+async editReferenceEntry(text: string): Promise<void> {
+    await this.nativeReferencesRecording.editEntry(text);
+  }
+
+async findNativeReferences(line: number, column: number): Promise<void> {
+    await this.nativeReferencesRecording.find(line, column);
+  }
+
+async showNativeReferenceCoverage(): Promise<void> {
+    await this.nativeReferencesRecording.showCoverage();
+  }
+
+async requestConvertedReferences(line: number, character: number, includeDeclaration: boolean): Promise<void> { this.referenceConversionRecording.request(line, character, includeDeclaration); }
+
+async hasReferenceSearch(request: number): Promise<boolean> { return this.referenceRecording.reply(request) !== undefined; }
+
+async referenceLocationCount(request: number): Promise<number> { return this.referenceRecording.search(request).locations.length; }
+
+async referenceLocationUri(request: number, location: number): Promise<string> { return this.referenceRecording.location(request, location).source.uri; }
+
+async referenceLocationText(request: number, location: number): Promise<string> { return this.referenceRecording.location(request, location).source.text; }
+
+async referenceLocationName(request: number, location: number): Promise<string> { return this.referenceRecording.name(request, location); }
+
+async referenceLocationStartLine(request: number, location: number): Promise<number> { return this.referenceRecording.start(request, location).line; }
+
+async referenceLocationStartColumn(request: number, location: number): Promise<number> { return this.referenceRecording.start(request, location).column; }
+
+async referenceLocationEndLine(request: number, location: number): Promise<number> { return this.referenceRecording.end(request, location).line; }
+
+async referenceLocationEndColumn(request: number, location: number): Promise<number> { return this.referenceRecording.end(request, location).column; }
+
+async referenceCoveredUris(request: number): Promise<Array<string>> { return this.referenceRecording.search(request).coveredUris; }
+
+async referenceUnavailableUri(request: number, uri: string): Promise<boolean> { return this.referenceRecording.unavailable(request, uri); }
+
+async referencePrerequisiteCode(request: number, code: string): Promise<boolean> { return this.referenceRecording.prerequisiteCode(request, code); }
+
+async referenceHasDeferredPrerequisite(request: number): Promise<boolean> { return this.referenceRecording.hasDeferred(request); }
+
+async referenceWorkUnchanged(): Promise<boolean> { return this.referenceRecording.workUnchanged(); }
+
+async nativeReferenceCount(): Promise<number> {
+    return this.nativeReferencesRecording.observation().locations.length;
+  }
+
+async nativeReferenceUsesOwnedFile(location: number, fileName: string): Promise<boolean> {
+    return this.nativeReferencesRecording.usesOwnedFile(location, fileName);
+  }
+
+async nativeReferenceName(location: number): Promise<string> {
+    return this.nativeReferencesRecording.location(location).name;
+  }
+
+async nativeReferenceStartLine(location: number): Promise<number> {
+    return this.nativeReferencesRecording.location(location).range.start.line + 1;
+  }
+
+async nativeReferenceStartColumn(location: number): Promise<number> {
+    return this.nativeReferencesRecording.location(location).range.start.character + 1;
+  }
+
+async nativeReferenceEndLine(location: number): Promise<number> {
+    return this.nativeReferencesRecording.location(location).range.end.line + 1;
+  }
+
+async nativeReferenceEndColumn(location: number): Promise<number> {
+    return this.nativeReferencesRecording.location(location).range.end.character + 1;
+  }
+
+async nativeReferenceCoverageMessage(): Promise<string> {
+    return this.nativeReferencesRecording.coverageMessage();
+  }
+
+async nativeReferenceCoverageIncludesOwnedSource(fileName: string): Promise<boolean> {
+    return this.nativeReferencesRecording.coveredFile(fileName);
+  }
+
+async nativeReferenceCoverageIncludesUnavailable(fileName: string): Promise<boolean> {
+    return this.nativeReferencesRecording.unavailableFile(fileName);
+  }
+
+async nativeReferenceCoverageHasPrerequisite(code: string): Promise<boolean> {
+    return this.nativeReferencesRecording.prerequisite(code);
+  }
+
+async referenceImportIsDirty(): Promise<boolean> {
+    return this.nativeReferencesRecording.dirtyImport();
+  }
+
+async referenceEntryIsDirty(): Promise<boolean> {
+    return this.nativeReferencesRecording.dirtyEntry();
+  }
+
+async nativeReferenceFilesUnchanged(): Promise<boolean> {
+    return await this.nativeReferencesRecording.filesUnchanged();
+  }
+
+async hasConvertedReferenceSearch(request: number): Promise<boolean> { return this.referenceConversionRecording.reply(request) !== undefined; }
+
+async convertedReferenceCount(request: number): Promise<number> { return this.referenceConversionRecording.search(request).locations.length; }
+
+async convertedReferenceName(request: number, location: number): Promise<string> { return this.referenceConversionRecording.name(request, location); }
+
+async convertedReferenceStartLine(request: number, location: number): Promise<number> { return this.referenceConversionRecording.location(request, location).range.start.line; }
+
+async convertedReferenceStartCharacter(request: number, location: number): Promise<number> { return this.referenceConversionRecording.location(request, location).range.start.character; }
+
+async convertedReferenceEndLine(request: number, location: number): Promise<number> { return this.referenceConversionRecording.location(request, location).range.end.line; }
+
+async convertedReferenceEndCharacter(request: number, location: number): Promise<number> { return this.referenceConversionRecording.location(request, location).range.end.character; }
 }

@@ -40,6 +40,10 @@ export type NativeDefinitionObservation = {
   active: { uri: string; line: number; character: number };
 };
 
+export type NativeReferenceObservation = NativeDefinitionObservation & {
+  requestUri: string; requestVersion: number; requestResultId: string; requestPosition: DiagnosticPosition; includeDeclaration: false;
+};
+
 export type NativeHoverObservation = NativeDefinitionObservation & {
   hovers: readonly { markdown: string; name: string; range: DiagnosticRange }[];
 };
@@ -51,7 +55,7 @@ export type NativeCompletionObservation = NativeDefinitionObservation & {
   items: readonly { label: string; insertion: string; range: DiagnosticRange }[]; aggregate?: unknown;
 };
 export type NativeCompletionDocumentObservation = NativeDefinitionObservation & { entryText: string };
-type Operation = 'definitionOpen' | 'definitionEdit' | 'definitionGoTo' | 'definitionHover' | 'definitionSymbols' | 'definitionCompletion' | 'definitionApplyCompletion' | 'definitionDispose' | 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarManage' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
+type Operation = 'definitionReferences' | 'definitionReferenceObserve' | 'definitionOpen' | 'definitionEdit' | 'definitionGoTo' | 'definitionHover' | 'definitionSymbols' | 'definitionCompletion' | 'definitionApplyCompletion' | 'definitionDispose' | 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarManage' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
 type Pending = { promise: Promise<unknown>; resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> };
 
 /** One owned native host, with only the observations needed by its test consumers. */
@@ -229,6 +233,23 @@ export class VsCodeSession {
   }
   goToNativeDefinition(definitionId: string, line: number, character: number): Promise<NativeDefinitionObservation> {
     return this.definitionRequest('definitionGoTo', { definitionId, line, character });
+  }
+  async referencesNativeDefinition(definitionId: string, line: number, character: number): Promise<NativeReferenceObservation> {
+    const value = await this.definitionRequest('definitionReferences', { definitionId, line, character });
+    return this.referenceObservation(value, line, character);
+  }
+  async observeNativeReferences(definitionId: string): Promise<NativeReferenceObservation> {
+    return this.referenceObservation(await this.definitionRequest('definitionReferenceObserve', { definitionId }));
+  }
+  private async referenceObservation(value: NativeDefinitionObservation, line?: number, character?: number): Promise<NativeReferenceObservation> {
+    const actual = value as Partial<NativeReferenceObservation>;
+    if (actual.requestUri !== actual.entryUri || actual.requestVersion !== actual.entryVersion || actual.requestResultId !== actual.resultId
+      || actual.includeDeclaration !== false || !validPosition(actual.requestPosition)
+      || (line !== undefined && (actual.requestPosition?.line !== line || actual.requestPosition?.character !== character))) {
+      const error = new Error('The native host returned an invalid references observation.');
+      await this.poison(error); throw error;
+    }
+    return value as NativeReferenceObservation;
   }
   async hoverNativeDefinition(definitionId: string, line: number, character: number): Promise<NativeHoverObservation> {
     const value = await this.definitionRequest('definitionHover', { definitionId, line, character });

@@ -17,6 +17,9 @@ function recordedServer(sources: DocumentSources = { localPath: () => undefined,
   const callbacks = new Map<string, (params: any, token?: CancellationToken) => any>();
   const listenerCounts = new Map<string, number>();
   const released: string[] = [], warnings: string[] = [], errors: string[] = [];
+  let informationFailure: unknown, logFailure: unknown;
+  const information: Array<{ message: string; actions: Array<{ title: string }>; response: Promise<{ title: string } | undefined>;
+    complete(choice: { title: string } | undefined): void; refuse(error: unknown): void }> = [];
   const publications: PreviewPublication[] = [], publicationListeners = new Set<() => void>();
   const registrations: Array<{ options: unknown; complete: (registration: Disposable) => void }> = [];
   const listen = (name: string) => (callback: (params: any) => any) => {
@@ -25,7 +28,7 @@ function recordedServer(sources: DocumentSources = { localPath: () => undefined,
     return { dispose: () => { released.push(name); } };
   };
   const connection = {
-    onInitialize: listen('initialize'), onInitialized: listen('initialized'), onDefinition: listen('definition'), onHover: listen('hover'), onDocumentSymbol: listen('documentSymbols'), onCompletion: listen('completion'),
+    onInitialize: listen('initialize'), onInitialized: listen('initialized'), onDefinition: listen('definition'), onHover: listen('hover'), onDocumentSymbol: listen('documentSymbols'), onCompletion: listen('completion'), onReferences: listen('references'),
     onNotification: (method: string, callback: (params: any) => void) => listen(method)(callback),
     sendNotification: (_method: string, value: PreviewPublication) => { publications.push(value); for (const receive of [...publicationListeners]) receive(); return Promise.resolve(); },
     onDidChangeWatchedFiles: listen('watched'),
@@ -33,7 +36,18 @@ function recordedServer(sources: DocumentSources = { localPath: () => undefined,
     onDidCloseTextDocument: listen('closed'), onWillSaveTextDocument: listen('willSave'),
     onWillSaveTextDocumentWaitUntil: listen('willSaveWaitUntil'), onDidSaveTextDocument: listen('saved'),
     languages: { diagnostics: { on: listen('diagnostics'), refresh: () => Promise.resolve() } },
-    console: { warn: (message: string) => { warnings.push(message); }, error: (message: string) => { errors.push(message); } },
+    window: {
+      showWarningMessage: (message: string) => { warnings.push(message); },
+      showInformationMessage: (message: string, ...actions: Array<{ title: string }>) => {
+        if (informationFailure !== undefined) { const error = informationFailure; informationFailure = undefined; throw error; }
+        let complete!: (choice: { title: string } | undefined) => void, refuse!: (error: unknown) => void;
+        const response = new Promise<{ title: string } | undefined>((resolve, reject) => { complete = resolve; refuse = reject; });
+        void response.catch(() => undefined);
+        information.push({ message, actions, response, complete, refuse });
+        return response;
+      },
+    },
+    console: { warn: (message: string) => { warnings.push(message); }, error: (message: string) => { errors.push(message); if (logFailure !== undefined) throw logFailure; } },
     client: { register: (_type: unknown, options: unknown) => new Promise<Disposable>(complete => { registrations.push({ options, complete }); }) },
   } as unknown as Connection;
   const adapter = new LanguageServerAdapter(connection, sources);
@@ -44,7 +58,8 @@ function recordedServer(sources: DocumentSources = { localPath: () => undefined,
   } } });
   callbacks.get('initialized')!({});
   return {
-    adapter, warnings, errors, released, registrations, publications, initialization,
+    adapter, warnings, errors, released, registrations, publications, initialization, information,
+    failInformation: (error: unknown) => { informationFailure = error; }, failErrorLog: (error: unknown) => { logFailure = error; },
     listenerCount: (name: string) => listenerCounts.get(name) ?? 0,
     notification: (method: string, value: unknown) => { const receive = callbacks.get(method); if (!receive) throw Error('No registered notification ' + method); receive(value); },
     waitPreview: (matches: (publication: PreviewPublication) => boolean) => new Promise<void>(resolve => { const receive = () => { if (publications.some(matches)) { publicationListeners.delete(receive); resolve(); } }; publicationListeners.add(receive); receive(); }),
@@ -52,6 +67,12 @@ function recordedServer(sources: DocumentSources = { localPath: () => undefined,
     open: (source: SourceDocument) => callbacks.get('opened')!({ textDocument: { ...source, version: 1, languageId: 'expec' } }),
     change: (source: SourceDocument, version: number) => callbacks.get('changed')!({ textDocument: { uri: source.uri, version }, contentChanges: [{ text: source.text }] }),
     close: (uri: string) => callbacks.get('closed')!({ textDocument: { uri } }),
+    references: async (uri: string, line: number, character: number, includeDeclaration = false, token = CancellationToken.None) => {
+      const handler = callbacks.get('references');
+      if (!handler) throw new Error('No registered textDocument/references handler.');
+      const actual = await handler({ textDocument: { uri }, position: { line, character }, context: { includeDeclaration } }, token);
+      return actual as import('vscode-languageserver/node').Location[] | undefined;
+    },
     definition: async (uri: string, line: number, character: number, token = CancellationToken.None) => {
       const handler = callbacks.get('definition');
       if (!handler) throw new Error('No registered textDocument/definition handler.');
@@ -72,6 +93,193 @@ function recordedServer(sources: DocumentSources = { localPath: () => undefined,
 
 const range = (sourceId: string, start: number, end: number, line = 1, column = start + 1) => ({
   sourceId, start: { offset: start, line, column }, end: { offset: end, line, column: column + end - start },
+});
+
+describe('native references at their standard protocol boundary', () => {
+  it('advertises one standard References provider and releases its registration once', () => {
+    const server = recordedServer();
+    try {
+      expect(server.initialization.capabilities.referencesProvider).toBe(true);
+      expect(server.listenerCount('references')).toBe(1);
+      server.adapter.start();
+      expect(server.listenerCount('references')).toBe(1);
+      server.adapter.dispose(); server.adapter.dispose();
+      expect(server.released.filter(name => name === 'references')).toEqual(['references']);
+    } finally { server.adapter.dispose(); }
+  });
+});
+
+const referenceSummary = 'Reference search covers captured sources only; workspace importers were not scanned.';
+const referenceEntry = { uri: 'file:///workspace/references.expec', text: 'type Book {}\ntype Basket { book: Book }' };
+async function chooseCoverage(server: ReturnType<typeof recordedServer>, index = 0): Promise<void> {
+  const actual = server.information[index];
+  if (!actual?.actions[0]) throw new Error('The real summary did not offer a coverage action.');
+  actual.complete(actual.actions[0]); await actual.response; await Promise.resolve();
+}
+function endCoverage(server: ReturnType<typeof recordedServer>): void {
+  server.adapter.dispose();
+  for (const message of server.information) message.complete(undefined);
+}
+
+describe('bounded References coverage through standard native messages', () => {
+  it('returns actual locations before the coverage choice settles and preserves includeDeclaration', async () => {
+    const server = recordedServer();
+    try {
+      server.open(referenceEntry);
+      const references = await server.references(referenceEntry.uri, 0, 5, false);
+      expect(references).toEqual([{ uri: referenceEntry.uri, range: { start: { line: 1, character: 20 }, end: { line: 1, character: 24 } } }]);
+      expect(server.information[0]?.message).toBe(referenceSummary);
+      expect(server.information[0]?.actions).toEqual([{ title: 'Show coverage' }]);
+      const withDeclaration = await server.references(referenceEntry.uri, 0, 5, true);
+      expect(withDeclaration).toEqual([
+        { uri: referenceEntry.uri, range: { start: { line: 0, character: 5 }, end: { line: 0, character: 9 } } },
+        ...references!,
+      ]);
+      await chooseCoverage(server, 1);
+      expect(server.information[2]?.message).toContain('Covered sources:\n' + referenceEntry.uri);
+    } finally { endCoverage(server); }
+  });
+  it('lists actual unavailable-source prerequisites beside the useful bound locations', async () => {
+    const server = recordedServer(), source = { ...referenceEntry, text: 'include "./missing.expec"\ntype Book {}\ntype Basket { book: Book }' };
+    try {
+      server.open(source);
+      expect(await server.references(source.uri, 1, 5)).toHaveLength(1);
+      await chooseCoverage(server);
+      expect(server.information[1]?.message).toContain('Covered sources:\n' + source.uri);
+      expect(server.information[1]?.message).toContain('unavailable-module:');
+      expect(server.information[1]?.message).toContain('Unavailable source: file:///workspace/missing.expec');
+    } finally { endCoverage(server); }
+  });
+  it('does not offer coverage for an absent cursor result or a cancelled request', async () => {
+    const server = recordedServer(), cancellation = new CancellationTokenSource();
+    try {
+      server.open(referenceEntry);
+      expect(await server.references(referenceEntry.uri, 0, 0)).toBeUndefined();
+      cancellation.cancel();
+      expect(await server.references(referenceEntry.uri, 0, 5, false, cancellation.token)).toBeUndefined();
+      expect(server.information).toEqual([]);
+    } finally { cancellation.dispose(); endCoverage(server); }
+  });
+  it('refuses malformed UTF-16 positions without clamping or offering a coverage choice', async () => {
+    const server = recordedServer(), source = { uri: 'file:///workspace/quoted.expec',
+      text: 'type `📚Book` {}\r\ntype Basket { book: `📚Book` }' };
+    try {
+      server.open(source);
+      expect(await server.references(source.uri, -1, 5)).toBeUndefined();
+      expect(await server.references(source.uri, 0, 5.5)).toBeUndefined();
+      expect(await server.references(source.uri, 8, 0)).toBeUndefined();
+      expect(await server.references(source.uri, 1, 100)).toBeUndefined();
+      expect(await server.references(source.uri, 1, 22)).toBeUndefined();
+      expect(server.information).toEqual([]);
+    } finally { endCoverage(server); }
+  });
+  it('contains a synchronous detail-message failure after the Location reply has returned', async () => {
+    const server = recordedServer(), failure = new Error('The standard coverage detail failed.');
+    try {
+      server.open(referenceEntry); const locations = await server.references(referenceEntry.uri, 0, 5);
+      server.failInformation(failure); await chooseCoverage(server);
+      expect(server.errors.some(message => message.includes(String(failure)))).toBe(true);
+      expect(locations).toHaveLength(1);
+      expect(server.information).toHaveLength(1);
+    } finally { endCoverage(server); }
+  });
+  it('ignores a coverage choice after the requesting source changes', async () => {
+    const server = recordedServer();
+    try {
+      server.open(referenceEntry); await server.references(referenceEntry.uri, 0, 5);
+      server.change({ ...referenceEntry, text: 'type Book {}\ntype Basket { title: Text }' }, 2);
+      await chooseCoverage(server);
+      expect(server.information).toHaveLength(1);
+    } finally { endCoverage(server); }
+  });
+  it('ignores an old choice after the same URI closes and reopens at the same version', async () => {
+    const server = recordedServer();
+    try {
+      server.open(referenceEntry); await server.references(referenceEntry.uri, 0, 5);
+      server.close(referenceEntry.uri); server.open(referenceEntry);
+      await chooseCoverage(server);
+      expect(server.information).toHaveLength(1);
+    } finally { endCoverage(server); }
+  });
+  it('ignores an old choice after an imported unsaved edit replaces the unchanged requester report', async () => {
+    const server = recordedServer(), imported = { uri: 'file:///workspace/book.expec', text: 'type Book {}' };
+    const entry = { uri: 'file:///workspace/entry.expec', text: 'use Book from "./book.expec"\ntype Basket { book: Book }' };
+    try {
+      server.open(imported); server.open(entry);
+      const previous = server.pull(entry.uri).resultId;
+      await server.references(entry.uri, 0, 5);
+      server.change({ ...imported, text: 'type Book { title: Text }' }, 2);
+      expect(server.pull(entry.uri).resultId).not.toBe(previous);
+      await chooseCoverage(server);
+      expect(server.information).toHaveLength(1);
+    } finally { endCoverage(server); }
+  });
+  it('ignores an earlier choice after a new search with the same document version and analysis identity', async () => {
+    const server = recordedServer();
+    try {
+      server.open(referenceEntry);
+      const identity = server.pull(referenceEntry.uri).resultId;
+      await server.references(referenceEntry.uri, 0, 5);
+      await server.references(referenceEntry.uri, 0, 5);
+      expect(server.pull(referenceEntry.uri).resultId).toBe(identity);
+      await chooseCoverage(server, 0); expect(server.information).toHaveLength(2);
+      await chooseCoverage(server, 1); expect(server.information).toHaveLength(3);
+    } finally { endCoverage(server); }
+  });
+  it('ignores a coverage choice after request cancellation', async () => {
+    const server = recordedServer(), cancellation = new CancellationTokenSource();
+    try {
+      server.open(referenceEntry); await server.references(referenceEntry.uri, 0, 5, false, cancellation.token);
+      cancellation.cancel(); await chooseCoverage(server);
+      expect(server.information).toHaveLength(1);
+    } finally { cancellation.dispose(); endCoverage(server); }
+  });
+  it('ignores a coverage choice after adapter disposal', async () => {
+    const server = recordedServer();
+    try {
+      server.open(referenceEntry); await server.references(referenceEntry.uri, 0, 5);
+      server.adapter.dispose(); await chooseCoverage(server);
+      expect(server.information).toHaveLength(1);
+    } finally { endCoverage(server); }
+  });
+  it('surfaces a synchronous native summary failure instead of returning fabricated empty success', async () => {
+    const server = recordedServer(), failure = new Error('The standard coverage summary failed.');
+    try {
+      server.open(referenceEntry); server.failInformation(failure);
+      await expect(server.references(referenceEntry.uri, 0, 5)).rejects.toBe(failure);
+    } finally { endCoverage(server); }
+  });
+  it('logs a rejected standard summary request without holding the Location response', async () => {
+    const server = recordedServer(), failure = new Error('The coverage message transport rejected.');
+    try {
+      server.open(referenceEntry); expect(await server.references(referenceEntry.uri, 0, 5)).toHaveLength(1);
+      const actual = server.information[0]!; actual.refuse(failure);
+      await actual.response.catch(() => undefined); await Promise.resolve();
+      expect(server.errors.some(message => message.includes(String(failure)))).toBe(true);
+    } finally { endCoverage(server); }
+  });
+  it('logs a rejected detail presentation without changing the returned reference locations', async () => {
+    const server = recordedServer(), failure = new Error('The coverage detail transport rejected.');
+    try {
+      server.open(referenceEntry); const locations = await server.references(referenceEntry.uri, 0, 5);
+      await chooseCoverage(server);
+      const actual = server.information[1]!; actual.refuse(failure);
+      await actual.response.catch(() => undefined); await Promise.resolve(); await Promise.resolve();
+      expect(server.errors.some(message => message.includes(String(failure)))).toBe(true);
+      expect(locations).toHaveLength(1);
+    } finally { endCoverage(server); }
+  });
+  it('contains native logger shutdown and retains the actual transport failure on stderr', async () => {
+    const server = recordedServer(), failure = new Error('Coverage transport shutdown.'), loggingFailure = new Error('The native logger is closed.');
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      server.open(referenceEntry); await server.references(referenceEntry.uri, 0, 5);
+      server.failErrorLog(loggingFailure);
+      const actual = server.information[0]!; actual.refuse(failure);
+      await actual.response.catch(() => undefined); await Promise.resolve();
+      expect(stderr).toHaveBeenCalledWith('Reference coverage request failed: ' + String(failure), loggingFailure);
+    } finally { stderr.mockRestore(); endCoverage(server); }
+  });
 });
 
 describe('native document outlines at their protocol boundary', () => {
@@ -280,7 +488,7 @@ describe('native semantic feedback at its protocol boundary', () => {
     expect(server.pull(source.uri).items).toEqual([]);
     expect(server.pull(source.uri).resultId).toBeUndefined();
     expect(releases).toBe(1);
-    expect(new Set(server.released)).toEqual(new Set(['initialize', 'initialized', 'watched', 'diagnostics', 'opened', 'changed', 'closed', 'willSave', 'willSaveWaitUntil', 'saved', 'expec/previewConfiguration', 'expec/previewSelection', 'definition', 'hover', 'documentSymbols', 'completion']));
+    expect(new Set(server.released)).toEqual(new Set(['initialize', 'initialized', 'watched', 'diagnostics', 'opened', 'changed', 'closed', 'willSave', 'willSaveWaitUntil', 'saved', 'expec/previewConfiguration', 'expec/previewSelection', 'definition', 'hover', 'documentSymbols', 'completion', 'references']));
     expect(() => server.adapter.dispose()).not.toThrow();
   });
 });

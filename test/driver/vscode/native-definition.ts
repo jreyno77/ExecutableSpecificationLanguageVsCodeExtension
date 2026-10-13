@@ -1,13 +1,15 @@
+import type { Page } from 'playwright';
 import { randomUUID } from 'node:crypto';
 import { lstat, readFile, readdir, readlink, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NativeCleanupError, ownTemporaryDirectory, removeOwnedDirectory } from './native-process.js';
-import { type NativeDefinitionObservation, type NativeHoverObservation, type NativeOutlineObservation, type NativeCompletionObservation, VsCodeSession } from './vscode-session.js';
+import { type NativeDefinitionObservation, type NativeHoverObservation, type NativeOutlineObservation, type NativeCompletionObservation, type NativeReferenceObservation, VsCodeSession } from './vscode-session.js';
 
 /** Mutable documents/files belong to one case; the installed host has suite ownership. */
 export class NativeDefinitionCase {
   private readonly id = randomUUID();
+  private readonly beforeDisposal = new Set<() => Promise<void>>();
   private directory: string | undefined;
   private session: VsCodeSession | undefined;
   private opening: Promise<void> | undefined;
@@ -77,6 +79,32 @@ export class NativeDefinitionCase {
     this.actual = actual;
     return actual.entryText;
   }
+  beforeDispose(cleanup: () => Promise<void>): void {
+    if (this.disposal) throw new Error('The owned source case is disposing.');
+    this.beforeDisposal.add(cleanup);
+  }
+  async references(line: number, column: number): Promise<NativeReferenceObservation> {
+    if (!Number.isInteger(line) || !Number.isInteger(column) || line < 1 || column < 1) throw new RangeError('Native reference coordinates are one-based integers.');
+    await this.open();
+    const actual = await this.session!.referencesNativeDefinition(this.id, line - 1, column - 1);
+    this.actual = actual;
+    return actual;
+  }
+  async currentReferences(): Promise<NativeReferenceObservation> {
+    await this.open();
+    const actual = await this.session!.observeNativeReferences(this.id);
+    this.actual = actual;
+    return actual;
+  }
+  async workbench(): Promise<Page> {
+    await this.open();
+    const pages: Page[] = [];
+    for (const context of (await this.session!.webviewBrowser()).contexts()) for (const page of context.pages()) {
+      if (await page.locator('.monaco-workbench').count()) pages.push(page);
+    }
+    if (pages.length !== 1) throw new Error('Expected one actual workbench for the owned source case.');
+    return pages[0]!;
+  }
   async symbols(): Promise<NativeOutlineObservation> {
     await this.open();
     const actual = await this.session!.symbolsNativeDefinition(this.id);
@@ -97,7 +125,10 @@ export class NativeDefinitionCase {
     await this.opening?.catch(() => undefined);
     if (!this.directory) return;
     if (!this.opened) throw new NativeCleanupError('Native definition setup/cleanup is unconfirmed; retained ' + this.directory);
-    try { await this.session!.disposeNativeDefinition(this.id); }
+    try {
+      for (const cleanup of this.beforeDisposal) await cleanup();
+      await this.session!.disposeNativeDefinition(this.id);
+    }
     catch (error) { throw new NativeCleanupError('Native definition cleanup is unconfirmed; retained ' + this.directory, { cause: error }); }
     await removeOwnedDirectory(this.directory);
   }

@@ -1,0 +1,235 @@
+use SourceDocument from "./workspace.expec"
+use DocumentReport from "./document-analysis.expec"
+use SourceDefinition from "./source-navigation.expec"
+
+// Occurrences reuse the same exact captured source and scalar range as navigation.
+// Coverage is explicitly bounded; these are not exhaustive workspace references.
+type ReferenceSearch {
+  source: SourceDocument
+  locations: List<SourceDefinition>
+  coveredUris: List<Text>
+  prerequisites: List<Text>
+}
+
+component SourceReferences {
+  requires package "expec" for runtime
+  requires package "typescript" for build
+  requires package "vitest" for test
+
+  construction()
+  public published, closed, search, dispose
+
+  capability published(source: SourceDocument, version: Number, report: DocumentReport) returns Nothing {
+    promises "Receive the same current immutable DocumentAnalysis publication as diagnostics and navigation, including replacement reports at an unchanged editor version after imported edits. Withdraw previous facts before preparing the new publication. Capture exact report.sources and prepare bound occurrences and source declaration name ranges through its one public Inspection, sharing privately prepared reference facts by immutable report identity. Match the actual target NodeId within this same report, never decoded spelling or declaration order. Rejected entry syntax or absent Inspection withdraws earlier results; rejected imported syntax does not silently substitute its previously accepted model. Current bound facts remain useful beside independent problems or deferred requirements. Never parse, resolve, compile, acquire files or make a second model. Invalid noninteger or negative versions throw RangeError before state changes; preparation errors surface after old facts are withdrawn. The caller excludes publications from a previous document lifetime."
+  }
+  capability closed(uri: Text) returns Nothing {
+    promises "Forget this document's current lookup. Repeated close is harmless; other entries remain usable. Reopening begins a new lifetime and may publish a lower version."
+  }
+  capability search(uri: Text, version: Number, offset: Number, includeDeclaration: Boolean) returns ReferenceSearch? {
+    promises "Use only prepared facts for this exact URI/version and zero-based Unicode-scalar cursor. Reject noninteger or negative versions/offsets with RangeError. Select a bound reference's final identifier segment, or a named source declaration's own authored name, whose finite half-open range contains the cursor in the requesting captured source. Supported declarations are record, alias and opaque types, components, concepts, classes, interfaces, fields, parameters, type parameters, capabilities, functions, setup/action/observation helpers, checks and fixtures with an actual source nameOrigin. A wrapper or import alias spelling is not a fabricated declaration. Require the selected target's actual source nameOrigin and exact captured text; builtin, external, unnamed, uncaptured, unresolved, ambiguous or deferred targets return absence. Qualified prefixes, punctuation and comments return absence. Without a current matching report, after close/disposal or outside its text, return absence."
+    promises "Return every current bound final-segment occurrence of that same target identity in this report's requesting source and reachable captured imports/includes. Import source-name references are real occurrences; a use through an alias remains the same target, and another declaration with the same spelling is excluded. Return no unresolved, ambiguous or deferred occurrence as a match. When includeDeclaration is true add that target's exact authored name range once; when false exclude it. An unused source declaration has a present reply with an empty locations list. Every location contains its actual captured source/text and valid scalar range. Deduplicate identical URI/start/end ranges and sort by URI code-unit order, then start/end offset. Returned sources, locations and coverage lists are caller-isolated: mutation cannot alter an earlier or later reply. Requests never traverse Inspection, parse, resolve, compile, read files, scan projects, generate, write or change editor selection."
+    promises "coveredUris is the sorted unique set of exact report.sources URIs inspected for this publication, including captured sources with rejected syntax; it is never a claim that their findings are complete. prerequisites preserves actual syntax explanations, compiler problem codes/messages and deferred requires text, plus each attempted report.dependencies URI absent from report.sources as 'Unavailable source: ' followed by that exact URI. Compiler problems use their actual code followed by ': ' and message; deferred entries use 'Deferred: ' followed by requires; syntax entries use 'Rejected source: ' followed by the primary source URI and explanation. Deduplicate identical entries without inventing requirements. An empty prerequisites list still means only this captured closure was searched. Reverse workspace importers, unrelated unopened files and unavailable source contents are not searched, and no workspace-wide completeness is promised."
+  }
+  capability dispose() returns Nothing {
+    promises "End this lifetime, clear retained lookups and ignore later publications. All later searches return absence; repeated disposal is harmless. Prepared immutable facts own no files or processes."
+  }
+}
+
+// Assemble real DocumentAnalysis, supplied in-memory saved sources and this core.
+// Forward actual publications/close events; record actual replies by request number.
+// One-based input positions are Unicode scalars in the exact current source.
+// Observe reply locations/text/ranges and coverage directly, without a driver parser,
+// name resolver or expected-result reconstruction. Work counters wrap real public
+// reader/compiler/source/Inspection calls before and after requests.
+examples for SourceReferences {
+  fixture referencesLocal: SourceDocument = {
+    uri: "file:///workspace/catalog.expec",
+    text: "type Book {}\ntype Basket { book: Book }"
+  }
+  fixture referencesEntry: SourceDocument = {
+    uri: "file:///workspace/basket.expec",
+    text: "use Book as Novel from \"./book.expec\"\ntype Basket { book: Novel }"
+  }
+  fixture referencesBook: SourceDocument = {
+    uri: "file:///workspace/book.expec",
+    text: "type Book {}\ntype Shelf { book: Book }"
+  }
+
+  setup sourceReferences() returns Nothing
+  action saveReferenceSource(source: SourceDocument) returns Nothing
+  action openReferenceSource(source: SourceDocument, version: Number) returns Nothing
+  action changeReferenceSource(source: SourceDocument, version: Number) returns Nothing
+  action closeReferenceSource(uri: Text) returns Nothing
+  action disposeReferences() returns Nothing
+  action requestSourceReferences(uri: Text, version: Number, line: Number, column: Number, includeDeclaration: Boolean) returns Nothing
+  action rememberReferenceWork() returns Nothing
+  observation hasReferenceSearch(request: Number) returns Boolean
+  observation referenceLocationCount(request: Number) returns Number
+  observation referenceLocationUri(request: Number, location: Number) returns Text
+  observation referenceLocationText(request: Number, location: Number) returns Text
+  observation referenceLocationName(request: Number, location: Number) returns Text
+  observation referenceLocationStartLine(request: Number, location: Number) returns Number
+  observation referenceLocationStartColumn(request: Number, location: Number) returns Number
+  observation referenceLocationEndLine(request: Number, location: Number) returns Number
+  observation referenceLocationEndColumn(request: Number, location: Number) returns Number
+  observation referenceCoveredUris(request: Number) returns List<Text>
+  observation referenceUnavailableUri(request: Number, uri: Text) returns Boolean
+  observation referencePrerequisiteCode(request: Number, code: Text) returns Boolean
+  observation referenceHasDeferredPrerequisite(request: Number) returns Boolean
+  observation referenceWorkUnchanged() returns Boolean
+
+  check expectReferenceCount(request: Number, count: Number) {
+    let present = hasReferenceSearch(request)
+    let actual = referenceLocationCount(request)
+    assert present == true
+    assert actual == count
+  }
+  check expectReferenceLocation(request: Number, location: Number, uri: Text, text: Text, name: Text, line: Number, column: Number, endColumn: Number) {
+    let actualUri = referenceLocationUri(request, location)
+    let actualText = referenceLocationText(request, location)
+    let actualName = referenceLocationName(request, location)
+    let startLine = referenceLocationStartLine(request, location)
+    let startColumn = referenceLocationStartColumn(request, location)
+    let endLine = referenceLocationEndLine(request, location)
+    let actualEnd = referenceLocationEndColumn(request, location)
+    assert actualUri == uri
+    assert actualText == text
+    assert actualName == name
+    assert startLine == line
+    assert startColumn == column
+    assert endLine == line
+    assert actualEnd == endColumn
+  }
+  check expectReferenceCoverage(request: Number, uris: List<Text>) {
+    let actual = referenceCoveredUris(request)
+    assert actual == uris
+  }
+  check expectUnavailableReferenceSource(request: Number, uri: Text) {
+    let actual = referenceUnavailableUri(request, uri)
+    assert actual == true
+  }
+  check expectReferencePrerequisite(request: Number, code: Text) {
+    let actual = referencePrerequisiteCode(request, code)
+    assert actual == true
+  }
+  check expectDeferredReferenceCoverage(request: Number) {
+    let actual = referenceHasDeferredPrerequisite(request)
+    assert actual == true
+  }
+  check expectNoReferenceSearch(request: Number) {
+    let present = hasReferenceSearch(request)
+    assert present == false
+  }
+  check expectNoReferenceAnalysis() {
+    let unchanged = referenceWorkUnchanged()
+    assert unchanged == true
+  }
+
+  scenario "a declaration finds its bound use and includes its own range only when requested" {
+    given sourceReferences()
+    when openReferenceSource(referencesLocal, 1)
+    when rememberReferenceWork()
+    when requestSourceReferences(referencesLocal.uri, 1, 1, 6, false)
+    when requestSourceReferences(referencesLocal.uri, 1, 2, 22, true)
+    then expectReferenceCount(1, 1)
+    then expectReferenceLocation(1, 1, referencesLocal.uri, referencesLocal.text, "Book", 2, 21, 25)
+    then expectReferenceCount(2, 2)
+    then expectReferenceLocation(2, 1, referencesLocal.uri, referencesLocal.text, "Book", 1, 6, 10)
+    then expectReferenceLocation(2, 2, referencesLocal.uri, referencesLocal.text, "Book", 2, 21, 25)
+    then expectReferenceCoverage(2, [referencesLocal.uri])
+    then expectNoReferenceAnalysis()
+  }
+  scenario "an imported alias finds every actual use of the same declaration in the captured closure" {
+    given sourceReferences()
+    when saveReferenceSource(referencesBook)
+    when openReferenceSource(referencesEntry, 1)
+    when requestSourceReferences(referencesEntry.uri, 1, 2, 22, false)
+    then expectReferenceCount(1, 3)
+    then expectReferenceLocation(1, 1, referencesEntry.uri, referencesEntry.text, "Book", 1, 5, 9)
+    then expectReferenceLocation(1, 2, referencesEntry.uri, referencesEntry.text, "Novel", 2, 21, 26)
+    then expectReferenceLocation(1, 3, referencesBook.uri, referencesBook.text, "Book", 2, 20, 24)
+    then expectReferenceCoverage(1, [referencesEntry.uri, referencesBook.uri])
+  }
+  scenario "another same-named declaration is not a reference to the selected Book" {
+    given sourceReferences()
+    when openReferenceSource({ uri: referencesLocal.uri, text: "type Book {}\ncomponent Store {\n  local type Book {}\n  capability stock(book: Book)\n}\ntype Basket { book: Book }" }, 1)
+    when requestSourceReferences(referencesLocal.uri, 1, 1, 6, false)
+    then expectReferenceCount(1, 1)
+    then expectReferenceLocation(1, 1, referencesLocal.uri, "type Book {}\ncomponent Store {\n  local type Book {}\n  capability stock(book: Book)\n}\ntype Basket { book: Book }", "Book", 6, 21, 25)
+  }
+  scenario "an unused declaration has a present empty search rather than an unavailable result" {
+    given sourceReferences()
+    when openReferenceSource({ uri: referencesLocal.uri, text: "type Book {}" }, 1)
+    when requestSourceReferences(referencesLocal.uri, 1, 1, 6, false)
+    when requestSourceReferences(referencesLocal.uri, 1, 1, 6, true)
+    then expectReferenceCount(1, 0)
+    then expectReferenceCount(2, 1)
+    then expectReferenceLocation(2, 1, referencesLocal.uri, "type Book {}", "Book", 1, 6, 10)
+  }
+  scenario "unsaved replacement withdraws the old version and uses actual new captured text" {
+    given sourceReferences()
+    when openReferenceSource(referencesLocal, 1)
+    when requestSourceReferences(referencesLocal.uri, 1, 1, 6, false)
+    when changeReferenceSource({ uri: referencesLocal.uri, text: "type Magazine {}\ntype Basket { book: Magazine }" }, 2)
+    when requestSourceReferences(referencesLocal.uri, 1, 1, 6, false)
+    when requestSourceReferences(referencesLocal.uri, 2, 1, 6, false)
+    then expectReferenceCount(1, 1)
+    then expectNoReferenceSearch(2)
+    then expectReferenceCount(3, 1)
+    then expectReferenceLocation(3, 1, referencesLocal.uri, "type Magazine {}\ntype Basket { book: Magazine }", "Magazine", 2, 21, 29)
+  }
+  scenario "an imported unsaved replacement invalidates the same-version entry binding" {
+    given sourceReferences()
+    when saveReferenceSource(referencesBook)
+    when openReferenceSource(referencesEntry, 1)
+    when requestSourceReferences(referencesEntry.uri, 1, 2, 22, false)
+    when openReferenceSource({ uri: referencesBook.uri, text: "type Magazine {}" }, 2)
+    when requestSourceReferences(referencesEntry.uri, 1, 2, 22, false)
+    then expectReferenceCount(1, 3)
+    then expectNoReferenceSearch(2)
+  }
+  scenario "an ambiguous selected use does not choose one imported declaration" {
+    given sourceReferences()
+    when saveReferenceSource({ uri: "file:///workspace/first.expec", text: "type Book {}" })
+    when saveReferenceSource({ uri: "file:///workspace/second.expec", text: "type Book {}" })
+    when openReferenceSource({ uri: referencesEntry.uri, text: "use Book from \"./first.expec\"\nuse Book from \"./second.expec\"\ntype Basket { book: Book }" }, 1)
+    when requestSourceReferences(referencesEntry.uri, 1, 3, 22, false)
+    then expectNoReferenceSearch(1)
+  }
+  scenario "known matches expose unavailable composition coverage without claiming an exhaustive search" {
+    given sourceReferences()
+    when openReferenceSource({ uri: referencesLocal.uri, text: "include \"./missing.expec\"\ntype Book {}\ntype Basket { book: Book }" }, 1)
+    when requestSourceReferences(referencesLocal.uri, 1, 2, 6, false)
+    then expectReferenceCount(1, 1)
+    then expectReferenceLocation(1, 1, referencesLocal.uri, "include \"./missing.expec\"\ntype Book {}\ntype Basket { book: Book }", "Book", 3, 21, 25)
+    then expectReferenceCoverage(1, [referencesLocal.uri])
+    then expectUnavailableReferenceSource(1, "file:///workspace/missing.expec")
+    then expectReferencePrerequisite(1, "unavailable-module")
+    then expectDeferredReferenceCoverage(1)
+  }
+  scenario "deferred and rejected edits plus close and disposal never reuse earlier matches" {
+    given sourceReferences()
+    when openReferenceSource(referencesLocal, 10)
+    when requestSourceReferences(referencesLocal.uri, 10, 1, 6, false)
+    when changeReferenceSource({ uri: referencesLocal.uri, text: "include \"./missing.expec\"\ntype Basket { book: Boo }" }, 11)
+    when requestSourceReferences(referencesLocal.uri, 11, 2, 22, false)
+    when changeReferenceSource({ uri: referencesLocal.uri, text: "type Book {}\ntype Basket { book: Book " }, 12)
+    when requestSourceReferences(referencesLocal.uri, 12, 2, 22, false)
+    when requestSourceReferences(referencesLocal.uri, 10, 1, 6, false)
+    when closeReferenceSource(referencesLocal.uri)
+    when openReferenceSource(referencesLocal, 1)
+    when requestSourceReferences(referencesLocal.uri, 1, 1, 6, false)
+    when closeReferenceSource(referencesLocal.uri)
+    when requestSourceReferences(referencesLocal.uri, 1, 1, 6, false)
+    when openReferenceSource(referencesLocal, 1)
+    when disposeReferences()
+    when requestSourceReferences(referencesLocal.uri, 1, 1, 6, false)
+    then expectReferenceCount(1, 1)
+    then expectNoReferenceSearch(2)
+    then expectNoReferenceSearch(3)
+    then expectNoReferenceSearch(4)
+    then expectReferenceCount(5, 1)
+    then expectNoReferenceSearch(6)
+    then expectNoReferenceSearch(7)
+  }
+}

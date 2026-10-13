@@ -3223,4 +3223,354 @@ readonly scopedMarkdown: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"
 readonly scopedSavedPreview: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/ui\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"src/library.expec\",\"test\":[\"playwright\"]}]}}";
 
 readonly invalidScopedSavedPreview: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/ui\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"src/library.expec\",\"test\":[\"react\"]}]}}";
+
+async sourceReferences(): Promise<void> {
+    return await this.driver.sourceReferences();
+  }
+
+async importedReferenceEditor(entry: string, imported: string): Promise<void> {
+    return await this.driver.importedReferenceEditor(entry, imported);
+  }
+
+async localReferenceEditor(entry: string): Promise<void> {
+    return await this.driver.localReferenceEditor(entry);
+  }
+
+async referenceConversion(text: string): Promise<void> {
+    return await this.driver.referenceConversion(text);
+  }
+
+async saveReferenceSource(source: SourceDocument): Promise<void> {
+    return await this.driver.saveReferenceSource(source);
+  }
+
+async openReferenceSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.openReferenceSource(source, version);
+  }
+
+async changeReferenceSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.changeReferenceSource(source, version);
+  }
+
+async closeReferenceSource(uri: string): Promise<void> {
+    return await this.driver.closeReferenceSource(uri);
+  }
+
+async disposeReferences(): Promise<void> {
+    return await this.driver.disposeReferences();
+  }
+
+async requestSourceReferences(uri: string, version: number, line: number, column: number, includeDeclaration: boolean): Promise<void> {
+    return await this.driver.requestSourceReferences(uri, version, line, column, includeDeclaration);
+  }
+
+async rememberReferenceWork(): Promise<void> {
+    return await this.driver.rememberReferenceWork();
+  }
+
+async editReferenceImport(text: string): Promise<void> {
+    return await this.driver.editReferenceImport(text);
+  }
+
+async editReferenceEntry(text: string): Promise<void> {
+    return await this.driver.editReferenceEntry(text);
+  }
+
+async findNativeReferences(line: number, column: number): Promise<void> {
+    return await this.driver.findNativeReferences(line, column);
+  }
+
+async showNativeReferenceCoverage(): Promise<void> {
+    return await this.driver.showNativeReferenceCoverage();
+  }
+
+async requestConvertedReferences(line: number, character: number, includeDeclaration: boolean): Promise<void> {
+    return await this.driver.requestConvertedReferences(line, character, includeDeclaration);
+  }
+
+async hasReferenceSearch(request: number): Promise<boolean> {
+    return await this.driver.hasReferenceSearch(request);
+  }
+
+async referenceLocationCount(request: number): Promise<number> {
+    return await this.driver.referenceLocationCount(request);
+  }
+
+async referenceLocationUri(request: number, location: number): Promise<string> {
+    return await this.driver.referenceLocationUri(request, location);
+  }
+
+async referenceLocationText(request: number, location: number): Promise<string> {
+    return await this.driver.referenceLocationText(request, location);
+  }
+
+async referenceLocationName(request: number, location: number): Promise<string> {
+    return await this.driver.referenceLocationName(request, location);
+  }
+
+async referenceLocationStartLine(request: number, location: number): Promise<number> {
+    return await this.driver.referenceLocationStartLine(request, location);
+  }
+
+async referenceLocationStartColumn(request: number, location: number): Promise<number> {
+    return await this.driver.referenceLocationStartColumn(request, location);
+  }
+
+async referenceLocationEndLine(request: number, location: number): Promise<number> {
+    return await this.driver.referenceLocationEndLine(request, location);
+  }
+
+async referenceLocationEndColumn(request: number, location: number): Promise<number> {
+    return await this.driver.referenceLocationEndColumn(request, location);
+  }
+
+async referenceCoveredUris(request: number): Promise<Array<string>> {
+    return await this.driver.referenceCoveredUris(request);
+  }
+
+async referenceUnavailableUri(request: number, uri: string): Promise<boolean> {
+    return await this.driver.referenceUnavailableUri(request, uri);
+  }
+
+async referencePrerequisiteCode(request: number, code: string): Promise<boolean> {
+    return await this.driver.referencePrerequisiteCode(request, code);
+  }
+
+async referenceHasDeferredPrerequisite(request: number): Promise<boolean> {
+    return await this.driver.referenceHasDeferredPrerequisite(request);
+  }
+
+async referenceWorkUnchanged(): Promise<boolean> {
+    return await this.driver.referenceWorkUnchanged();
+  }
+
+async nativeReferenceCount(): Promise<number> {
+    return await this.driver.nativeReferenceCount();
+  }
+
+async nativeReferenceUsesOwnedFile(location: number, fileName: string): Promise<boolean> {
+    return await this.driver.nativeReferenceUsesOwnedFile(location, fileName);
+  }
+
+async nativeReferenceName(location: number): Promise<string> {
+    return await this.driver.nativeReferenceName(location);
+  }
+
+async nativeReferenceStartLine(location: number): Promise<number> {
+    return await this.driver.nativeReferenceStartLine(location);
+  }
+
+async nativeReferenceStartColumn(location: number): Promise<number> {
+    return await this.driver.nativeReferenceStartColumn(location);
+  }
+
+async nativeReferenceEndLine(location: number): Promise<number> {
+    return await this.driver.nativeReferenceEndLine(location);
+  }
+
+async nativeReferenceEndColumn(location: number): Promise<number> {
+    return await this.driver.nativeReferenceEndColumn(location);
+  }
+
+async nativeReferenceCoverageMessage(): Promise<string> {
+    return await this.driver.nativeReferenceCoverageMessage();
+  }
+
+async nativeReferenceCoverageIncludesOwnedSource(fileName: string): Promise<boolean> {
+    return await this.driver.nativeReferenceCoverageIncludesOwnedSource(fileName);
+  }
+
+async nativeReferenceCoverageIncludesUnavailable(fileName: string): Promise<boolean> {
+    return await this.driver.nativeReferenceCoverageIncludesUnavailable(fileName);
+  }
+
+async nativeReferenceCoverageHasPrerequisite(code: string): Promise<boolean> {
+    return await this.driver.nativeReferenceCoverageHasPrerequisite(code);
+  }
+
+async referenceImportIsDirty(): Promise<boolean> {
+    return await this.driver.referenceImportIsDirty();
+  }
+
+async referenceEntryIsDirty(): Promise<boolean> {
+    return await this.driver.referenceEntryIsDirty();
+  }
+
+async nativeReferenceFilesUnchanged(): Promise<boolean> {
+    return await this.driver.nativeReferenceFilesUnchanged();
+  }
+
+async hasConvertedReferenceSearch(request: number): Promise<boolean> {
+    return await this.driver.hasConvertedReferenceSearch(request);
+  }
+
+async convertedReferenceCount(request: number): Promise<number> {
+    return await this.driver.convertedReferenceCount(request);
+  }
+
+async convertedReferenceName(request: number, location: number): Promise<string> {
+    return await this.driver.convertedReferenceName(request, location);
+  }
+
+async convertedReferenceStartLine(request: number, location: number): Promise<number> {
+    return await this.driver.convertedReferenceStartLine(request, location);
+  }
+
+async convertedReferenceStartCharacter(request: number, location: number): Promise<number> {
+    return await this.driver.convertedReferenceStartCharacter(request, location);
+  }
+
+async convertedReferenceEndLine(request: number, location: number): Promise<number> {
+    return await this.driver.convertedReferenceEndLine(request, location);
+  }
+
+async convertedReferenceEndCharacter(request: number, location: number): Promise<number> {
+    return await this.driver.convertedReferenceEndCharacter(request, location);
+  }
+
+async expectReferenceCount(request: number, count: number): Promise<void> {
+    const present = await this.driver.hasReferenceSearch(request);
+    const actual = await this.driver.referenceLocationCount(request);
+    expectData(present, true);
+    expectData(actual, count);
+  }
+
+async expectReferenceLocation(request: number, location: number, uri: string, text: string, name: string, line: number, column: number, endColumn: number): Promise<void> {
+    const actualUri = await this.driver.referenceLocationUri(request, location);
+    const actualText = await this.driver.referenceLocationText(request, location);
+    const actualName = await this.driver.referenceLocationName(request, location);
+    const startLine = await this.driver.referenceLocationStartLine(request, location);
+    const startColumn = await this.driver.referenceLocationStartColumn(request, location);
+    const endLine = await this.driver.referenceLocationEndLine(request, location);
+    const actualEnd = await this.driver.referenceLocationEndColumn(request, location);
+    expectData(actualUri, uri);
+    expectData(actualText, text);
+    expectData(actualName, name);
+    expectData(startLine, line);
+    expectData(startColumn, column);
+    expectData(endLine, line);
+    expectData(actualEnd, endColumn);
+  }
+
+async expectReferenceCoverage(request: number, uris: Array<string>): Promise<void> {
+    const actual = await this.driver.referenceCoveredUris(request);
+    expectData(actual, uris);
+  }
+
+async expectUnavailableReferenceSource(request: number, uri: string): Promise<void> {
+    const actual = await this.driver.referenceUnavailableUri(request, uri);
+    expectData(actual, true);
+  }
+
+async expectReferencePrerequisite(request: number, code: string): Promise<void> {
+    const actual = await this.driver.referencePrerequisiteCode(request, code);
+    expectData(actual, true);
+  }
+
+async expectDeferredReferenceCoverage(request: number): Promise<void> {
+    const actual = await this.driver.referenceHasDeferredPrerequisite(request);
+    expectData(actual, true);
+  }
+
+async expectNoReferenceSearch(request: number): Promise<void> {
+    const present = await this.driver.hasReferenceSearch(request);
+    expectData(present, false);
+  }
+
+async expectNoReferenceAnalysis(): Promise<void> {
+    const unchanged = await this.driver.referenceWorkUnchanged();
+    expectData(unchanged, true);
+  }
+
+async expectNativeReferenceCount(count: number): Promise<void> {
+    const actual = await this.driver.nativeReferenceCount();
+    expectData(actual, count);
+  }
+
+async expectNativeReference(location: number, fileName: string, name: string, line: number, column: number, endColumn: number): Promise<void> {
+    const owned = await this.driver.nativeReferenceUsesOwnedFile(location, fileName);
+    const actualName = await this.driver.nativeReferenceName(location);
+    const startLine = await this.driver.nativeReferenceStartLine(location);
+    const startColumn = await this.driver.nativeReferenceStartColumn(location);
+    const endLine = await this.driver.nativeReferenceEndLine(location);
+    const actualEnd = await this.driver.nativeReferenceEndColumn(location);
+    expectData(owned, true);
+    expectData(actualName, name);
+    expectData(startLine, line);
+    expectData(startColumn, column);
+    expectData(endLine, line);
+    expectData(actualEnd, endColumn);
+  }
+
+async expectVisibleReferenceCoverage(): Promise<void> {
+    const actualMessage = await this.driver.nativeReferenceCoverageMessage();
+    expectData(actualMessage, "Reference search covers captured sources only; workspace importers were not scanned.");
+  }
+
+async expectCoveredReferenceFile(fileName: string): Promise<void> {
+    const actual = await this.driver.nativeReferenceCoverageIncludesOwnedSource(fileName);
+    expectData(actual, true);
+  }
+
+async expectUnavailableNativeReferenceFile(fileName: string): Promise<void> {
+    const actual = await this.driver.nativeReferenceCoverageIncludesUnavailable(fileName);
+    expectData(actual, true);
+  }
+
+async expectNativeReferencePrerequisite(code: string): Promise<void> {
+    const actual = await this.driver.nativeReferenceCoverageHasPrerequisite(code);
+    expectData(actual, true);
+  }
+
+async expectReferenceImportDirty(): Promise<void> {
+    const actual = await this.driver.referenceImportIsDirty();
+    expectData(actual, true);
+  }
+
+async expectReferenceEntryDirty(): Promise<void> {
+    const actual = await this.driver.referenceEntryIsDirty();
+    expectData(actual, true);
+  }
+
+async expectNativeReferenceFilesUnchanged(): Promise<void> {
+    const actual = await this.driver.nativeReferenceFilesUnchanged();
+    expectData(actual, true);
+  }
+
+async expectConvertedReferenceCount(request: number, count: number): Promise<void> {
+    const present = await this.driver.hasConvertedReferenceSearch(request);
+    const actual = await this.driver.convertedReferenceCount(request);
+    expectData(present, true);
+    expectData(actual, count);
+  }
+
+async expectConvertedReference(request: number, location: number, name: string, line: number, character: number, endCharacter: number): Promise<void> {
+    const actualName = await this.driver.convertedReferenceName(request, location);
+    const startLine = await this.driver.convertedReferenceStartLine(request, location);
+    const startCharacter = await this.driver.convertedReferenceStartCharacter(request, location);
+    const endLine = await this.driver.convertedReferenceEndLine(request, location);
+    const actualEnd = await this.driver.convertedReferenceEndCharacter(request, location);
+    expectData(actualName, name);
+    expectData(startLine, line);
+    expectData(startCharacter, character);
+    expectData(endLine, line);
+    expectData(actualEnd, endCharacter);
+  }
+
+async expectNoConvertedReferenceSearch(request: number): Promise<void> {
+    const present = await this.driver.hasConvertedReferenceSearch(request);
+    expectData(present, false);
+  }
+
+readonly referencesLocal: SourceDocument = { ["uri"]: "file:///workspace/catalog.expec", ["text"]: "type Book {}\ntype Basket { book: Book }" };
+
+readonly referencesEntry: SourceDocument = { ["uri"]: "file:///workspace/basket.expec", ["text"]: "use Book as Novel from \"./book.expec\"\ntype Basket { book: Novel }" };
+
+readonly referencesBook: SourceDocument = { ["uri"]: "file:///workspace/book.expec", ["text"]: "type Book {}\ntype Shelf { book: Book }" };
+
+readonly nativeReferencesEntry: string = "use Book as Novel from \"./book.expec\"\ntype Basket { book: Novel }";
+
+readonly nativeReferencesBook: string = "type Book {}\ntype Shelf { book: Book }";
+
+readonly nativeReferencesChangedBook: string = "type Marker { label: Text = \"📚\" }\n\ntype Book {}\ntype Shelf { book: Book }";
 }
