@@ -6,12 +6,6 @@ use VsCodeExtensionContext, NativeLanguageClient from "./live-diagnostics.expec"
 // Host/resource and protocol adaptation only; core supplies complete current display state.
 component OutputPreviewHost {
   requires package "language-client" for runtime
-  requires package "vscode-types" for build
-  requires package "node-types" for build
-  requires package "typescript" for build
-  requires package "vite" for build
-  requires package "vscode-test-electron" for test
-  requires package "playwright" for test
   depends on OutputTabs
 
   construction(context: VsCodeExtensionContext, client: NativeLanguageClient)
@@ -239,4 +233,51 @@ examples for OutputPreviewHost {
     then expectNativePreviewZoomHistory([100, 125, 100])
     then expectNativePreviewZoom(100)
   }
+
+  fixture scopedSavedPreview: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/ui\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"src/library.expec\",\"test\":[\"playwright\"]}]}}"
+  fixture invalidScopedSavedPreview: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/ui\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"src/library.expec\",\"test\":[\"react\"]}]}}"
+  // Forward a genuine saved configuration change using the existing native path,
+  // retaining its actual pull resultId/version and visible window warning text.
+  // Warning observations read the real VS Code notification UI, not preview text,
+  // OutputChannel logs, a computed expected problem, or a fabricated source range.
+  action saveScopedPreviewConfiguration(configuration: Text) returns Nothing
+  // Capture exactly one visible native notification while the actual configuration
+  // is invalid, owned by this case's real manifest/current report. Keep that one
+  // raw message for later historical checks; never combine different messages.
+  action observeVisibleScopeWarning() returns Nothing
+  observation nativeScopeWarningIncludes(text: Text) returns Boolean
+  observation nativeScopeWarningMatches(code: Text, path: Text) returns Boolean
+  check expectVisibleScopeWarning(code: Text, path: Text) {
+    let actualCode = nativeScopeWarningIncludes(code)
+    let actualPath = nativeScopeWarningIncludes(path)
+    let sameOwnedMessage = nativeScopeWarningMatches(code, path)
+    assert actualCode == true
+    assert actualPath == true
+    assert sameOwnedMessage == true
+  }
+  check expectNativeScopePreviewRecovered() {
+    let previous = nativePreviewBeforeConfigurationStatus()
+    let unchangedVersion = nativePreviewEntryVersionUnchanged()
+    let hasDiagnostics = nativePreviewHasDiagnostics()
+    assert previous == "blocked"
+    assert unchangedVersion == true
+    assert hasDiagnostics == false
+  }
+  scenario "saved scope findings are visible and recovery previews the same unsaved source" {
+    given previewEditor("component ReactView { requires package \"react\" for runtime }", scopedSavedPreview)
+    when showOutputPreviews()
+    when editPreviewWithoutSaving("component ReactScreen { requires package \"react\" for runtime }")
+    when selectPreviewOutput("markdown")
+    when selectPreviewDocument("draft/docs/ReactScreen.md")
+    when saveScopedPreviewConfiguration(invalidScopedSavedPreview)
+    when observeVisibleScopeWarning()
+    when saveScopedPreviewConfiguration(scopedSavedPreview)
+    when selectPreviewOutput("markdown")
+    when selectPreviewDocument("draft/docs/ReactScreen.md")
+    then expectVisibleScopeWarning("unavailable-package", "\"requirements\",\"files\",0,\"test\",0")
+    then expectNativeScopePreviewRecovered()
+    then expectNativePreviewText("markdown", "draft/docs/ReactScreen.md", "text/markdown", "component ReactScreen")
+    then expectNativePreviewUnsaved("component ReactView { requires package \"react\" for runtime }", "component ReactScreen { requires package \"react\" for runtime }")
+  }
+
 }

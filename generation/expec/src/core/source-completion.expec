@@ -19,8 +19,6 @@ type TypeCompletion {
 
 component SourceCompletion {
   requires package "expec" for runtime
-  requires package "typescript" for build
-  requires package "vitest" for test
   construction()
   public published, closed, completion, dispose
 

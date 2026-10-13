@@ -6,10 +6,6 @@ use WorkspaceCore, SourceDocument, OutputTab from "../core/workspace.expec"
 opaque type VsCodeDocument
 
 component EditorAdapter {
-  requires package "typescript" for build
-  requires package "vscode-types" for build
-  requires package "vite" for build
-  requires package "vitest" for test
 
   construction(core: WorkspaceCore)
   public documentChanged, documentSaved

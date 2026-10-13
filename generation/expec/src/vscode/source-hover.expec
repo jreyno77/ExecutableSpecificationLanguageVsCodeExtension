@@ -7,9 +7,6 @@ opaque type NativeHover
 component SourceHoverAdapter {
   requires package "language-server" for runtime
   requires package "language-server-document" for runtime
-  requires package "typescript" for build
-  requires package "vitest" for test
-  requires package "vscode-test-electron" for test
   depends on SourceHover
 
   construction(hover: SourceHover)
