@@ -101,12 +101,27 @@ export class EditorLanguageSupport {
             return result;
         };
         middleware.provideCompletionItem = completionGuard;
+        const previousReferences = middleware.provideReferences;
+        const referencesGuard: NonNullable<typeof previousReferences> = async (document, position, context, token, next) => {
+            const current = (buffer: typeof document, version: number) => !this.disposed && !token.isCancellationRequested
+                && !buffer.isClosed && buffer.version === version && workspace.textDocuments.includes(buffer);
+            if (!current(document, document.version)) throw new CancellationError();
+            const captured = new Map(workspace.textDocuments.filter(open => !open.isClosed && open.languageId === 'expec')
+                .map(open => [open, open.version]));
+            captured.set(document, document.version);
+            const result = await (previousReferences ? previousReferences(document, position, context, token, next)
+                : next(document, position, context, token));
+            if ([...captured].some(([buffer, version]) => !current(buffer, version))) throw new CancellationError();
+            return result;
+        };
+        middleware.provideReferences = referencesGuard;
         this.releaseMiddleware = () => {
             if (middleware.provideDiagnostics === guard) middleware.provideDiagnostics = previous;
             if (middleware.provideDefinition === definitionGuard) middleware.provideDefinition = previousDefinition;
             if (middleware.provideHover === hoverGuard) middleware.provideHover = previousHover;
             if (middleware.provideDocumentSymbols === symbolGuard) middleware.provideDocumentSymbols = previousSymbols;
             if (middleware.provideCompletionItem === completionGuard) middleware.provideCompletionItem = previousCompletion;
+            if (middleware.provideReferences === referencesGuard) middleware.provideReferences = previousReferences;
         };
         this.context.subscriptions.push(this);
         void this.client.start().catch(error => this.client.error('.expec language server failed to start.', error, true));

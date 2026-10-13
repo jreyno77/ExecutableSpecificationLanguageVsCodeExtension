@@ -26,7 +26,7 @@ function warningServer(onWarning?: (message: string) => unknown, onError?: (mess
   };
   const connection = {
     onInitialize: listen('initialize'), onInitialized: listen('initialized'),
-    onDefinition: listen('definition'), onHover: listen('hover'), onDocumentSymbol: listen('symbols'), onCompletion: listen('completion'),
+    onDefinition: listen('definition'), onHover: listen('hover'), onDocumentSymbol: listen('symbols'), onCompletion: listen('completion'), onReferences: listen('references'),
     onNotification: (name: string, callback: (...args: any[]) => any) => listen(name)(callback),
     onDidChangeWatchedFiles: listen('watched'),
     onDidOpenTextDocument: listen('opened'), onDidChangeTextDocument: listen('changed'), onDidCloseTextDocument: listen('closed'),

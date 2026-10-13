@@ -1,3 +1,6 @@
+import { NativeReferencesRecording } from './vscode/native-references.js';
+import { SourceReferencesRecording } from './source-references.js';
+import { SourceReferenceConversion } from './source-reference-conversion.js';
 import { FileScopes } from './file-scopes.js';
 import { NativeCompletionRecording } from './vscode/native-completion.js';
 import { SourceCompletionRecording } from './source-completion.js';
@@ -38,6 +41,11 @@ import { ConnectionOutputGuidance } from "../../src/core/ConnectionOutputGuidanc
 
 
 export class WorkspaceDriver {
+  private nativeReferencesRecording!: NativeReferencesRecording;
+
+  private referenceRecording!: SourceReferencesRecording;
+  private referenceConversionRecording!: SourceReferenceConversion;
+
   private scopeFiles!: FileScopes;
   private nativeCompletionRecording!: NativeCompletionRecording;
   private sourceCompletionRecording!: SourceCompletionRecording;
@@ -2093,207 +2101,145 @@ async nativeScopeWarningMatches(code: string, path: string): Promise<boolean> {
     return this.nativePreview.scopeWarningMatches(code, path);
   }
 
-async sourceReferences(): Promise<void> {
-    throw new Error("Not implemented: workspace.sourceReferences");
-  }
+async sourceReferences(): Promise<void> { this.referenceRecording = SourceReferencesRecording.create(); }
 
 async importedReferenceEditor(entry: string, imported: string): Promise<void> {
-    throw new Error("Not implemented: workspace.importedReferenceEditor");
+    this.nativeReferencesRecording = await NativeReferencesRecording.open({ 'entry.expec': entry, 'book.expec': imported });
   }
 
 async localReferenceEditor(entry: string): Promise<void> {
-    throw new Error("Not implemented: workspace.localReferenceEditor");
+    this.nativeReferencesRecording = await NativeReferencesRecording.open({ 'entry.expec': entry });
   }
 
-async referenceConversion(text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.referenceConversion");
-  }
+async referenceConversion(text: string): Promise<void> { this.referenceConversionRecording = new SourceReferenceConversion(text); }
 
-async saveReferenceSource(source: SourceDocument): Promise<void> {
-    throw new Error("Not implemented: workspace.saveReferenceSource");
-  }
+async saveReferenceSource(source: SourceDocument): Promise<void> { this.referenceRecording.savedSource(source); }
 
-async openReferenceSource(source: SourceDocument, version: number): Promise<void> {
-    throw new Error("Not implemented: workspace.openReferenceSource");
-  }
+async openReferenceSource(source: SourceDocument, version: number): Promise<void> { this.referenceRecording.opened(source, version); }
 
-async changeReferenceSource(source: SourceDocument, version: number): Promise<void> {
-    throw new Error("Not implemented: workspace.changeReferenceSource");
-  }
+async changeReferenceSource(source: SourceDocument, version: number): Promise<void> { this.referenceRecording.changed(source, version); }
 
-async closeReferenceSource(uri: string): Promise<void> {
-    throw new Error("Not implemented: workspace.closeReferenceSource");
-  }
+async closeReferenceSource(uri: string): Promise<void> { this.referenceRecording.closed(uri); }
 
-async disposeReferences(): Promise<void> {
-    throw new Error("Not implemented: workspace.disposeReferences");
-  }
+async disposeReferences(): Promise<void> { this.referenceRecording.disposed(); }
 
-async requestSourceReferences(uri: string, version: number, line: number, column: number, includeDeclaration: boolean): Promise<void> {
-    throw new Error("Not implemented: workspace.requestSourceReferences");
-  }
+async requestSourceReferences(uri: string, version: number, line: number, column: number, includeDeclaration: boolean): Promise<void> { this.referenceRecording.request(uri, version, line, column, includeDeclaration); }
 
-async rememberReferenceWork(): Promise<void> {
-    throw new Error("Not implemented: workspace.rememberReferenceWork");
-  }
+async rememberReferenceWork(): Promise<void> { this.referenceRecording.rememberWork(); }
 
 async editReferenceImport(text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.editReferenceImport");
+    await this.nativeReferencesRecording.editImport(text);
   }
 
 async editReferenceEntry(text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.editReferenceEntry");
+    await this.nativeReferencesRecording.editEntry(text);
   }
 
 async findNativeReferences(line: number, column: number): Promise<void> {
-    throw new Error("Not implemented: workspace.findNativeReferences");
+    await this.nativeReferencesRecording.find(line, column);
   }
 
 async showNativeReferenceCoverage(): Promise<void> {
-    throw new Error("Not implemented: workspace.showNativeReferenceCoverage");
+    await this.nativeReferencesRecording.showCoverage();
   }
 
-async requestConvertedReferences(line: number, character: number, includeDeclaration: boolean): Promise<void> {
-    throw new Error("Not implemented: workspace.requestConvertedReferences");
-  }
+async requestConvertedReferences(line: number, character: number, includeDeclaration: boolean): Promise<void> { this.referenceConversionRecording.request(line, character, includeDeclaration); }
 
-async hasReferenceSearch(request: number): Promise<boolean> {
-    throw new Error("Not implemented: workspace.hasReferenceSearch");
-  }
+async hasReferenceSearch(request: number): Promise<boolean> { return this.referenceRecording.reply(request) !== undefined; }
 
-async referenceLocationCount(request: number): Promise<number> {
-    throw new Error("Not implemented: workspace.referenceLocationCount");
-  }
+async referenceLocationCount(request: number): Promise<number> { return this.referenceRecording.search(request).locations.length; }
 
-async referenceLocationUri(request: number, location: number): Promise<string> {
-    throw new Error("Not implemented: workspace.referenceLocationUri");
-  }
+async referenceLocationUri(request: number, location: number): Promise<string> { return this.referenceRecording.location(request, location).source.uri; }
 
-async referenceLocationText(request: number, location: number): Promise<string> {
-    throw new Error("Not implemented: workspace.referenceLocationText");
-  }
+async referenceLocationText(request: number, location: number): Promise<string> { return this.referenceRecording.location(request, location).source.text; }
 
-async referenceLocationName(request: number, location: number): Promise<string> {
-    throw new Error("Not implemented: workspace.referenceLocationName");
-  }
+async referenceLocationName(request: number, location: number): Promise<string> { return this.referenceRecording.name(request, location); }
 
-async referenceLocationStartLine(request: number, location: number): Promise<number> {
-    throw new Error("Not implemented: workspace.referenceLocationStartLine");
-  }
+async referenceLocationStartLine(request: number, location: number): Promise<number> { return this.referenceRecording.start(request, location).line; }
 
-async referenceLocationStartColumn(request: number, location: number): Promise<number> {
-    throw new Error("Not implemented: workspace.referenceLocationStartColumn");
-  }
+async referenceLocationStartColumn(request: number, location: number): Promise<number> { return this.referenceRecording.start(request, location).column; }
 
-async referenceLocationEndLine(request: number, location: number): Promise<number> {
-    throw new Error("Not implemented: workspace.referenceLocationEndLine");
-  }
+async referenceLocationEndLine(request: number, location: number): Promise<number> { return this.referenceRecording.end(request, location).line; }
 
-async referenceLocationEndColumn(request: number, location: number): Promise<number> {
-    throw new Error("Not implemented: workspace.referenceLocationEndColumn");
-  }
+async referenceLocationEndColumn(request: number, location: number): Promise<number> { return this.referenceRecording.end(request, location).column; }
 
-async referenceCoveredUris(request: number): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.referenceCoveredUris");
-  }
+async referenceCoveredUris(request: number): Promise<Array<string>> { return this.referenceRecording.search(request).coveredUris; }
 
-async referenceUnavailableUri(request: number, uri: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.referenceUnavailableUri");
-  }
+async referenceUnavailableUri(request: number, uri: string): Promise<boolean> { return this.referenceRecording.unavailable(request, uri); }
 
-async referencePrerequisiteCode(request: number, code: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.referencePrerequisiteCode");
-  }
+async referencePrerequisiteCode(request: number, code: string): Promise<boolean> { return this.referenceRecording.prerequisiteCode(request, code); }
 
-async referenceHasDeferredPrerequisite(request: number): Promise<boolean> {
-    throw new Error("Not implemented: workspace.referenceHasDeferredPrerequisite");
-  }
+async referenceHasDeferredPrerequisite(request: number): Promise<boolean> { return this.referenceRecording.hasDeferred(request); }
 
-async referenceWorkUnchanged(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.referenceWorkUnchanged");
-  }
+async referenceWorkUnchanged(): Promise<boolean> { return this.referenceRecording.workUnchanged(); }
 
 async nativeReferenceCount(): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeReferenceCount");
+    return this.nativeReferencesRecording.observation().locations.length;
   }
 
 async nativeReferenceUsesOwnedFile(location: number, fileName: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.nativeReferenceUsesOwnedFile");
+    return this.nativeReferencesRecording.usesOwnedFile(location, fileName);
   }
 
 async nativeReferenceName(location: number): Promise<string> {
-    throw new Error("Not implemented: workspace.nativeReferenceName");
+    return this.nativeReferencesRecording.location(location).name;
   }
 
 async nativeReferenceStartLine(location: number): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeReferenceStartLine");
+    return this.nativeReferencesRecording.location(location).range.start.line + 1;
   }
 
 async nativeReferenceStartColumn(location: number): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeReferenceStartColumn");
+    return this.nativeReferencesRecording.location(location).range.start.character + 1;
   }
 
 async nativeReferenceEndLine(location: number): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeReferenceEndLine");
+    return this.nativeReferencesRecording.location(location).range.end.line + 1;
   }
 
 async nativeReferenceEndColumn(location: number): Promise<number> {
-    throw new Error("Not implemented: workspace.nativeReferenceEndColumn");
+    return this.nativeReferencesRecording.location(location).range.end.character + 1;
   }
 
 async nativeReferenceCoverageMessage(): Promise<string> {
-    throw new Error("Not implemented: workspace.nativeReferenceCoverageMessage");
+    return this.nativeReferencesRecording.coverageMessage();
   }
 
 async nativeReferenceCoverageIncludesOwnedSource(fileName: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.nativeReferenceCoverageIncludesOwnedSource");
+    return this.nativeReferencesRecording.coveredFile(fileName);
   }
 
 async nativeReferenceCoverageIncludesUnavailable(fileName: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.nativeReferenceCoverageIncludesUnavailable");
+    return this.nativeReferencesRecording.unavailableFile(fileName);
   }
 
 async nativeReferenceCoverageHasPrerequisite(code: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.nativeReferenceCoverageHasPrerequisite");
+    return this.nativeReferencesRecording.prerequisite(code);
   }
 
 async referenceImportIsDirty(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.referenceImportIsDirty");
+    return this.nativeReferencesRecording.dirtyImport();
   }
 
 async referenceEntryIsDirty(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.referenceEntryIsDirty");
+    return this.nativeReferencesRecording.dirtyEntry();
   }
 
 async nativeReferenceFilesUnchanged(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.nativeReferenceFilesUnchanged");
+    return await this.nativeReferencesRecording.filesUnchanged();
   }
 
-async hasConvertedReferenceSearch(request: number): Promise<boolean> {
-    throw new Error("Not implemented: workspace.hasConvertedReferenceSearch");
-  }
+async hasConvertedReferenceSearch(request: number): Promise<boolean> { return this.referenceConversionRecording.reply(request) !== undefined; }
 
-async convertedReferenceCount(request: number): Promise<number> {
-    throw new Error("Not implemented: workspace.convertedReferenceCount");
-  }
+async convertedReferenceCount(request: number): Promise<number> { return this.referenceConversionRecording.search(request).locations.length; }
 
-async convertedReferenceName(request: number, location: number): Promise<string> {
-    throw new Error("Not implemented: workspace.convertedReferenceName");
-  }
+async convertedReferenceName(request: number, location: number): Promise<string> { return this.referenceConversionRecording.name(request, location); }
 
-async convertedReferenceStartLine(request: number, location: number): Promise<number> {
-    throw new Error("Not implemented: workspace.convertedReferenceStartLine");
-  }
+async convertedReferenceStartLine(request: number, location: number): Promise<number> { return this.referenceConversionRecording.location(request, location).range.start.line; }
 
-async convertedReferenceStartCharacter(request: number, location: number): Promise<number> {
-    throw new Error("Not implemented: workspace.convertedReferenceStartCharacter");
-  }
+async convertedReferenceStartCharacter(request: number, location: number): Promise<number> { return this.referenceConversionRecording.location(request, location).range.start.character; }
 
-async convertedReferenceEndLine(request: number, location: number): Promise<number> {
-    throw new Error("Not implemented: workspace.convertedReferenceEndLine");
-  }
+async convertedReferenceEndLine(request: number, location: number): Promise<number> { return this.referenceConversionRecording.location(request, location).range.end.line; }
 
-async convertedReferenceEndCharacter(request: number, location: number): Promise<number> {
-    throw new Error("Not implemented: workspace.convertedReferenceEndCharacter");
-  }
+async convertedReferenceEndCharacter(request: number, location: number): Promise<number> { return this.referenceConversionRecording.location(request, location).range.end.character; }
 }

@@ -1,3 +1,5 @@
+import { SourceReferences as CoreSourceReferences } from '../core/SourceReferences.js';
+import { SourceReferenceAdapter as NativeSourceReferenceAdapter } from './SourceReferenceAdapter.js';
 import { SourceCompletion as CoreSourceCompletion } from '../core/SourceCompletion.js';
 import { SourceCompletionAdapter as NativeSourceCompletionAdapter } from './SourceCompletionAdapter.js';
 import { DocumentOutline as CoreDocumentOutline } from '../core/DocumentOutline.js';
@@ -78,6 +80,9 @@ export class LanguageServerAdapter {
     private readonly outlines = new NativeSourceOutlineAdapter(this.outline);
     private readonly completion = new CoreSourceCompletion();
     private readonly completions = new NativeSourceCompletionAdapter(this.completion);
+    private readonly referenceSearch = new CoreSourceReferences();
+    private readonly referenceAdapter = new NativeSourceReferenceAdapter(this.referenceSearch);
+    private latestReferenceSearch: object | undefined;
     private readonly documents = new TextDocuments(TextDocument);
     private readonly subscriptions: Disposable[] = [];
     private readonly reports = new Map<string, { resultId: string; items: Diagnostic[]; dependencies: readonly string[] }>();
@@ -142,6 +147,7 @@ export class LanguageServerAdapter {
                     hoverProvider: true,
                     documentSymbolProvider: true,
                     completionProvider: {},
+                    referencesProvider: true,
                 } };
             }),
             this.connection.onInitialized(() => {
@@ -174,6 +180,29 @@ export class LanguageServerAdapter {
                 const document = this.documents.get(textDocument.uri);
                 return document ? this.completions.items(document, position) : [];
             }),
+            this.connection.onReferences(({ textDocument, position, context }, token) => {
+                const request = this.latestReferenceSearch = {};
+                if (this.disposed || token.isCancellationRequested) return undefined;
+                const document = this.documents.get(textDocument.uri);
+                if (!document) return undefined;
+                const version = document.version, resultId = this.reports.get(document.uri)?.resultId;
+                const presentation = this.referenceAdapter.references(document, position, context.includeDeclaration);
+                if (!presentation || resultId === undefined) return undefined;
+                const coveredUris = [...presentation.coveredUris], prerequisites = [...presentation.prerequisites];
+                const current = () => !this.disposed && !token.isCancellationRequested && this.latestReferenceSearch === request
+                    && this.documents.get(document.uri) === document && document.version === version
+                    && this.reports.get(document.uri)?.resultId === resultId;
+                if (!current()) return undefined;
+                const choice = this.connection.window.showInformationMessage(
+                    'Reference search covers captured sources only; workspace importers were not scanned.', { title: 'Show coverage' });
+                void Promise.resolve(choice).then(action => {
+                    if (action?.title !== 'Show coverage' || !current()) return;
+                    const reply = this.connection.window.showInformationMessage(
+                        'Covered sources:\n' + coveredUris.join('\n') + '\n\nPrerequisites:\n' + prerequisites.join('\n'));
+                    return Promise.resolve(reply).then(() => undefined);
+                }).catch(error => this.referenceFailure(error));
+                return current() ? presentation.locations : undefined;
+            }),
             this.connection.languages.diagnostics.on(({ textDocument }) => {
                 const report = this.reports.get(textDocument.uri);
                 return { kind: 'full', resultId: report?.resultId, items: report?.items ?? [] };
@@ -198,6 +227,7 @@ export class LanguageServerAdapter {
         this.hover.published(source, version, report);
         this.outline.published(source, version, report);
         this.completion.published(source, version, report);
+        this.referenceSearch.published(source, version, report);
         this.previews.published(source, version, report);
         if (this.disposed || this.publicationTokens.get(source.uri) !== token || this.configurationRevision !== configurationRevision) return;
         const warnings = this.scopeWarnings;
@@ -296,6 +326,7 @@ export class LanguageServerAdapter {
         this.hover.closed(uri);
         this.outline.closed(uri);
         this.completion.closed(uri);
+        this.referenceSearch.closed(uri);
         this.previews.closed(uri);
         this.reports.delete(uri);
         this.updateWatches();
@@ -319,6 +350,8 @@ export class LanguageServerAdapter {
         release(() => this.hover.dispose());
         release(() => this.outline.dispose());
         release(() => this.completion.dispose());
+        this.latestReferenceSearch = undefined;
+        release(() => this.referenceSearch.dispose());
         release(() => this.previews.dispose());
         for (const uri of this.documents.keys()) release(() => this.analysis.closed(uri));
         this.reports.clear();
@@ -328,6 +361,13 @@ export class LanguageServerAdapter {
         this.unsupportedWatches.clear();
         for (const failure of failures.slice(1)) this.connection.console.error('Additional shutdown failure: ' + String(failure));
         if (failures.length) throw failures[0];
+    }
+    private referenceFailure(error: unknown): void {
+        const message = 'Reference coverage request failed: ' + String(error);
+        try { this.connection.console.error(message); }
+        catch (loggingError) {
+            try { console.error(message, loggingError); } catch {}
+        }
     }
     private updateWatches(): void {
         if (this.disposed || !this.initialized) return;
