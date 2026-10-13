@@ -2,6 +2,7 @@ import { ConfigurationReader, acceptanceOutput, contractListOutput, javaAcceptan
     kotlinAcceptanceOutput, kotlinOutput, markdownOutput, pythonAcceptanceOutput, pythonOutput, structureListOutput,
     typescriptOutput, umlOutput, type DependencyPackage } from 'executable-specification-language';
 import { Compiler, LangiumModel, QueryInspection, SourceComposer, type ModuleModel, type ReadResult } from 'executable-specification-language';
+import { requirementsFor, type Configuration, type Diagnostic } from 'executable-specification-language';
 import type { DocumentReport } from './DocumentReport.js';
 
 type OpenDocument = { source: SourceDocument; version: number; revision: number; dependencies: Set<string>; pending?: Set<string> };
@@ -21,8 +22,6 @@ import type { ConnectionConfiguration } from "./ConnectionConfiguration.js";
 /**
  * Unverified implementation obligation.
  * Requires package: expec (runtime)
- * Requires package: typescript (build)
- * Requires package: vitest (test)
  */
 export class DocumentAnalysis {
     private readonly configurationReader = new ConfigurationReader([
@@ -30,7 +29,10 @@ export class DocumentAnalysis {
         acceptanceOutput, javaOutput, javaAcceptanceOutput, kotlinOutput, kotlinAcceptanceOutput, pythonOutput, pythonAcceptanceOutput,
     ]);
     private packages: readonly DependencyPackage[] = [];
-    private packageKey = '[]';
+    private packageKey = '';
+    private configuration: Configuration | undefined;
+    private configurationProblems: Diagnostic[] = [];
+    private readonly ownership = new Map<string, string | undefined>();
     private configurationRevision = 0;
     private readonly reader = new LangiumReader();
     private readonly compiler = new Compiler();
@@ -102,6 +104,7 @@ export class DocumentAnalysis {
             for (const uri of document.dependencies) retained.add(uri);
             for (const uri of document.pending ?? []) retained.add(uri);
         }
+        for (const uri of this.ownership.keys()) if (!retained.has(uri)) this.ownership.delete(uri);
         for (const uri of this.saved.keys()) if (!retained.has(uri)) this.saved.delete(uri);
         for (const uri of this.parsed.keys()) if (!retained.has(uri)) this.parsed.delete(uri);
     }
@@ -149,6 +152,27 @@ export class DocumentAnalysis {
         this.saved.set(uri, captured);
         return captured;
     }
+    private localPath(uri: string, dependencies: Set<string>, current: () => void): string | undefined {
+        const configuration = this.configuration!;
+        if (!configuration.requirements?.folders?.length && !configuration.requirements?.files?.length) return undefined;
+        dependencies.add(uri);
+        if (!this.ownership.has(uri)) {
+            const path = this.sources.localPath(uri, configuration.sourceId);
+            current();
+            this.ownership.set(uri, path);
+        }
+        return this.ownership.get(uri);
+    }
+    private captureFacts<T>(value: T): T {
+        const captured = structuredClone(value);
+        const freeze = (data: unknown): void => {
+            if (data === null || typeof data !== 'object') return;
+            for (const child of Object.values(data)) freeze(child);
+            Object.freeze(data);
+        };
+        freeze(captured);
+        return captured;
+    }
     private check(document: OpenDocument, revision: number): void {
         const dependencies = new Set<string>();
         document.pending = dependencies;
@@ -176,7 +200,15 @@ export class DocumentAnalysis {
             const compilation = resolution ? this.compiler.compile({ resolution }) : undefined;
             const inspection = resolution ? new QueryInspection(resolution.model) : undefined;
             current();
+            const requirements = this.configuration ? requirementsFor(this.configuration,
+                [...captures.keys()].map(sourceId => {
+                    const localPath = this.localPath(sourceId, dependencies, current);
+                    return { sourceId, ...(localPath === undefined ? {} : { localPath }) };
+                })) : undefined;
+            current();
             const report: DocumentReport = {
+                requirements: this.captureFacts([...(requirements?.value ?? [])]),
+                dependencyProblems: this.captureFacts([...(requirements?.problems ?? this.configurationProblems)]),
                 syntax: [...captures.values()].flatMap(parsed => parsed.result.status === 'rejected' ? [...parsed.result.diagnostics] : []),
                 ...(compilation === undefined ? {} : { compilation }),
                 ...(inspection === undefined ? {} : { inspection }),
@@ -197,9 +229,11 @@ export class DocumentAnalysis {
 /**
      * Unverified implementation obligation.
      * Invalidate a requested saved source after creation, change or deletion and recheck affected open entries even when their editor version is unchanged. Ignore unrelated URIs and saved changes hidden by an authoritative open snapshot. Reuse unchanged parsed snapshots and read only the invalidated source plus newly required imports. Track missing imports too, and terminate cyclic import acquisition. Preserve other documents and previous reports; do not let reentrant older work replace current feedback.
+     * When folder/file scopes are in use, a relevant file-route notification also invalidates the cached local-path fact, including for authoritative open unsaved text. Recheck the same retained snapshot if its effective scope ownership changed; do not replace that text with saved bytes. Include actually queried ownership URIs in dependencies so the existing native watch boundary can invalidate them. Unrelated notifications cannot trigger a scan or reset another document's facts.
      */
 sourceChanged(uri: string): void {
-        if (this.documents.has(uri)) return;
+        if (this.documents.has(uri) && !this.ownership.has(uri)) return;
+        this.ownership.delete(uri);
         const affected = this.affected(uri);
         if (!affected.length) return;
         this.saved.delete(uri);
@@ -210,6 +244,7 @@ sourceChanged(uri: string): void {
      * Unverified implementation obligation.
      * Receive the current selected saved configuration snapshot or absence. Validate its supplied text through the public ConfigurationReader with shipped output profiles, then capture only validated Configuration.packages aliases and phases as the existing SourceComposer's DependencyPackage inputs. Missing text, invalid configuration, switching manifests or withdrawing selection replaces the prior catalog; never retain old supplied packages after an invalid or absent snapshot. Do not use writable as package availability or read unsaved configuration buffers; ConnectionSidebar supplies its actual saved-text policy. These are supplied compiler configuration facts, not proof of package installation, native exports, external declaration models, runtime behavior or generation readiness. Keep genuinely unsupplied aliases and missing phases as the language's actual findings. Do not infer packages from imports, folder names, node_modules or another project.
      * A changed catalog invalidates current open analyses and republishes their exact retained unsaved sources at unchanged editor versions through the same SourceComposer, Compiler and Inspection/Resolution publication. Reuse unchanged parsed sources and saved dependency snapshots. Retain the validated catalog for ordinary source edits rather than revalidating configuration per edit. Preserve current document lifetimes and guard reentrant source/configuration/feedback changes so older work cannot publish with an obsolete catalog. Validation or publication exceptions surface; they are not empty success. Existing configuration consumers retain actual validation explanations. This operation never acquires project/package code, scans, installs, generates, saves or writes; it does not require connected-target verification.
+     * Retain the validated requirements metadata with the same catalog, and include the selected manifest filename and effective scope metadata in configuration currentness even when aliases/phases are unchanged. Prepare requirementsFor over the actual captured workspace source identities and provider-supplied local paths; no resolver, synthetic model or implicit runtime imports are added. Project obligations apply to supplied workspace sources even when a foreign or untitled source has no local path; folder/exact-file obligations require verified local paths. Do not treat acquired external declaration models as workspace sources. Invalid or absent configuration withdraws earlier rows/catalog and publishes the actual configuration findings; failed scope preparation publishes no old rows. A relevant saved scope change rechecks retained unsaved text at the same editor version. Cache source ownership between text edits; invalidate it after a selected configuration change or relevant source-route notification, guard reentrant provider/feedback callbacks, and never run SourceLoader or connected native capture on each keystroke.
      */
 configurationChanged(configuration: ConnectionConfiguration | undefined): void {
         const revision = ++this.configurationRevision;
@@ -222,10 +257,16 @@ configurationChanged(configuration: ConnectionConfiguration | undefined): void {
         const packages = (checked?.value?.packages ?? []).map(({ alias, phases }) => Object.freeze({
             alias, phases: Object.freeze([...phases].sort()),
         })).sort((first, second) => first.alias.localeCompare(second.alias));
-        const key = JSON.stringify(packages);
+        const key = JSON.stringify({ packages, file: snapshot?.file, requirements: checked?.value?.requirements,
+            problems: checked?.problems ?? [] });
         if (key === this.packageKey) return;
         this.packageKey = key;
         this.packages = Object.freeze(packages);
+        this.configuration = checked?.value === undefined ? undefined : this.captureFacts(checked.value);
+        this.configurationProblems = this.captureFacts((checked?.problems ?? []).filter(problem =>
+            !(['unknown-output', 'invalid-output-options'].includes(problem.code) && problem.at.kind === 'dependency'
+                && problem.at.path[0] === 'manifest' && problem.at.path[1] === snapshot?.file && problem.at.path[2] === 'outputs')));
+        this.ownership.clear();
         this.run([...this.documents.values()].map(document => ({ document, revision: ++document.revision })));
     }
 }

@@ -13,7 +13,7 @@ import type { ConnectionConfiguration } from '../../../src/core/ConnectionConfig
 
 // A narrow native-connection recorder: the real adapter registers and invokes these
 // protocol operations. It never parses source or supplies an expected compiler answer.
-function recordedServer(sources: DocumentSources = { read: () => undefined }) {
+function recordedServer(sources: DocumentSources = { localPath: () => undefined, read: () => undefined }) {
   const callbacks = new Map<string, (params: any, token?: CancellationToken) => any>();
   const listenerCounts = new Map<string, number>();
   const released: string[] = [], warnings: string[] = [], errors: string[] = [];
@@ -127,7 +127,7 @@ describe('native source hovers at their protocol boundary', () => {
 
   it('forwards a changed imported callable at the same entry version from the actual analysis', async () => {
     const imported = { uri: 'file:///workspace/book.expec', text: 'function publish(title: Text) returns Boolean { promises "Publish the title." }' };
-    const server = recordedServer({ read: uri => uri === imported.uri ? imported : undefined });
+    const server = recordedServer({ localPath: () => undefined, read: uri => uri === imported.uri ? imported : undefined });
     const entry = { uri: 'file:///workspace/client.expec', text: 'use publish from "./book.expec"\nexamples for publish {}' };
     try {
       server.open(entry);
@@ -251,7 +251,7 @@ describe('native semantic feedback at its protocol boundary', () => {
 
   it('unregisters a pending watch that completes after shutdown without reading source', async () => {
     let reads = 0;
-    const server = recordedServer({ read: () => { reads++; return undefined; } });
+    const server = recordedServer({ localPath: () => undefined, read: () => { reads++; return undefined; } });
     const source = { uri: 'file:///workspace/main.expec', text: '' };
     server.adapter.publish(source, 1, emptyReport([source], ['file:///outside/book.expec']));
     server.adapter.dispose();
@@ -267,7 +267,7 @@ describe('native semantic feedback at its protocol boundary', () => {
 
   it('releases owned watches and reports when closing an imported lifetime cannot read its saved source', async () => {
     const failure = new Error('Saved source acquisition failed during shutdown.');
-    const server = recordedServer({ read: () => { throw failure; } });
+    const server = recordedServer({ localPath: () => undefined, read: () => { throw failure; } });
     const imported = { uri: 'file:///workspace/book.expec', text: 'type Book {}' };
     const source = { uri: 'file:///workspace/main.expec', text: 'use Book from "./book.expec"\ntype Main { book: Book }' };
     server.open(imported);

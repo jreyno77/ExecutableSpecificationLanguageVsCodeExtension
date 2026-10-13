@@ -9,7 +9,7 @@ const source = { uri: 'file:///workspace/catalog.expec', text: 'type Book {}\nty
 const tokenStart = 33, tokenEnd = 36;
 function reportFor(input: SourceDocument): DocumentReport {
   let captured: DocumentReport | undefined;
-  const analysis = new DocumentAnalysis({ publish: (_source, _version, report) => { captured = report; }, clear: () => {} }, { read: () => undefined });
+  const analysis = new DocumentAnalysis({ publish: (_source, _version, report) => { captured = report; }, clear: () => {} }, { localPath: () => undefined, read: () => undefined });
   analysis.opened(input, 1);
   if (!captured) throw new Error('The actual DocumentAnalysis did not publish.');
   return captured;

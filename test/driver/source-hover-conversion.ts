@@ -11,7 +11,7 @@ export class SourceHoverConversion {
   private readonly analysis = new DocumentAnalysis({
     publish: (source, version, report) => this.hover.published(source, version, report),
     clear: uri => this.hover.closed(uri),
-  }, { read: () => undefined });
+  }, { localPath: () => undefined, read: () => undefined });
   private readonly document: TextDocument;
   private readonly adapter: SourceHoverAdapter;
   private readonly replies: Array<Hover | undefined> = [];

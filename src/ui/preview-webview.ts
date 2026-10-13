@@ -13,6 +13,8 @@ window.addEventListener('message', ({ data }: MessageEvent<{ type: string; publi
   context.dataset.sourceUri = publication.uri ?? '';
   context.dataset.sourceVersion = String(publication.version ?? '');
   explanation.textContent = publication.message ?? '';
+  if (publication.blocked === true) explanation.dataset.status = 'blocked';
+  else delete explanation.dataset.status;
   tabs.present(publication.tabs);
 });
 window.addEventListener('pagehide', () => tabs.dispose(), { once: true });

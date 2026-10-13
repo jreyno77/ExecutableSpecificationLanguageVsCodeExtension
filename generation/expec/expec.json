@@ -149,6 +149,20 @@
             ],
             "from": "vscode-languageserver",
             "name": "CompletionItem"
+          },
+          {
+            "declaration": [
+              "ScopedPackageRequirement"
+            ],
+            "from": "executable-specification-language",
+            "name": "ScopedPackageRequirement"
+          },
+          {
+            "declaration": [
+              "DependencyDiagnostic"
+            ],
+            "from": "executable-specification-language",
+            "name": "Diagnostic"
           }
         ]
       }
@@ -282,7 +296,7 @@
     {
       "alias": "expec",
       "name": "npm:executable-specification-language",
-      "version": "0.1.0",
+      "version": "0.1.0-pr.116",
       "phases": [
         "build",
         "runtime"
@@ -344,5 +358,67 @@
       ],
       "name": "npm:vscode-languageserver-textdocument"
     }
-  ]
+  ],
+  "requirements": {
+    "project": {
+      "build": [
+        "typescript",
+        "vite",
+        "node-types",
+        "vsce"
+      ],
+      "test": [
+        "vitest",
+        "vite"
+      ]
+    },
+    "folders": [
+      {
+        "path": "src/ui",
+        "build": [
+          "react-types",
+          "react-dom-types",
+          "vite-react"
+        ],
+        "runtime": [
+          "react",
+          "react-dom"
+        ],
+        "test": [
+          "vite-react",
+          "playwright"
+        ]
+      },
+      {
+        "path": "src/vscode",
+        "build": [
+          "vscode-types"
+        ],
+        "test": [
+          "vscode-test-electron"
+        ]
+      }
+    ],
+    "files": [
+      {
+        "path": "src/core/output-previews.expec",
+        "test": [
+          "playwright"
+        ]
+      },
+      {
+        "path": "src/vscode/output-previews.expec",
+        "test": [
+          "playwright"
+        ]
+      },
+      {
+        "path": "src/vscode/language-support.expec",
+        "test": [
+          "vscode-textmate",
+          "vscode-oniguruma"
+        ]
+      }
+    ]
+  }
 }

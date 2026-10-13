@@ -6,4 +6,6 @@ export type PreviewPublication = {
     version?: number | undefined;
     tabs: Array<OutputTab>;
     message?: string | undefined;
+
+blocked?: boolean | undefined;
 };

@@ -1,12 +1,7 @@
 import type { ProjectOutputs } from "./ProjectOutputs.js";
 import type { SourceDocument } from "./SourceDocument.js";
 import type { OutputTab } from "./OutputTab.js";
-/**
- * Unverified implementation obligation.
- * Requires package: typescript (build)
- * Requires package: vite (build)
- * Requires package: vitest (test)
- */
+
 export class WorkspaceCore {
     private readonly outputs: ProjectOutputs;
     private readonly generateOnSave: boolean;

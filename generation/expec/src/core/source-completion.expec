@@ -1,7 +1,7 @@
 // EXT-10 completes an existing final named-type token from one current publication.
 // Boo also matches builtin Boolean; independent eligible names survive bad imports.
-// The full reviewed CORE-36 development SDK capture cecb20e supplies typeCandidates;
-// language CI and exact package delivery remain separate from this capture.
+// The complete verified SDK release pr-116 includes CORE-36's public typeCandidates.
+// Its manifest and native package pin share the exact delivered payload.
 use SourceDocument from "./workspace.expec"
 use DocumentReport from "./document-analysis.expec"
 
@@ -19,8 +19,6 @@ type TypeCompletion {
 
 component SourceCompletion {
   requires package "expec" for runtime
-  requires package "typescript" for build
-  requires package "vitest" for test
   construction()
   public published, closed, completion, dispose
 

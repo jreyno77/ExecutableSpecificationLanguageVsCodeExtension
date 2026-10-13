@@ -3,6 +3,10 @@ import type { Compilation } from "executable-specification-language";
 import type { SourceDocument } from "./SourceDocument.js";
 import type { Inspection } from "executable-specification-language";
 import type { Resolution } from "executable-specification-language";
+import type { ScopedPackageRequirement } from "executable-specification-language";
+
+import type { Diagnostic } from "executable-specification-language";
+
 
 
 
@@ -17,4 +21,8 @@ export type DocumentReport = {
 inspection?: Inspection | undefined;
 
 resolution?: Resolution | undefined;
+
+requirements?: Array<ScopedPackageRequirement> | undefined;
+
+dependencyProblems?: Array<Diagnostic> | undefined;
 };

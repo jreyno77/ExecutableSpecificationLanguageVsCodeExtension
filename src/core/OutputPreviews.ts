@@ -23,8 +23,6 @@ import type { DocumentReport } from "./DocumentReport.js";
 /**
  * Unverified implementation obligation.
  * Requires package: expec (runtime)
- * Requires package: typescript (build)
- * Requires package: vitest (test)
  */
 export class OutputPreviews {
     private readonly feedback: PreviewFeedback;
@@ -35,6 +33,7 @@ export class OutputPreviews {
     private configuration: Configuration | undefined;
     private configurationToken = {};
     private manifest: string | undefined;
+    private configurationBlocked = false;
     private configurationMessage = 'Choose a saved .expec configuration to preview outputs.';
     private selection: string | undefined;
     private view: PreviewView | undefined;
@@ -50,7 +49,7 @@ export class OutputPreviews {
     }
     /**
      * Unverified implementation obligation.
-     * Capture this current saved manifest or absence and advance private currentness before further work. Prepare the real Outputs registry and ConfigurationReader from supplied registrations, or shipped built-ins when absent. An explicit list replaces built-ins. Validate through ConfigurationReader without discovering files. Missing/invalid configuration withdraws old tabs with its actual explanation. Preserve configured output IDs/order/options; duplicate IDs remain a configuration error. Changed options replace queued requests. Valid outputs may preview without a project or with an unavailable target; target availability is not authored-preview readiness. Use this absolute native manifest filename as OutputContext.manifestLocation. Do not install, capture targets, rewrite configuration or request generation.
+     * Capture this current saved manifest or absence and advance private currentness before further work. Prepare the real Outputs registry and ConfigurationReader from supplied registrations, or shipped built-ins when absent. An explicit list replaces built-ins. Validate through ConfigurationReader without discovering files. Missing/invalid configuration withdraws old tabs with its actual explanation. An actual rejected ConfigurationReader result also publishes whole-view blocked true; selection absence, waiting and an empty configured output set do not invent that failure marker. Preserve configured output IDs/order/options; duplicate IDs remain a configuration error. Changed options replace queued requests. Valid outputs may preview without a project or with an unavailable target; target availability is not authored-preview readiness. Use this absolute native manifest filename as OutputContext.manifestLocation. Do not install, capture targets, rewrite configuration or request generation.
      */
     configurationChanged(configuration: ConnectionConfiguration | undefined): void {
         if (this.disposed) return;
@@ -59,12 +58,14 @@ export class OutputPreviews {
         for (const work of this.work.values()) work.queued = undefined;
         this.configuration = undefined;
         this.manifest = configuration?.file;
+        this.configurationBlocked = false;
         this.configurationMessage = 'Choose a saved .expec configuration to preview outputs.';
         if (configuration?.text !== undefined) {
             try {
                 const checked = this.reader.read({ sourceId: configuration.file, text: configuration.text });
                 if (this.disposed || this.configurationToken !== token) return;
                 this.configuration = checked.value;
+                this.configurationBlocked = checked.value === undefined && checked.problems.length > 0;
                 this.configurationMessage = this.findings(checked) || 'Configuration is unavailable.';
             } catch (error) {
                 if (this.disposed || this.configurationToken !== token) return;
@@ -84,6 +85,7 @@ export class OutputPreviews {
     }
     /**
      * Unverified implementation obligation.
+     * Actual dependencyProblems in this current report block configured outputs with their real codes/messages and dependency-origin paths, withdrawing old documents even when editor version is unchanged. Do not manufacture a compiler failure or ignore an invalid scoped configuration merely because the unchanged source's Compilation has a Specification. Successful scoped requirements permit ordinary previews using the same checked source; they do not install packages, capture a target or prove native generation readiness. Legacy supplied reports without this additive field have no extra scope findings.
      * Receive the real current immutable DocumentAnalysis publication before native diagnostic conversion loses its Compilation. Keep the source/version and complete report inside core; never parse, compile, discover files or rebuild models here. Each publication is a new private report revision even at the same editor version after imported-source changes. Only the selected current report drives previews. Rejected syntax or absent/failed/deferred Compilation blocks configured tabs with actual syntax/compiler codes/messages or requirement reasons/requires and no old documents. From its checked Specification call public Outputs.preview independently for each configured ID/options with captured report source URIs as workspaceModules and the selected manifest filename. Publish pending tabs with no previous documents before starting work; each current completion updates only its tab while others progress. Retain actual document paths/media types/order. Strictly decode supported UTF-8 text media, application/json and image/svg+xml from their exact byte spans; invalid UTF-8 or unsupported binary presentation refuses that output with an explicit unsupported-presentation explanation and no silent replacement. Successful empty documents are ready with No authored documents; refused checks retain actual diagnostic codes/messages or requirement reasons/requires. Provider/contract exceptions are visibly refused rather than fabricated upstream findings or empty success. Status is pending, ready, blocked or refused. Private work currentness covers source lifetime/version, report/configuration/selection revisions and coordinator lifetime; check it after every await and discard stale success/refusal/error. Keep at most one invocation per output ID in flight and only its latest requested report/configuration queued; after settlement render that latest request and skip superseded intermediate edits. Other IDs progress independently. Do not open project adapters, capture a target, plan/apply writes, generate acceptance output, execute scenarios or claim handwritten preservation/write readiness.
      */
     published(source: SourceDocument, version: number, report: DocumentReport): void {
@@ -125,15 +127,21 @@ export class OutputPreviews {
             publication: { ...(this.selection === undefined ? {} : { uri: this.selection }), ...(report ? { version: report.version } : {}), tabs: [] },
         };
         this.view = view;
-        if (!view.configuration) view.publication.message = this.configurationMessage;
+        if (!view.configuration) {
+            view.publication.message = this.configurationMessage;
+            if (this.configurationBlocked) view.publication.blocked = true;
+        }
         else if (this.selection === undefined) view.publication.message = 'Select an authored .expec document to preview.';
         else if (!report) view.publication.message = 'Waiting for analysis of the selected authored document.';
         else {
             const compilation = report.report.compilation;
-            const blocked = report.report.syntax.length || !compilation?.value || compilation.problems.length || compilation.deferred.length || compilation.syntax.length;
+            const blocked = report.report.dependencyProblems?.length || report.report.syntax.length || !compilation?.value || compilation.problems.length || compilation.deferred.length || compilation.syntax.length;
             const message = [...new Set([
                 ...report.report.syntax, ...(compilation?.syntax ?? []),
-            ].map(item => item.category + ': ' + item.explanation).concat(compilation ? this.findings(compilation) : []).filter(Boolean))].join('; ')
+            ].map(item => item.category + ': ' + item.explanation).concat(
+                (report.report.dependencyProblems ?? []).map(problem => problem.code + ': ' + problem.message
+                    + (problem.at.kind === 'dependency' ? ' ' + JSON.stringify(problem.at.path) : '')),
+                compilation ? this.findings(compilation) : []).filter(Boolean))].join('; ')
                 || 'Compilation is unavailable.';
             view.publication.tabs = view.configuration.outputs.map(output => ({
                 id: output.id, label: this.label(output.id), status: blocked ? 'blocked' : 'pending', documents: [],

@@ -11,10 +11,6 @@ import type { GenerationShutdownFeedback } from "./GenerationShutdownFeedback.js
 /**
  * Unverified implementation obligation.
  * Requires package: expec (runtime)
- * Requires package: node-types (build)
- * Requires package: typescript (build)
- * Requires package: vite (build)
- * Requires package: vitest (test)
  */
 export class NodeGenerationWorker {
     private readonly nodeExecutable: string;

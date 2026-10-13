@@ -11,9 +11,6 @@ import type { Location } from "vscode-languageserver";
  * Unverified implementation obligation.
  * Requires package: language-server (runtime)
  * Requires package: language-server-document (runtime)
- * Requires package: typescript (build)
- * Requires package: vitest (test)
- * Requires package: vscode-test-electron (test)
  * Depends on: SourceNavigation
  */
 export class SourceDefinitionAdapter {
