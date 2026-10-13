@@ -464,3 +464,55 @@ describe('connection management for saved metadata and active work', () => {
     expect(work).toEqual([{ file, text: configuredText(alpha), writable: true }]);
   });
 });
+
+
+describe('target events during an accepted metadata save', () => {
+  async function pendingConnection() {
+    const paths = await projectDirectories(), ready = deferred<void>(), saved = deferred<SaveRequest>(), acknowledged = deferred<void>();
+    const work: Array<ConnectionConfiguration | undefined> = [];
+    const fixture = recordedConnection(state => {
+      if (state.status === 'connected' && state.target === paths.alpha) ready.resolve();
+      if (state.status === 'connected' && state.target === paths.beta) acknowledged.resolve();
+    }, request => saved.resolve(request));
+    fixture.controller.configurationChanged({ file: paths.file, text: configuredText(paths.alpha), writable: true });
+    await ready.promise;
+    fixture.controller.observeWork({ configurationChanged(configuration) { work.push(configuration); } });
+    return { ...paths, ...fixture, work, saved, acknowledged };
+  }
+
+  it('retains the exact pending Delete failure after a target event and keeps old work withdrawn', async () => {
+    const { alpha, controller, states, saves, work } = await pendingConnection();
+    controller.deleteConnection(); const request = saves[0]!;
+    controller.targetChanged(alpha);
+    controller.saveFailed(request.previous, 'Actual native save failed.');
+    expect(states.at(-1)).toMatchObject({ status: 'unavailable', message: 'Actual native save failed.' });
+    expect(work.at(-1)).toBeUndefined();
+    expect(saves).toHaveLength(1);
+  });
+
+  for (const operation of ['choose', 'create'] as const) it(`keeps a pending ${operation} withdrawn until acknowledgement verifies the actual new target`, async () => {
+    const { file, alpha, beta, controller, states, saves, work, saved, acknowledged } = await pendingConnection();
+    if (operation === 'choose') controller.chooseProject(beta); else controller.createConnection(beta, [], []);
+    const request = await saved.promise;
+    const connector = vi.spyOn(ProjectConnector.prototype, 'connect'); onTestFinished(() => connector.mockRestore());
+    controller.targetChanged(alpha);
+    await Promise.all(connector.mock.results.map(result => result.value));
+    const workBeforeAcknowledgement = [...work];
+    controller.configurationChanged({ file, text: request.text, writable: true }); await acknowledged.promise;
+    expect(workBeforeAcknowledgement.at(-1)).toBeUndefined();
+    expect(states.at(-1)).toMatchObject({ status: 'connected', target: beta });
+    expect(work.at(-1)?.text).toBe(configuredText(beta));
+    expect(saves).toHaveLength(1);
+  });
+
+  it('checks the actual acknowledged new target when it disappeared during the pending save', async () => {
+    const { file, alpha, beta, controller, states, work, saved } = await pendingConnection();
+    controller.chooseProject(beta); const request = await saved.promise;
+    expect(beta).toBe(join(alpha, '..', 'beta'));
+    await rm(beta, { recursive: true });
+    controller.targetChanged(beta);
+    controller.configurationChanged({ file, text: request.text, writable: true });
+    await vi.waitFor(() => expect(states.at(-1)).toMatchObject({ status: 'unavailable', target: beta }));
+    expect(work.at(-1)).toBeUndefined();
+  });
+});

@@ -100,7 +100,7 @@ export class ConnectionController {
      * Recheck the current configured target automatically after relevant logical or canonical root or ancestor events, including deletion and restoration. Ignore unrelated paths and events for a superseded target, and never resume an explicitly disconnected session from watcher events. Reuse validated current configuration; perform only connector identity/availability checking, not tree capture. Withdraw connected while rechecking and suppress stale completion.
      */
     targetChanged(path: string): void {
-        if (this.disposed || !this.snapshot || this.suspended) return;
+        if (this.disposed || !this.snapshot || this.suspended || this.pending) return;
         const target = this.configuredTarget();
         if (![target, this.canonical, this.candidate].some(root => root !== undefined && this.ancestor(path, root))) return;
         const revision = this.advance(false);

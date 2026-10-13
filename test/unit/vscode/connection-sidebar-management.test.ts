@@ -372,3 +372,49 @@ describe('Delete rechecks the confirmed saved selection after native read events
     } finally { acceptedRead.release(); confirmation.release(undefined); await command; }
   });
 });
+
+
+describe('native save confirmation while an ancestor watch rechecks the target', () => {
+  async function heldDeleteSave(failure?: string) {
+    const fixture = await start();
+    const document = await workspace.openTextDocument(Uri.file(fixture.host.file)), actualSave = document.save.bind(document);
+    const holding = heldAnswer<void>();
+    vi.spyOn(document, 'save').mockImplementation(async () => {
+      await holding.answer();
+      if (failure) throw new Error(failure);
+      return actualSave();
+    });
+    fixture.host.confirmDeletion = true;
+    const command = commands.executeCommand('expec.deleteConnection');
+    await holding.started;
+    return { ...fixture, document, holding, command };
+  }
+  async function ancestorEvent(host: RecordedSidebarHost) {
+    const ancestor = Uri.file(host.directory), matching = host.watchers.filter(watcher => !watcher.disposed && watcher.matches(ancestor));
+    expect(matching.length).toBeGreaterThan(0);
+    for (const watcher of matching) watcher.changed.fire(ancestor);
+    await host.settleRequestedSave();
+  }
+
+  it('confirms actual removed metadata after an owned ancestor event during native save', async () => {
+    const { host, document, holding, command, previews } = await heldDeleteSave();
+    try {
+      await ancestorEvent(host); holding.release(undefined); await command; await host.settleRequestedSave();
+      const saved = await host.savedConfiguration();
+      expect(saved).toBe('{"formatVersion":1,"version":"0.1.0","build":{"entries":["src/main.expec"]},"outputs":[]}');
+      expect(document.isDirty).toBe(false);
+      expect(await host.rows()).toContainEqual(expect.objectContaining({ contextValue: 'unconfigured' }));
+      expect(previews.at(-1)?.text).toBe(saved);
+    } finally { holding.release(undefined); await command; await host.settleRequestedSave(); }
+  });
+
+  it('surfaces an actual native save failure after an owned ancestor event', async () => {
+    const { host, document, holding, command } = await heldDeleteSave('Native document save failed.');
+    try {
+      await ancestorEvent(host); holding.release(undefined); await command; await host.settleRequestedSave();
+      expect(await host.savedConfiguration()).toBe(shop);
+      expect(document.isDirty).toBe(true);
+      expect(await host.rows()).toContainEqual(expect.objectContaining({ contextValue: 'unavailable', tooltip: expect.stringContaining('Native document save failed.') }));
+    } finally { holding.release(undefined); await command; await host.settleRequestedSave(); }
+  });
+});
