@@ -1,5 +1,5 @@
 use PreviewConfigurationFeedback from "../core/output-previews.expec"
-use ConnectionController, ConnectionConfiguration, ConnectionState from "../core/project-connection.expec"
+use ConnectionController, ConnectionConfiguration, ConnectionState, ConnectionOutputChoice, ConnectionWorkFeedback from "../core/project-connection.expec"
 use VsCodeExtensionContext from "./live-diagnostics.expec"
 
 // Caller assembly selects one explicit local configuration filename. The sidebar
@@ -12,22 +12,41 @@ component ConnectionSidebar {
   depends on ConnectionController
 
   construction(context: VsCodeExtensionContext, previews: PreviewConfigurationFeedback)
-  public start, present, saveConfiguration, dispose
+  public start, observeWork, editConnection, newConnection, disconnect, reconnect, deleteConnection, present, saveConfiguration, dispose
 
   capability start(configurationFile: Text) returns Nothing {
-    promises "Register the native .expec Project Connection view and Choose Project command once. Adapt this same instance to the standard TreeDataProvider APIs; native activation exposes that actual registered provider as connectionTreeProvider alongside the same native LanguageClient, for standard provider consumers. Existing client identity and methods remain intact; no extra core business query or reconstructed test rows. Start core ConnectionController for the supplied absolute local manifest filename, feeding actual saved text or absence and whether the document can be written. Display checking until core verifies the connection. Picking a folder sends its absolute fsPath to core; cancel does nothing. Switching filename disposes the previous controller and watches before following the new configuration; obsolete callbacks cannot affect the view or save a file. Settings expec.configurationFile defaults to expec.json relative to the selected workspace folder; a single folder can be selected automatically, multiple folders require a workspace choice. Empty/remote workspaces show an explanation and do not claim a connection. Opening the view or invoking the command activates the extension; opening an expec document still activates existing language support. Forward the actual selected saved ConnectionConfiguration snapshot to the supplied preview feedback whenever it changes, independently of target verification. Withdraw the prior selection with absence before switching manifests. Do not parse it again or wait for connected status to permit authored previews."
+    promises "Register the native .expec Project Connection view and legacy Choose Project command once. Contribute a dedicated .expec Activity Bar container with a packaged recognizable monochrome icon and move the existing expec.connection view into it, retaining its public view ID and actual registered TreeDataProvider. Supply discoverable New Connection and Edit Connection title actions, and row context actions Edit Connection, New Connection, Disconnect or Reconnect according to the actual state, and Delete Connection when project metadata exists. Use native commands expec.newConnection, expec.editConnection, expec.disconnectConnection, expec.reconnectConnection and expec.deleteConnection, with their declared activation and contextual menus. Adapt this same instance to standard TreeDataProvider APIs; native activation exposes that actual registered provider as connectionTreeProvider alongside the same native LanguageClient. Existing client identity and methods remain intact; no test-only core query or reconstructed test rows. Start core ConnectionController for the supplied absolute local manifest filename, feeding actual saved text or absence and whether the document can be written. Display checking until core verifies the connection. Legacy picking a folder sends its absolute fsPath to core; cancel does nothing. Switching filename withdraws work, disposes the previous controller and watches before following the new configuration; obsolete callbacks cannot affect the view or save a file. Attach any current work observer to the new controller. Settings expec.configurationFile defaults to expec.json relative to the selected workspace folder; a single folder can be selected automatically, multiple folders require a workspace choice. Empty/remote workspaces show an explanation and do not claim a connection. Opening the view or invoking a command activates the extension; opening an expec document still activates existing language support. Forward the actual selected saved ConnectionConfiguration snapshot to the supplied preview feedback whenever it changes, independently of target verification or session-only disconnect. Withdraw the prior preview selection with absence before switching manifests. Do not parse it again or wait for connected status to permit authored previews."
+  }
+
+  capability observeWork(feedback: ConnectionWorkFeedback) returns Nothing {
+    promises "Attach one replaceable connection-owned work observer, immediately forwarding to the current controller or delivering absence if no controller exists. Replacing or disposing the observer withdraws the prior one. Retain this one observer across controller replacement while guarding current selection, observer identity and native lifetime around reentrant callbacks. Existing constructor and metadata-only callers remain valid. Actual activation always attaches its existing single GenerationHost here once; the independent preview callback carries raw saved metadata to previews and live package analysis but never generation. Do not duplicate core connection or generation decisions."
+  }
+  capability editConnection() returns Nothing {
+    promises "Open the actual selected local manifest in the ordinary VS Code text editor. Preserve dirty text and do not save, create a missing file or change metadata merely to edit it. If the selected file does not exist, explain that New Connection can create it. Editing is the supported path for advanced existing output options. Guard selected filename and native lifetime around awaits."
+  }
+  capability newConnection() returns Nothing {
+    promises "Guide an explicit author choice with standard VS Code folder dialog, output QuickPick and destination InputBox steps; no project-scaffolding wizard or custom webview. Obtain the current plain ConnectionController.guidance result once before choices; absence uses the existing invalid or unavailable explanation and cannot start a proposal. Consume its captured configuration, configured flags, eligible output IDs, suggested destinations and requiresEntries, rather than parsing saved JSON, registering output profiles or reconstructing setup policy in the native adapter. Select any usable empty or existing local target directory. Present already configured output IDs, preserving their exact options, and the core's eligible new choices. Explain that advanced profiles can be retained or edited in the manifest but are not initialized with guessed options. Preserve authored selection order. Prompt an actual relative destination only for a newly selected output, labelled relative to the connected target, with the core-supplied editable suggestion. Suggestions are extension setup policy, not SDK defaults. Explain TypeScript folder mirroring from the manifest's source folder; core supplies sourceRoot '.', and the target-root suggestion avoids src/src duplication. Request real source entries only when guidance.requiresEntries is true; existing metadata retains build.entries and needs no new source prompt. For a missing manifest use an actual saved ordinary .expec source within its folder, or ask the author to select real .expec source files within that folder, and pass their literal relative entries; absent/cancelled source selection requests no creation. Never assume src/main.expec exists or create an authored entry. Capture the exact selected controller and saved file/text/writable snapshot plus selection revision and native lifetime before guidance; recheck after every asynchronous choice and immediately before forwarding core.createConnection. Cancellation at any step, selection replacement, changed saved metadata, dirty configuration or disposal cannot initiate a late write or change the old selection. Core owns proposal validation, target verification and persistence requests. Surface real refusals and save failures; do not claim rollback, target initialization, dependency readiness or generation success. Only the selected manifest may be created by the explicit New Connection action."
+  }
+  capability disconnect() returns Nothing {
+    promises "Forward the explicit session-only suspension to the current core controller. Present its actual disconnected state and explain that saved configuration and files are retained and reconnection is available. The work observer withdraws connection-owned generation; its prior per-manifest opt-in is neither erased nor granted. Keep raw saved preview/package configuration available. No metadata write or target deletion."
+  }
+  capability reconnect() returns Nothing {
+    promises "Forward the explicit resume to the current core controller and show its real fresh verification outcome. Preserve prior explicit per-manifest generation opt-in exactly; a previously disabled connection stays disabled. Never start generation, replay a previous save or save configuration from reconnection. A later genuine source save is required even if opt-in was previously true."
+  }
+  capability deleteConnection() returns Nothing {
+    promises "Ask for explicit native confirmation naming the selected manifest and explaining that only its project metadata will be removed, with target files, outputs and packages retained. Cancellation changes nothing. Capture selected controller and exact saved snapshot before prompting; recheck selection, saved text, write safety and lifetime before core.deleteConnection. Dirty configuration or changed selection cannot delete another connection. Core owns the conditional metadata proposal and actual confirmation. Do not delete a manifest, source, generated artifact or target directory."
   }
 
   capability present(state: ConnectionState) returns Nothing {
-    promises "Translate the current core state into native TreeItem labels, description and tooltip; do not validate configuration or decide connection policy. Show the actual target and explanation. Connected means the configured directory has a verified filesystem identity, not that native build prerequisites or generation succeeded. Keep scoped native watches for the selected manifest and current logical/canonical target and their existing ancestors, including when a target is absent. Forward actual relevant configuration and target events to core, including creation, deletion and settings changes, without a manual Refresh action, polling, scanning or recursive project capture. Dispose old watches when the target/configuration changes; changes at an old target cannot restore an obsolete state. Register before reading and recheck once after registration; registration alone does not prove the operating-system watcher is ready. Surface watch failures rather than showing a stale healthy status."
+    promises "Translate the current core state into native TreeItem labels, description, tooltip and contextual command availability; do not validate configuration or decide connection policy. Use current core guidance.hasProject for Delete availability; a requested state.target alone does not prove saved project metadata exists. Show the actual target and explanation, including explicit session-only disconnected status. Make the actual selected manifest filename and full absolute path visible in the native view so the author can identify which metadata these commands affect; hidden provider fields alone do not satisfy this presentation. Connected means the configured directory has a verified filesystem identity, not that native build prerequisites or generation succeeded. Keep scoped native watches for the selected manifest and current logical/canonical target and their existing ancestors, including when a target is absent. Forward actual relevant configuration and target events to core, including creation, deletion and settings changes, without a manual Refresh action, polling, scanning or recursive project capture. Dispose old watches when the target/configuration changes; changes at an old target cannot restore an obsolete state. Register before reading and recheck once after registration; registration alone does not prove the operating-system watcher is ready. Surface watch failures rather than showing a stale healthy status."
   }
 
   capability saveConfiguration(previous: ConnectionConfiguration, text: Text) returns Nothing {
-    promises "Fulfill this exact current core save request using VS Code file/document APIs. Recheck the selected filename, current saved text and dirty-editor state immediately before applying; refuse stale requests or dirty documents without overwriting user edits. Save only the manifest selected by the author, preserve all other settings as supplied by core, and never write connected-project source. Confirm success to core with actual saved text, or report the failure using core.saveFailed with the exact previous snapshot. A requested write or picker result alone never proves success. Missing manifests can be created only by this explicit Choose Project action. Do not create projects, install packages, compile or generate outputs. Forward successful actual saved confirmation to the same preview feedback; dirty edits continue using saved bytes, not unsaved configuration text."
+    promises "Fulfill this exact current core save request using VS Code file/document APIs. Recheck the selected filename, current saved text and dirty-editor state immediately before applying; refuse stale requests or dirty documents without overwriting user edits. Save only the manifest selected by the author, preserve all other settings as supplied by core, and never write connected-project source. Confirm success to core with actual saved text, or report the failure using core.saveFailed with the exact previous snapshot. A requested write or picker result alone never proves success. Missing manifests can be created only by explicit Choose Project or New Connection actions. Do not create projects, install packages, compile or generate outputs. Forward successful actual saved confirmation to the same preview feedback; dirty edits continue using saved bytes, not unsaved configuration text. Actual apply/save effects are not atomic and failures do not establish rollback."
   }
 
   capability dispose() returns Nothing {
-    promises "Stop core and dispose every owned view, command, event subscription and watcher. Repeated disposal is harmless; pending reads, picks and saves cannot publish or initiate writes after disposal. Cleanup must attempt all owned resources even when one throws. Withdraw the selected preview configuration through the supplied feedback before releasing this native lifetime."
+    promises "Stop core and dispose every owned view, command, event subscription and watcher. Repeated disposal is harmless; pending reads, guidance, confirmations and saves cannot publish or initiate writes after disposal. Cleanup must attempt all owned resources even when one throws and preserve actual causes. Withdraw and release the work observer and selected preview configuration before releasing this native lifetime; the existing awaited GenerationHost shutdown retains terminal worker results until owned work settles."
   }
 }
 
@@ -36,9 +55,23 @@ component ConnectionSidebar {
 // configuration; they do not reconstruct expected state from folders or actions.
 // Each case owns a clean local configuration and project directories; one native
 // host is reused. The driver settles real change events and cleans owned state.
+// New guidance cases invoke the actual registered command. Controlled ordinary
+// picker/input boundaries return author choices for real owned paths; they do not
+// decide validation or save success. Icon/menu checks inspect the real workbench
+// and contributed visible actions. Preview checks read the actual output webview.
 examples for ConnectionSidebar {
   fixture configuredShop: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"shop\"},\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[]}"
   fixture configuredLibrary: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"library\"},\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[]}"
+  fixture sidebarEntries: List<Text> = ["src/model.expec"]
+  fixture retainedSidebarEntries: List<Text> = []
+  fixture sidebarNewOutputs: List<ConnectionOutputChoice> = [
+    { id: "typescript", directory: "." }, { id: "uml", directory: "diagrams" }
+  ]
+  fixture sidebarRetainedOutputs: List<ConnectionOutputChoice> = [
+    { id: "typescript" }, { id: "markdown", directory: "docs" }
+  ]
+  fixture managedShop: Text = "{\"formatVersion\":1,\"version\":\"1.2.3\",\"project\":{\"root\":\"shop\"},\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"sourceRoot\":\".\",\"directory\":\".\",\"configFile\":\"tsconfig.json\"}}],\"packages\":[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"version\":\"1.0.0\",\"phases\":[\"runtime\"]}]}"
+  fixture previewShop: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"shop\"},\"build\":{\"entries\":[\"src/model.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"docs\"}}]}"
 
   setup connectionSidebar(configuration: Text, directories: List<Text>) returns Nothing
   setup unconfiguredSidebar(directories: List<Text>) returns Nothing
@@ -48,6 +81,32 @@ examples for ConnectionSidebar {
   action removeSidebarProject(directory: Text) returns Nothing
   action restoreSidebarProject(directory: Text) returns Nothing
   action editConfigurationWithoutSaving(text: Text) returns Nothing
+  action openConnectionActivityBar() returns Nothing
+  action openSidebarConnectionMenu() returns Nothing
+  action editSidebarConnection() returns Nothing
+  action guideNewSidebarConnection(directory: Text, outputs: List<ConnectionOutputChoice>, entries: List<Text>) returns Nothing
+  // Reach the actual directory-input step after target/output choices, then cancel.
+  action cancelNewSidebarConnectionAtDestination(directory: Text, outputs: List<Text>) returns Nothing
+  action disconnectSidebarConnection() returns Nothing
+  action reconnectSidebarConnection() returns Nothing
+  action deleteSidebarConnection(confirmed: Boolean) returns Nothing
+  action keepSidebarSource(path: Text, text: Text) returns Nothing
+  action keepSidebarTargetFile(directory: Text, path: Text, text: Text) returns Nothing
+  action previewSidebarSource(path: Text) returns Nothing
+  observation sidebarActivityBarVisible() returns Boolean
+  // Compare actual visible native view text to the owned manifest filename/path
+  // supplied at setup, not a filename inferred from the product's own row values.
+  observation sidebarSelectedConfigurationVisible() returns Boolean
+  observation sidebarVisibleConnectionActions() returns List<Text>
+  observation sidebarEditingSelectedConfiguration() returns Boolean
+  observation sidebarSavedEntries() returns List<Text>
+  observation sidebarSavedOutputIds() returns List<Text>
+  // Canonical JSON of actual saved values; sorted keys do not alter values.
+  observation sidebarSavedOutputOptions(id: Text) returns Text
+  observation sidebarSavedVersion() returns Text
+  observation sidebarSavedPackages() returns Text
+  observation sidebarOwnedTreesUnchanged() returns Boolean
+  observation sidebarPreviewDocumentIncludes(id: Text, path: Text, text: Text) returns Boolean
   observation sidebarConnectionStatus() returns Text
   observation sidebarProjectName() returns Text
   observation sidebarConnectionExplanation() returns Text
@@ -72,6 +131,40 @@ examples for ConnectionSidebar {
     let actualUnsaved = sidebarUnsavedConfiguration()
     assert actualSaved == saved
     assert actualUnsaved == unsaved
+  }
+  check expectDedicatedConnectionView(actions: List<Text>) {
+    let visible = sidebarActivityBarVisible()
+    let configuration = sidebarSelectedConfigurationVisible()
+    let actualActions = sidebarVisibleConnectionActions()
+    let editing = sidebarEditingSelectedConfiguration()
+    assert visible == true
+    assert configuration == true
+    assert actualActions == actions
+    assert editing == true
+  }
+  check expectSidebarSavedOutputs(entries: List<Text>, outputs: List<Text>) {
+    let actualEntries = sidebarSavedEntries()
+    let actualOutputs = sidebarSavedOutputIds()
+    assert actualEntries == entries
+    assert actualOutputs == outputs
+  }
+  check expectSidebarSavedOutput(id: Text, options: Text) {
+    let actual = sidebarSavedOutputOptions(id)
+    assert actual == options
+  }
+  check expectSidebarRetainedSettings(version: Text, packages: Text) {
+    let actualVersion = sidebarSavedVersion()
+    let actualPackages = sidebarSavedPackages()
+    assert actualVersion == version
+    assert actualPackages == packages
+  }
+  check expectSidebarTreesUntouched() {
+    let unchanged = sidebarOwnedTreesUnchanged()
+    assert unchanged == true
+  }
+  check expectSidebarPreviewDocument(id: Text, path: Text, text: Text) {
+    let present = sidebarPreviewDocumentIncludes(id, path, text)
+    assert present == true
   }
 
   scenario "choose an existing project and see its verified directory connection" {
@@ -116,6 +209,87 @@ examples for ConnectionSidebar {
     when chooseProjectInSidebar("library")
     then expectSidebarConfigurationPreserved(configuredShop, configuredLibrary)
     then expectSidebarConnection("connected", "shop")
+  }
+  scenario "the dedicated expec view exposes connection actions and edits the selected manifest" {
+    given connectionSidebar(configuredShop, ["shop"])
+    when openConnectionActivityBar()
+    when openSidebarConnectionMenu()
+    when editSidebarConnection()
+    when deleteSidebarConnection(false)
+    then expectDedicatedConnectionView(["Edit Connection", "New Connection", "Disconnect", "Delete Connection"])
+    then expectSidebarConnection("connected", "shop")
+    then expectSidebarConfigurationPreserved(configuredShop, configuredShop)
+    then expectSidebarTreesUntouched()
+  }
+  scenario "guided new connection configures an empty target without scaffolding it" {
+    given unconfiguredSidebar(["shop"])
+    when keepSidebarSource("src/model.expec", "type Book {}")
+    when guideNewSidebarConnection("shop", sidebarNewOutputs, sidebarEntries)
+    then expectSidebarConnection("connected", "shop")
+    then expectSidebarSavedProject("shop")
+    then expectSidebarSavedOutputs(["src/model.expec"], ["typescript", "uml"])
+    then expectSidebarSavedOutput("typescript", "{\"directory\":\".\",\"sourceRoot\":\".\"}")
+    then expectSidebarSavedOutput("uml", "{\"directory\":\"diagrams\",\"views\":[\"structure\"]}")
+    then expectSidebarTreesUntouched()
+  }
+  scenario "guided existing target retains authored settings and handwritten target files" {
+    given connectionSidebar(managedShop, ["shop", "library"])
+    when keepSidebarTargetFile("library", "manual.txt", "Keep handwritten library")
+    when guideNewSidebarConnection("library", sidebarRetainedOutputs, retainedSidebarEntries)
+    then expectSidebarConnection("connected", "library")
+    then expectSidebarSavedOutputs(["src/main.expec"], ["typescript", "markdown"])
+    then expectSidebarSavedOutput("typescript", "{\"configFile\":\"tsconfig.json\",\"directory\":\".\",\"sourceRoot\":\".\"}")
+    then expectSidebarSavedOutput("markdown", "{\"directory\":\"docs\"}")
+    then expectSidebarRetainedSettings("1.2.3", "[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"phases\":[\"runtime\"],\"version\":\"1.0.0\"}]")
+    then expectSidebarTreesUntouched()
+  }
+  scenario "cancelling guided output destination preserves the old saved connection" {
+    given connectionSidebar(configuredShop, ["shop", "library"])
+    when cancelNewSidebarConnectionAtDestination("library", ["typescript", "uml"])
+    then expectSidebarConnection("connected", "shop")
+    then expectSidebarConfigurationPreserved(configuredShop, configuredShop)
+    then expectSidebarTreesUntouched()
+  }
+  scenario "new and delete commands cannot overwrite dirty configuration" {
+    given connectionSidebar(configuredShop, ["shop", "library"])
+    when editConfigurationWithoutSaving(configuredLibrary)
+    when guideNewSidebarConnection("library", sidebarNewOutputs, retainedSidebarEntries)
+    when deleteSidebarConnection(true)
+    then expectSidebarConfigurationPreserved(configuredShop, configuredLibrary)
+    then expectSidebarConnection("connected", "shop")
+    then expectSidebarTreesUntouched()
+  }
+  scenario "session-only disconnect keeps authored previews and cannot be reversed by target events" {
+    given connectionSidebar(previewShop, ["shop"])
+    when keepSidebarSource("src/model.expec", "type Book {}")
+    when disconnectSidebarConnection()
+    when removeSidebarProject("shop")
+    when restoreSidebarProject("shop")
+    when previewSidebarSource("src/model.expec")
+    then expectSidebarConnection("disconnected", "shop")
+    then expectSidebarSavedProject("shop")
+    then expectSidebarPreviewDocument("markdown", "docs/Book.md", "# Book")
+    then expectSidebarTreesUntouched()
+  }
+  scenario "reconnect verifies the latest saved target without rewriting configuration" {
+    given connectionSidebar(configuredShop, ["shop", "library"])
+    when disconnectSidebarConnection()
+    when saveSidebarConfiguration(configuredLibrary)
+    when reconnectSidebarConnection()
+    then expectSidebarConnection("connected", "library")
+    then expectSidebarConfigurationPreserved(configuredLibrary, configuredLibrary)
+    then expectSidebarTreesUntouched()
+  }
+  scenario "confirmed delete removes connection metadata but preserves output configuration and files" {
+    given connectionSidebar(managedShop, ["shop"])
+    when keepSidebarTargetFile("shop", "manual.txt", "Keep handwritten shop")
+    when deleteSidebarConnection(true)
+    then expectSidebarConnection("unconfigured", "")
+    then expectSidebarSavedProject("")
+    then expectSidebarSavedOutputs(["src/main.expec"], ["typescript"])
+    then expectSidebarSavedOutput("typescript", "{\"configFile\":\"tsconfig.json\",\"directory\":\".\",\"sourceRoot\":\".\"}")
+    then expectSidebarRetainedSettings("1.2.3", "[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"phases\":[\"runtime\"],\"version\":\"1.0.0\"}]")
+    then expectSidebarTreesUntouched()
   }
 }
 

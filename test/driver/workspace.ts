@@ -31,6 +31,10 @@ import { SourceDocument } from "../../src/core/SourceDocument.js";
 import { OutputPreviewsRecording } from './output-previews.js';
 import type { NativePreviewCase } from './vscode/native-preview.js';
 import { ConnectionConfiguration } from "../../src/core/ConnectionConfiguration.js";
+import { ConnectionOutputChoice } from "../../src/core/ConnectionOutputChoice.js";
+import { ConnectionOutputGuidance } from "../../src/core/ConnectionOutputGuidance.js";
+
+
 
 export class WorkspaceDriver {
   private nativeCompletionRecording!: NativeCompletionRecording;
@@ -524,7 +528,10 @@ async sidebarConnectionExplanation(): Promise<string> {
 async sidebarSavedProjectName(): Promise<string> {
     const saved = this.sidebarCase.last.saved;
     if (saved === undefined) throw new Error('The native sidebar has no saved configuration.');
-    return basename(JSON.parse(saved).project.root);
+    const project = JSON.parse(saved).project;
+    if (project === undefined) return '';
+    if (!project || typeof project.root !== 'string') throw new Error('The saved project root is not text.');
+    return basename(project.root);
   }
 
 async sidebarSavedConfiguration(): Promise<string> {
@@ -534,9 +541,9 @@ async sidebarSavedConfiguration(): Promise<string> {
   }
 
 async sidebarUnsavedConfiguration(): Promise<string> {
-    const unsaved = this.sidebarCase.last.unsaved;
-    if (unsaved === undefined) throw new Error('The native sidebar has no unsaved configuration.');
-    return unsaved;
+    const current = this.sidebarCase.last.unsaved ?? this.sidebarCase.last.saved;
+    if (current === undefined) throw new Error('The native sidebar has no captured configuration text.');
+    return current;
   }
 
 async previewAuthoring(configuration: string): Promise<void> {
@@ -1779,5 +1786,189 @@ async nativePreviewEntryVersionUnchanged(): Promise<boolean> {
 
 async nativePreviewHasDiagnostics(): Promise<boolean> {
     return await this.nativePreview.hasDiagnostics();
+  }
+
+async attachConnectionWorkObserver(): Promise<void> {
+    return await this.connectionRecording.attachWork();
+  }
+
+async createProjectConnection(name: string, outputs: Array<ConnectionOutputChoice>, entries: Array<string>): Promise<void> {
+    return await this.connectionRecording.create(name, outputs, entries);
+  }
+
+async disconnectProjectConnection(): Promise<void> {
+    return await this.connectionRecording.disconnect();
+  }
+
+async reconnectProjectConnection(): Promise<void> {
+    return await this.connectionRecording.reconnect();
+  }
+
+async deleteProjectConnection(): Promise<void> {
+    return await this.connectionRecording.deleteConnection();
+  }
+
+async keepConnectionSource(path: string, text: string): Promise<void> {
+    return await this.connectionRecording.keepSource(path, text);
+  }
+
+async keepConnectionTargetFile(name: string, path: string, text: string): Promise<void> {
+    return await this.connectionRecording.keepTarget(name, path, text);
+  }
+
+async openConnectionActivityBar(): Promise<void> {
+    return await this.sidebarCase.openActivityBar();
+  }
+
+async openSidebarConnectionMenu(): Promise<void> {
+    return await this.sidebarCase.openConnectionMenu();
+  }
+
+async editSidebarConnection(): Promise<void> {
+    return await this.sidebarCase.editConnection();
+  }
+
+async guideNewSidebarConnection(directory: string, outputs: Array<ConnectionOutputChoice>, entries: Array<string>): Promise<void> {
+    return await this.sidebarCase.newConnection(directory, outputs, entries);
+  }
+
+async cancelNewSidebarConnectionAtDestination(directory: string, outputs: Array<string>): Promise<void> {
+    return await this.sidebarCase.cancelNewAtDestination(directory, outputs);
+  }
+
+async disconnectSidebarConnection(): Promise<void> {
+    return await this.sidebarCase.disconnect();
+  }
+
+async reconnectSidebarConnection(): Promise<void> {
+    return await this.sidebarCase.reconnect();
+  }
+
+async deleteSidebarConnection(confirmed: boolean): Promise<void> {
+    return await this.sidebarCase.deleteConnection(confirmed);
+  }
+
+async keepSidebarSource(path: string, text: string): Promise<void> {
+    return await this.sidebarCase.keepSource(path, text);
+  }
+
+async keepSidebarTargetFile(directory: string, path: string, text: string): Promise<void> {
+    return await this.sidebarCase.keepTargetFile(directory, path, text);
+  }
+
+async previewSidebarSource(path: string): Promise<void> {
+    return await this.sidebarCase.previewSource(path);
+  }
+
+async connectionWorkProjectName(): Promise<string> {
+    return await this.connectionRecording.workProjectName();
+  }
+
+async connectionSavedText(): Promise<string> {
+    return await this.connectionRecording.savedText();
+  }
+
+async connectionSavedEntries(): Promise<Array<string>> {
+    return await this.connectionRecording.savedEntries();
+  }
+
+async connectionSavedOutputIds(): Promise<Array<string>> {
+    return await this.connectionRecording.savedOutputIds();
+  }
+
+async connectionSavedOutputOptions(id: string): Promise<string> {
+    return await this.connectionRecording.savedOutputOptions(id);
+  }
+
+async connectionSavedVersion(): Promise<string> {
+    return await this.connectionRecording.savedVersion();
+  }
+
+async connectionSavedPackages(): Promise<string> {
+    return await this.connectionRecording.savedPackages();
+  }
+
+async connectionOwnedTreesUnchanged(): Promise<boolean> {
+    return await this.connectionRecording.treesUnchanged();
+  }
+
+async sidebarActivityBarVisible(): Promise<boolean> {
+    return await this.sidebarCase.activityBarVisible();
+  }
+
+async sidebarSelectedConfigurationVisible(): Promise<boolean> {
+    return await this.sidebarCase.selectedConfigurationVisible();
+  }
+
+async sidebarVisibleConnectionActions(): Promise<Array<string>> {
+    return await this.sidebarCase.visibleConnectionActions();
+  }
+
+async sidebarEditingSelectedConfiguration(): Promise<boolean> {
+    return await this.sidebarCase.editingSelectedConfiguration();
+  }
+
+async sidebarSavedEntries(): Promise<Array<string>> {
+    return await this.sidebarCase.savedEntries();
+  }
+
+async sidebarSavedOutputIds(): Promise<Array<string>> {
+    return await this.sidebarCase.savedOutputIds();
+  }
+
+async sidebarSavedOutputOptions(id: string): Promise<string> {
+    return await this.sidebarCase.savedOutputOptions(id);
+  }
+
+async sidebarSavedVersion(): Promise<string> {
+    return await this.sidebarCase.savedVersion();
+  }
+
+async sidebarSavedPackages(): Promise<string> {
+    return await this.sidebarCase.savedPackages();
+  }
+
+async sidebarOwnedTreesUnchanged(): Promise<boolean> {
+    return await this.sidebarCase.ownedTreesUnchanged();
+  }
+
+async sidebarPreviewDocumentIncludes(id: string, path: string, text: string): Promise<boolean> {
+    return await this.sidebarCase.previewDocumentIncludes(id, path, text);
+  }
+
+async inspectConnectionGuidance(): Promise<void> {
+    return await this.connectionRecording.inspectGuidance();
+  }
+
+async disposeConnectionController(): Promise<void> {
+    return await this.connectionRecording.disposeController();
+  }
+
+async connectionGuidanceAvailable(query: number): Promise<boolean> {
+    return await this.connectionRecording.guidanceAvailable(query);
+  }
+
+async connectionGuidanceRequiresEntries(query: number): Promise<boolean> {
+    return await this.connectionRecording.guidanceRequiresEntries(query);
+  }
+
+async connectionGuidanceHasProject(query: number): Promise<boolean> {
+    return await this.connectionRecording.guidanceHasProject(query);
+  }
+
+async connectionGuidanceOutputs(query: number): Promise<Array<ConnectionOutputGuidance>> {
+    return await this.connectionRecording.guidanceOutputs(query);
+  }
+
+async connectionGuidanceMatchesSavedSnapshot(query: number): Promise<boolean> {
+    return await this.connectionRecording.guidanceMatchesSavedSnapshot(query);
+  }
+
+async connectionGuidancePublications(query: number): Promise<number> {
+    return await this.connectionRecording.guidancePublications(query);
+  }
+
+async connectionGuidanceSaves(query: number): Promise<number> {
+    return await this.connectionRecording.guidanceSaves(query);
   }
 }

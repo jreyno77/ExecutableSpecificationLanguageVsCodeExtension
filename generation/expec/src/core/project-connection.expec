@@ -14,10 +14,37 @@ type ConnectionState {
   `message`: Text
 }
 
+// Choices retain already configured profiles. Only newly selected simple profiles
+// need a destination relative to the target; the native guide collects that value.
+type ConnectionOutputChoice {
+  id: Text
+  directory: Text?
+}
+
+type ConnectionOutputGuidance {
+  id: Text
+  configured: Boolean
+  suggestedDirectory: Text?
+}
+
+type ConnectionGuidance {
+  configuration: ConnectionConfiguration
+  requiresEntries: Boolean
+  hasProject: Boolean
+  outputs: List<ConnectionOutputGuidance>
+}
+
+interface ConnectionWorkFeedback {
+  public configurationChanged
+  capability configurationChanged(configuration: ConnectionConfiguration?) returns Nothing {
+    promises "Receive an immutable captured saved configuration only for this controller's current connected selection, or absence when checking a different target, disconnected, deleting metadata, unavailable, invalid, unconfigured or disposed. This controls connection-owned work, independently of authored preview configuration. Absence cancels existing generation admission and clears queued save intents through the existing GenerationHost; it does not erase prior explicit per-manifest opt-in or discard terminal results and partial receipts. Receiving configuration is not a save intent and never starts generation. Preview and live-analysis consumers continue receiving the selected saved metadata through their existing independent boundary."
+  }
+}
+
 interface ConnectionFeedback {
   public present, saveConfiguration
   capability present(state: ConnectionState) returns Nothing {
-    promises "Present this immutable current state. Status is unconfigured, checking, connected, unavailable or invalid. Target is the absolute logical configured or currently requested directory. verifiedDirectory is the actual canonical directory from the existing connector, only while connected. Connected establishes valid configuration and usable filesystem identity; it does not establish native build or dependency readiness."
+    promises "Present this immutable current state. Status is unconfigured, checking, connected, disconnected, unavailable or invalid. Target is the absolute logical configured or currently requested directory. verifiedDirectory is the actual canonical directory from the existing connector, only while connected. Connected establishes valid configuration and usable filesystem identity; it does not establish native build or dependency readiness. Disconnected means an explicit session-only suspension; saved metadata and target files remain intact."
   }
   capability saveConfiguration(previous: ConnectionConfiguration, text: Text) returns Nothing {
     promises "Request conditional persistence for this exact captured previous snapshot. This request is not a completed save. Preserve dirty editor work and refuse if actual saved bytes or write safety no longer match previous. Confirm success with the actual saved configurationChanged snapshot, or return this same previous object to saveFailed."
@@ -31,22 +58,41 @@ component ConnectionController {
   requires package "vitest" for test
 
   construction(feedback: ConnectionFeedback)
-  public configurationChanged, chooseProject, targetChanged, saveFailed, dispose
+  public configurationChanged, chooseProject, observeWork, guidance, createConnection, disconnect, reconnect, deleteConnection, targetChanged, saveFailed, dispose
+
+  capability observeWork(feedback: ConnectionWorkFeedback) returns Nothing {
+    promises "Attach one replaceable work observer without changing this controller's constructor or requiring metadata-only callers to attach one. Immediately deliver the current active saved snapshot or absence. Replacing an observer withdraws the previous observer first; disposal withdraws and releases it. Capture observer identity and controller revision around every callback. Reentrant replacement, disconnect, configuration changes or disposal cannot subsequently deliver old active work or overwrite newer state. Host callback failures remain observable; do not swallow them or skip owned cleanup. The actual extension assembly attaches its one existing GenerationHost through this operation, rather than routing generation through preview feedback."
+  }
+  capability guidance() returns ConnectionGuidance? {
+    promises "Return synchronous detached immutable facts prepared from the current captured saved snapshot and its already validated configuration. Missing metadata has requiresEntries true and hasProject false. Existing valid metadata keeps its build, has requiresEntries false and hasProject exactly when its validated project exists. A requested unsaved target is not saved project metadata. Invalid metadata, no captured selection or a disposed lifetime returns absence. List configured outputs first in actual authored order with configured true and no suggestedDirectory, then eligible new typescript, uml and markdown IDs not already configured with configured false and suggestions '.', 'diagrams' and 'docs'. Suggestions are core-owned extension setup policy, not SDK defaults. Do not expose or reconstruct retained options; createConnection preserves their actual saved values. Return file, exact text or absence, and writable from the same captured snapshot, including dirty write safety. Caller mutation cannot alter earlier or future facts. Prepare facts when the saved configuration changes; this query performs no parsing, validation, connector work, reads, state publication, observer notification or persistence. It does not change session suspension or generation opt-in."
+  }
 
   capability configurationChanged(snapshot: ConnectionConfiguration) returns Nothing {
-    promises "Capture this exact saved text and write safety for one selected local manifest. Advance currentness before any asynchronous work and withdraw the old connected state while checking. Missing text is unconfigured. Validate existing text with the real ConfigurationReader and registered built-in output profiles; invalid configuration stays invalid with its real diagnostic message and is never rewritten. Use ProjectConnector.connect with this absolute manifest filename. A valid configuration without a project is unconfigured; an unavailable root is unavailable; only an actual connected result establishes connected and verifiedDirectory. Preserve logical target and canonical verified directory separately. Do not scan or capture a project, install packages, generate outputs or parse native project code. Only the latest configuration/target revision may publish."
+    promises "Capture this exact saved text and write safety for one selected local manifest. Advance currentness before any asynchronous work and withdraw the old connected state while checking. Missing text is unconfigured. Validate existing text with the real ConfigurationReader and registered built-in output profiles; invalid configuration stays invalid with its real diagnostic message and is never rewritten. Use ProjectConnector.connect with this absolute manifest filename. A valid configuration without a project is unconfigured; an unavailable root is unavailable; only an actual connected result establishes connected and verifiedDirectory. Preserve logical target and canonical verified directory separately. An explicit disconnect remains suspended across saved changes to this same manifest and target events; selecting a different manifest starts its own unsuspended selection. Forward current active work only through the attached work observer, with absence before obsolete work can continue. Do not scan or capture a project, install packages, generate outputs or parse native project code. Only the latest configuration/target revision may publish."
   }
   capability chooseProject(directory: Text) returns Nothing {
     promises "Choose an absolute native directory for the current selected configuration. Reject invalid existing configuration without rewriting it. If writable is false, preserve the current target, request no save and present the message Save or revert unsaved configuration edits before choosing a project. Verify the proposed directory through the real connector before requesting persistence. A missing or unusable directory remains unavailable and requests no save. Preserve every other existing JSON field; change only project.root. For a missing manifest, propose formatVersion 1, version 0.1.0, build.entries [src/main.expec] and outputs []. This is this extension's explicit initial metadata setting, not a language default; connection does not check whether that source file exists, and authors must configure their actual build entry before compilation, with the selected root. Never write the file itself or report the new project connected before actual saved confirmation. Pass an immutable captured previous snapshot to feedback. New configuration or target revisions invalidate older verification and any unsent write request."
   }
+  capability createConnection(directory: Text, outputs: List<ConnectionOutputChoice>, entries: List<Text>) returns Nothing {
+    promises "Create or replace this selected manifest's project connection using an actual absolute target directory and the author's ordered output choices. Validate before requesting a conditional save; unknown or repeated IDs, unsupported new profiles, invalid relative destinations, invalid existing configuration, dirty write safety or missing required entries request no persistence. Preserve existing version, build including entries, packages, libraries and all other metadata. For each selected already configured ID retain its exact options; do not normalize, flatten or replace advanced settings. A retained choice omits directory or supplies its unchanged existing destination; a different destination requires editing the manifest. Removing an ID removes only its output configuration, never target artifacts. Newly selected profiles are limited to typescript, uml and markdown and require a nonblank destination relative to the target. Validate the complete proposal using actual shipped ConfigurationReader profiles. New TypeScript options are sourceRoot '.', directory the supplied value and no configFile, preserving folders relative to this manifest's source folder; '.' is a usable target-root destination, not an SDK default. New UML options are directory plus views ['structure']; new Markdown options contain directory. The native guide's suggested destinations are author choices, not language defaults. For missing text require an explicitly supplied nonempty list of literal relative source entries; propose formatVersion 1 and version 0.1.0 with those actual entries. Never discover sources, assume src/main.expec exists, scaffold a target, install packages or claim generation readiness. Existing metadata does not need new entries and retains its build unchanged. Verify the proposed target with the real connector; both empty and existing usable directories can connect. Invalidate older verification, pending saves and connection-owned work before accepting a new target. Request only manifest persistence through feedback with the exact captured previous snapshot, and remain checking until actual saved confirmation. A successful explicit creation resumes this session's selection. No target or authored-source writes."
+  }
+  capability disconnect() returns Nothing {
+    promises "Suspend this selected connection for this session only. Invalidate verification and unsent persistence, withdraw connection-owned work before presenting disconnected with the saved logical target and no verifiedDirectory. A missing project remains unconfigured. Preserve every saved manifest byte, output/package setting and target file. Explain that reconnection is available and the suspension is not persisted. Relevant target restoration or same-manifest saved changes do not silently reconnect. Keep independent authored previews and live package configuration available; no automatic generation or rollback claim."
+  }
+  capability reconnect() returns Nothing {
+    promises "Resume this session's selection by freshly validating the latest captured saved metadata and checking its current target through the real connector. Withdraw old work until actual current verification succeeds. Unavailable, invalid or missing metadata stays honest and requests no save. Preserve saved configuration, previous explicit per-manifest generation opt-in and target files; previously disabled stays disabled. Reconnection neither grants opt-in nor replays a save intent: even an earlier true opt-in requires a subsequent genuine source save before any generation. Only the current reconnect revision can present or activate work."
+  }
+  capability deleteConnection() returns Nothing {
+    promises "Remove only this selected saved manifest's project metadata through the same conditional persistence feedback. Reject invalid or dirty configuration without rewriting it, and treat an already absent project as unconfigured without a write. Preserve version, build, outputs, packages, libraries and all other fields exactly as values; never delete the manifest, target directory, generated files or handwritten files. Invalidate pending verification and withdraw connection-owned work before requesting removal. A request is not deletion success; become unconfigured only after actual saved confirmation without project. Failures use the exact pending previous snapshot and remain observable. Authored output previews still receive the saved retained output configuration."
+  }
   capability targetChanged(path: Text) returns Nothing {
-    promises "Recheck the current configured target automatically after relevant logical or canonical root or ancestor events, including deletion and restoration. Ignore unrelated paths and events for a superseded target. Reuse validated current configuration; perform only connector identity/availability checking, not tree capture. Withdraw connected while rechecking and suppress stale completion."
+    promises "Recheck the current configured target automatically after relevant logical or canonical root or ancestor events, including deletion and restoration. Ignore unrelated paths and events for a superseded target, and never resume an explicitly disconnected session from watcher events. Reuse validated current configuration; perform only connector identity/availability checking, not tree capture. Withdraw connected while rechecking and suppress stale completion."
   }
   capability saveFailed(previous: ConnectionConfiguration, `message`: Text) returns Nothing {
     promises "For the exact previous object of the current pending save request, report unavailable with this host failure message; never pretend the requested configuration was saved or connected. Ignore failures from superseded requests."
   }
   capability dispose() returns Nothing {
-    promises "End this controller lifetime, invalidate pending asynchronous work and prevent later publication or save requests. Repeated disposal is harmless; the native caller owns watchers and view registrations."
+    promises "End this controller lifetime, invalidate pending asynchronous work and prevent later publication or save requests. Withdraw and release the attached work observer even if another cleanup callback fails. Repeated disposal is harmless; the native caller owns watchers and view registrations."
   }
 }
 
@@ -63,6 +109,26 @@ examples for ConnectionController {
   fixture alphaConfiguration: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[],\"project\":{\"root\":\"./alpha\"}}"
   fixture betaConfiguration: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[],\"project\":{\"root\":\"./beta\"}}"
   fixture configuredSettings: Text = "{\"formatVersion\":1,\"version\":\"1.2.3\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"version\":\"1.0.0\",\"phases\":[\"runtime\"]}],\"project\":{\"root\":\"./alpha\"}}"
+  fixture connectionEntries: List<Text> = ["src/model.expec"]
+  fixture unchangedConnectionEntries: List<Text> = []
+  fixture simpleConnectionOutputs: List<ConnectionOutputChoice> = [
+    { id: "typescript", directory: "." },
+    { id: "uml", directory: "diagrams" }
+  ]
+  fixture retainedConnectionOutputs: List<ConnectionOutputChoice> = [
+    { id: "typescript" }, { id: "java" }, { id: "markdown", directory: "docs" }
+  ]
+  fixture retainedConnectionSettings: Text = "{\"formatVersion\":1,\"version\":\"1.2.3\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"sourceRoot\":\".\",\"directory\":\".\",\"configFile\":\"tsconfig.json\"}},{\"id\":\"java\",\"options\":{\"directory\":\"java\",\"package\":\"example.library\"}}],\"packages\":[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"version\":\"1.0.0\",\"phases\":[\"runtime\"]}],\"project\":{\"root\":\"./alpha\"}}"
+  fixture freshGuidanceOutputs: List<ConnectionOutputGuidance> = [
+    { id: "typescript", configured: false, suggestedDirectory: "." },
+    { id: "uml", configured: false, suggestedDirectory: "diagrams" },
+    { id: "markdown", configured: false, suggestedDirectory: "docs" }
+  ]
+  fixture retainedGuidanceOutputs: List<ConnectionOutputGuidance> = [
+    { id: "typescript", configured: true }, { id: "java", configured: true },
+    { id: "uml", configured: false, suggestedDirectory: "diagrams" },
+    { id: "markdown", configured: false, suggestedDirectory: "docs" }
+  ]
 
   setup connectionWorkspace(configuration: Text, writable: Boolean) returns Nothing
   setup missingConnectionWorkspace(writable: Boolean) returns Nothing
@@ -73,6 +139,35 @@ examples for ConnectionController {
   action makeProjectUnavailable(name: Text) returns Nothing
   action restoreProjectDirectory(name: Text) returns Nothing
   action replaceConnectionConfiguration(text: Text) returns Nothing
+  action attachConnectionWorkObserver() returns Nothing
+  action createProjectConnection(name: Text, outputs: List<ConnectionOutputChoice>, entries: List<Text>) returns Nothing
+  action disconnectProjectConnection() returns Nothing
+  action reconnectProjectConnection() returns Nothing
+  action deleteProjectConnection() returns Nothing
+  // Create actual authored/manual fixture files, then record their owned-tree baseline.
+  action keepConnectionSource(path: Text, text: Text) returns Nothing
+  action keepConnectionTargetFile(name: Text, path: Text, text: Text) returns Nothing
+  // Record the actual synchronous returned value and feedback counts around each query.
+  action inspectConnectionGuidance() returns Nothing
+  action disposeConnectionController() returns Nothing
+  observation connectionGuidanceAvailable(query: Number) returns Boolean
+  observation connectionGuidanceRequiresEntries(query: Number) returns Boolean
+  observation connectionGuidanceHasProject(query: Number) returns Boolean
+  observation connectionGuidanceOutputs(query: Number) returns List<ConnectionOutputGuidance>
+  // Compare returned file/text/writable with the owned input filename, real saved
+  // bytes or real absence, and setup write safety, never another product reply.
+  observation connectionGuidanceMatchesSavedSnapshot(query: Number) returns Boolean
+  observation connectionGuidancePublications(query: Number) returns Number
+  observation connectionGuidanceSaves(query: Number) returns Number
+  observation connectionWorkProjectName() returns Text
+  observation connectionSavedText() returns Text
+  observation connectionSavedEntries() returns List<Text>
+  observation connectionSavedOutputIds() returns List<Text>
+  // Canonical JSON of actual saved options; keys sorted, values unmodified.
+  observation connectionSavedOutputOptions(id: Text) returns Text
+  observation connectionSavedVersion() returns Text
+  observation connectionSavedPackages() returns Text
+  observation connectionOwnedTreesUnchanged() returns Boolean
   observation connectionStatus() returns Text
   observation configuredProjectName() returns Text
   observation verifiedProjectName() returns Text
@@ -134,6 +229,58 @@ examples for ConnectionController {
   check expectConnectionPublications(expected: Number) {
     let actual = connectionPublications()
     assert actual == expected
+  }
+  check expectConnectionWork(project: Text) {
+    let actual = connectionWorkProjectName()
+    assert actual == project
+  }
+  check expectSavedConnection(entries: List<Text>, outputs: List<Text>) {
+    let actualEntries = connectionSavedEntries()
+    let actualOutputs = connectionSavedOutputIds()
+    assert actualEntries == entries
+    assert actualOutputs == outputs
+  }
+  check expectSavedConnectionOutput(id: Text, options: Text) {
+    let actual = connectionSavedOutputOptions(id)
+    assert actual == options
+  }
+  check expectSavedConnectionSettings(version: Text, packages: Text) {
+    let actualVersion = connectionSavedVersion()
+    let actualPackages = connectionSavedPackages()
+    assert actualVersion == version
+    assert actualPackages == packages
+  }
+  check expectConnectionSavedText(expected: Text) {
+    let actual = connectionSavedText()
+    assert actual == expected
+  }
+  check expectConnectionTreesUntouched() {
+    let unchanged = connectionOwnedTreesUnchanged()
+    assert unchanged == true
+  }
+  check expectConnectionGuidance(query: Number, requiresEntries: Boolean, hasProject: Boolean, outputs: List<ConnectionOutputGuidance>) {
+    let available = connectionGuidanceAvailable(query)
+    assert available == true
+    let actualEntries = connectionGuidanceRequiresEntries(query)
+    let actualProject = connectionGuidanceHasProject(query)
+    let actualOutputs = connectionGuidanceOutputs(query)
+    assert actualEntries == requiresEntries
+    assert actualProject == hasProject
+    assert actualOutputs == outputs
+  }
+  check expectGuidanceSavedSnapshot(query: Number) {
+    let matches = connectionGuidanceMatchesSavedSnapshot(query)
+    assert matches == true
+  }
+  check expectGuidanceNoEffects(query: Number) {
+    let publications = connectionGuidancePublications(query)
+    let saves = connectionGuidanceSaves(query)
+    assert publications == 0
+    assert saves == 0
+  }
+  check expectGuidanceAvailability(query: Number, expected: Boolean) {
+    let available = connectionGuidanceAvailable(query)
+    assert available == expected
   }
 
   scenario "a missing configuration does not claim a connection" {
@@ -222,6 +369,140 @@ examples for ConnectionController {
     when chooseProjectDirectory("beta")
     then expectConnection("connected", "alpha", "alpha")
     then expectConnectionMessage("Save or revert unsaved configuration edits before choosing a project.")
+    then expectSaveRequests(0)
+  }
+  scenario "new connection metadata uses selected sources and preserves an empty target" {
+    given missingConnectionWorkspace(true)
+    when keepConnectionSource("src/model.expec", "type Book {}")
+    when inspectConnection()
+    when attachConnectionWorkObserver()
+    when createProjectConnection("alpha", simpleConnectionOutputs, connectionEntries)
+    when confirmRequestedConfigurationSave()
+    then expectConnection("connected", "alpha", "alpha")
+    then expectSaveRequests(1)
+    then expectSavedConnection(["src/model.expec"], ["typescript", "uml"])
+    then expectSavedConnectionOutput("typescript", "{\"directory\":\".\",\"sourceRoot\":\".\"}")
+    then expectSavedConnectionOutput("uml", "{\"directory\":\"diagrams\",\"views\":[\"structure\"]}")
+    then expectConnectionWork("alpha")
+    then expectConnectionTreesUntouched()
+  }
+  scenario "new target and output choices retain existing advanced options and packages" {
+    given connectionWorkspace(retainedConnectionSettings, true)
+    when keepConnectionTargetFile("beta", "manual.txt", "Keep handwritten beta")
+    when inspectConnection()
+    when createProjectConnection("beta", retainedConnectionOutputs, unchangedConnectionEntries)
+    when confirmRequestedConfigurationSave()
+    then expectConnection("connected", "beta", "beta")
+    then expectSavedConnection(["src/library.expec"], ["typescript", "java", "markdown"])
+    then expectSavedConnectionOutput("typescript", "{\"configFile\":\"tsconfig.json\",\"directory\":\".\",\"sourceRoot\":\".\"}")
+    then expectSavedConnectionOutput("java", "{\"directory\":\"java\",\"package\":\"example.library\"}")
+    then expectSavedConnectionOutput("markdown", "{\"directory\":\"docs\"}")
+    then expectSavedConnectionSettings("1.2.3", "[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"phases\":[\"runtime\"],\"version\":\"1.0.0\"}]")
+    then expectConnectionTreesUntouched()
+  }
+  scenario "new metadata needs real chosen source entries rather than a guessed filename" {
+    given missingConnectionWorkspace(true)
+    when inspectConnection()
+    when createProjectConnection("alpha", simpleConnectionOutputs, unchangedConnectionEntries)
+    then expectSaveRequests(0)
+    then expectConfigurationProblem()
+    then expectUnwrittenConfiguration()
+    then expectConnectionTreesUntouched()
+  }
+  scenario "an advanced profile cannot be newly configured with guessed options" {
+    given missingConnectionWorkspace(true)
+    when inspectConnection()
+    when createProjectConnection("alpha", [{ id: "java", directory: "java" }], connectionEntries)
+    then expectSaveRequests(0)
+    then expectConfigurationProblem()
+    then expectUnwrittenConfiguration()
+  }
+  scenario "dirty metadata refuses new connection and deletion without replacing saved settings" {
+    given connectionWorkspace(alphaConfiguration, false)
+    when inspectConnection()
+    when createProjectConnection("beta", simpleConnectionOutputs, connectionEntries)
+    when deleteProjectConnection()
+    then expectConnection("connected", "alpha", "alpha")
+    then expectSaveRequests(0)
+    then expectConnectionSavedText(alphaConfiguration)
+    then expectConnectionTreesUntouched()
+  }
+  scenario "disconnect is session-only and watcher restoration cannot silently resume work" {
+    given connectionWorkspace(alphaConfiguration, true)
+    when inspectConnection()
+    when attachConnectionWorkObserver()
+    when disconnectProjectConnection()
+    when makeProjectUnavailable("alpha")
+    when restoreProjectDirectory("alpha")
+    then expectConnection("disconnected", "alpha", "")
+    then expectConnectionWork("")
+    then expectSaveRequests(0)
+    then expectConnectionSavedText(alphaConfiguration)
+  }
+  scenario "reconnection checks the latest saved target without changing metadata" {
+    given connectionWorkspace(alphaConfiguration, true)
+    when inspectConnection()
+    when attachConnectionWorkObserver()
+    when disconnectProjectConnection()
+    when replaceConnectionConfiguration(betaConfiguration)
+    when reconnectProjectConnection()
+    then expectConnection("connected", "beta", "beta")
+    then expectConnectionWork("beta")
+    then expectSaveRequests(0)
+    then expectConnectionSavedText(betaConfiguration)
+    then expectConnectionTreesUntouched()
+  }
+  scenario "deleting a connection removes only project metadata and withdraws work" {
+    given connectionWorkspace(retainedConnectionSettings, true)
+    when keepConnectionTargetFile("alpha", "manual.txt", "Keep handwritten alpha")
+    when inspectConnection()
+    when attachConnectionWorkObserver()
+    when deleteProjectConnection()
+    when confirmRequestedConfigurationSave()
+    then expectConnection("unconfigured", "", "")
+    then expectConnectionWork("")
+    then expectSaveRequests(1)
+    then expectSavedConnection(["src/library.expec"], ["typescript", "java"])
+    then expectSavedConnectionOutput("typescript", "{\"configFile\":\"tsconfig.json\",\"directory\":\".\",\"sourceRoot\":\".\"}")
+    then expectSavedConnectionOutput("java", "{\"directory\":\"java\",\"package\":\"example.library\"}")
+    then expectSavedConnectionSettings("1.2.3", "[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"phases\":[\"runtime\"],\"version\":\"1.0.0\"}]")
+    then expectConnectionTreesUntouched()
+  }
+  scenario "guidance distinguishes missing metadata from an unsaved proposed connection" {
+    given missingConnectionWorkspace(true)
+    when keepConnectionSource("src/model.expec", "type Book {}")
+    when inspectConnection()
+    when createProjectConnection("alpha", simpleConnectionOutputs, connectionEntries)
+    when inspectConnectionGuidance()
+    then expectConnectionGuidance(1, true, false, freshGuidanceOutputs)
+    then expectGuidanceSavedSnapshot(1)
+    then expectGuidanceNoEffects(1)
+    then expectSaveRequests(1)
+    then expectUnwrittenConfiguration()
+  }
+  scenario "guidance retains configured profile order and only suggests genuinely new profiles" {
+    given connectionWorkspace(retainedConnectionSettings, true)
+    when inspectConnection()
+    when inspectConnectionGuidance()
+    then expectConnectionGuidance(1, false, true, retainedGuidanceOutputs)
+    then expectGuidanceSavedSnapshot(1)
+    then expectGuidanceNoEffects(1)
+    then expectSaveRequests(0)
+  }
+  scenario "invalid metadata and disposed selection withdraw earlier usable guidance" {
+    given connectionWorkspace(alphaConfiguration, true)
+    when inspectConnection()
+    when inspectConnectionGuidance()
+    when replaceConnectionConfiguration("{\"project\":")
+    when inspectConnectionGuidance()
+    when disposeConnectionController()
+    when inspectConnectionGuidance()
+    then expectGuidanceAvailability(1, true)
+    then expectGuidanceAvailability(2, false)
+    then expectGuidanceAvailability(3, false)
+    then expectGuidanceNoEffects(1)
+    then expectGuidanceNoEffects(2)
+    then expectGuidanceNoEffects(3)
     then expectSaveRequests(0)
   }
 }
