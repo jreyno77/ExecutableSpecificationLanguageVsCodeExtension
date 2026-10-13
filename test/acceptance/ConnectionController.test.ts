@@ -111,3 +111,159 @@ test("choosing another project cannot overwrite unsaved configuration edits", as
   await workspace.expectConnectionMessage("Save or revert unsaved configuration edits before choosing a project.");
   await workspace.expectSaveRequests(0);
 });
+
+/* @expec-test "8ee4d668-b947-4b61-8725-37b88509d069" */
+test("new connection metadata uses selected sources and preserves an empty target", async ({ workspace }) => {
+  await workspace.missingConnectionWorkspace(true);
+  await workspace.keepConnectionSource("src/model.expec", "type Book {}");
+  await workspace.inspectConnection();
+  await workspace.attachConnectionWorkObserver();
+  await workspace.createProjectConnection("alpha", workspace.simpleConnectionOutputs, workspace.connectionEntries);
+  await workspace.confirmRequestedConfigurationSave();
+  await workspace.expectConnection("connected", "alpha", "alpha");
+  await workspace.expectSaveRequests(1);
+  await workspace.expectSavedConnection(["src/model.expec"], ["typescript", "uml"]);
+  await workspace.expectSavedConnectionOutput("typescript", "{\"directory\":\".\",\"sourceRoot\":\".\"}");
+  await workspace.expectSavedConnectionOutput("uml", "{\"directory\":\"diagrams\",\"views\":[\"structure\"]}");
+  await workspace.expectConnectionWork("alpha");
+  await workspace.expectConnectionTreesUntouched();
+});
+
+/* @expec-test "01bdf71f-dd9c-47c9-ba3f-b85dd7aa54a1" */
+test("new target and output choices retain existing advanced options and packages", async ({ workspace }) => {
+  await workspace.connectionWorkspace(workspace.retainedConnectionSettings, true);
+  await workspace.keepConnectionTargetFile("beta", "manual.txt", "Keep handwritten beta");
+  await workspace.inspectConnection();
+  await workspace.createProjectConnection("beta", workspace.retainedConnectionOutputs, workspace.unchangedConnectionEntries);
+  await workspace.confirmRequestedConfigurationSave();
+  await workspace.expectConnection("connected", "beta", "beta");
+  await workspace.expectSavedConnection(["src/library.expec"], ["typescript", "java", "markdown"]);
+  await workspace.expectSavedConnectionOutput("typescript", "{\"configFile\":\"tsconfig.json\",\"directory\":\".\",\"sourceRoot\":\".\"}");
+  await workspace.expectSavedConnectionOutput("java", "{\"directory\":\"java\",\"package\":\"example.library\"}");
+  await workspace.expectSavedConnectionOutput("markdown", "{\"directory\":\"docs\"}");
+  await workspace.expectSavedConnectionSettings("1.2.3", "[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"phases\":[\"runtime\"],\"version\":\"1.0.0\"}]");
+  await workspace.expectConnectionTreesUntouched();
+});
+
+/* @expec-test "bb7c799f-a452-4f94-bf72-1b5769597eb7" */
+test("new metadata needs real chosen source entries rather than a guessed filename", async ({ workspace }) => {
+  await workspace.missingConnectionWorkspace(true);
+  await workspace.inspectConnection();
+  await workspace.createProjectConnection("alpha", workspace.simpleConnectionOutputs, workspace.unchangedConnectionEntries);
+  await workspace.expectSaveRequests(0);
+  await workspace.expectConfigurationProblem();
+  await workspace.expectUnwrittenConfiguration();
+  await workspace.expectConnectionTreesUntouched();
+});
+
+/* @expec-test "dc2ad069-7584-4513-814c-2e5b71beb36a" */
+test("an advanced profile cannot be newly configured with guessed options", async ({ workspace }) => {
+  await workspace.missingConnectionWorkspace(true);
+  await workspace.inspectConnection();
+  await workspace.createProjectConnection("alpha", [{ ["id"]: "java", ["directory"]: "java" }], workspace.connectionEntries);
+  await workspace.expectSaveRequests(0);
+  await workspace.expectConfigurationProblem();
+  await workspace.expectUnwrittenConfiguration();
+});
+
+/* @expec-test "f3fd95d8-8ed6-4e5c-a424-c5dbb1140f81" */
+test("dirty metadata refuses new connection and deletion without replacing saved settings", async ({ workspace }) => {
+  await workspace.connectionWorkspace(workspace.alphaConfiguration, false);
+  await workspace.inspectConnection();
+  await workspace.createProjectConnection("beta", workspace.simpleConnectionOutputs, workspace.connectionEntries);
+  await workspace.deleteProjectConnection();
+  await workspace.expectConnection("connected", "alpha", "alpha");
+  await workspace.expectSaveRequests(0);
+  await workspace.expectConnectionSavedText(workspace.alphaConfiguration);
+  await workspace.expectConnectionTreesUntouched();
+});
+
+/* @expec-test "fef50511-b674-49db-a16b-89c9a6b76040" */
+test("disconnect is session-only and watcher restoration cannot silently resume work", async ({ workspace }) => {
+  await workspace.connectionWorkspace(workspace.alphaConfiguration, true);
+  await workspace.inspectConnection();
+  await workspace.attachConnectionWorkObserver();
+  await workspace.disconnectProjectConnection();
+  await workspace.makeProjectUnavailable("alpha");
+  await workspace.restoreProjectDirectory("alpha");
+  await workspace.expectConnection("disconnected", "alpha", "");
+  await workspace.expectConnectionWork("");
+  await workspace.expectSaveRequests(0);
+  await workspace.expectConnectionSavedText(workspace.alphaConfiguration);
+});
+
+/* @expec-test "2b453286-c675-41ef-9037-90e7fa143102" */
+test("reconnection checks the latest saved target without changing metadata", async ({ workspace }) => {
+  await workspace.connectionWorkspace(workspace.alphaConfiguration, true);
+  await workspace.inspectConnection();
+  await workspace.attachConnectionWorkObserver();
+  await workspace.disconnectProjectConnection();
+  await workspace.replaceConnectionConfiguration(workspace.betaConfiguration);
+  await workspace.reconnectProjectConnection();
+  await workspace.expectConnection("connected", "beta", "beta");
+  await workspace.expectConnectionWork("beta");
+  await workspace.expectSaveRequests(0);
+  await workspace.expectConnectionSavedText(workspace.betaConfiguration);
+  await workspace.expectConnectionTreesUntouched();
+});
+
+/* @expec-test "8b440988-89b6-48f3-9e2f-fb5c5c1187b0" */
+test("deleting a connection removes only project metadata and withdraws work", async ({ workspace }) => {
+  await workspace.connectionWorkspace(workspace.retainedConnectionSettings, true);
+  await workspace.keepConnectionTargetFile("alpha", "manual.txt", "Keep handwritten alpha");
+  await workspace.inspectConnection();
+  await workspace.attachConnectionWorkObserver();
+  await workspace.deleteProjectConnection();
+  await workspace.confirmRequestedConfigurationSave();
+  await workspace.expectConnection("unconfigured", "", "");
+  await workspace.expectConnectionWork("");
+  await workspace.expectSaveRequests(1);
+  await workspace.expectSavedConnection(["src/library.expec"], ["typescript", "java"]);
+  await workspace.expectSavedConnectionOutput("typescript", "{\"configFile\":\"tsconfig.json\",\"directory\":\".\",\"sourceRoot\":\".\"}");
+  await workspace.expectSavedConnectionOutput("java", "{\"directory\":\"java\",\"package\":\"example.library\"}");
+  await workspace.expectSavedConnectionSettings("1.2.3", "[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"phases\":[\"runtime\"],\"version\":\"1.0.0\"}]");
+  await workspace.expectConnectionTreesUntouched();
+});
+
+/* @expec-test "c55044fa-6212-418c-9159-5993bc6842e2" */
+test("guidance distinguishes missing metadata from an unsaved proposed connection", async ({ workspace }) => {
+  await workspace.missingConnectionWorkspace(true);
+  await workspace.keepConnectionSource("src/model.expec", "type Book {}");
+  await workspace.inspectConnection();
+  await workspace.createProjectConnection("alpha", workspace.simpleConnectionOutputs, workspace.connectionEntries);
+  await workspace.inspectConnectionGuidance();
+  await workspace.expectConnectionGuidance(1, true, false, workspace.freshGuidanceOutputs);
+  await workspace.expectGuidanceSavedSnapshot(1);
+  await workspace.expectGuidanceNoEffects(1);
+  await workspace.expectSaveRequests(1);
+  await workspace.expectUnwrittenConfiguration();
+});
+
+/* @expec-test "81017081-d974-48a9-8c83-235bab35a970" */
+test("guidance retains configured profile order and only suggests genuinely new profiles", async ({ workspace }) => {
+  await workspace.connectionWorkspace(workspace.retainedConnectionSettings, true);
+  await workspace.inspectConnection();
+  await workspace.inspectConnectionGuidance();
+  await workspace.expectConnectionGuidance(1, false, true, workspace.retainedGuidanceOutputs);
+  await workspace.expectGuidanceSavedSnapshot(1);
+  await workspace.expectGuidanceNoEffects(1);
+  await workspace.expectSaveRequests(0);
+});
+
+/* @expec-test "25378f7c-b870-4489-a91e-f8a58846f20b" */
+test("invalid metadata and disposed selection withdraw earlier usable guidance", async ({ workspace }) => {
+  await workspace.connectionWorkspace(workspace.alphaConfiguration, true);
+  await workspace.inspectConnection();
+  await workspace.inspectConnectionGuidance();
+  await workspace.replaceConnectionConfiguration("{\"project\":");
+  await workspace.inspectConnectionGuidance();
+  await workspace.disposeConnectionController();
+  await workspace.inspectConnectionGuidance();
+  await workspace.expectGuidanceAvailability(1, true);
+  await workspace.expectGuidanceAvailability(2, false);
+  await workspace.expectGuidanceAvailability(3, false);
+  await workspace.expectGuidanceNoEffects(1);
+  await workspace.expectGuidanceNoEffects(2);
+  await workspace.expectGuidanceNoEffects(3);
+  await workspace.expectSaveRequests(0);
+});

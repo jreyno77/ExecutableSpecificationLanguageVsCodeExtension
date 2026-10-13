@@ -110,6 +110,12 @@ export class RecordedSidebarHost {
   readonly reads: string[] = [];
   private readonly holds: Array<{ kind: 'read' | 'stat'; file: string; hold: RecordedFileHold; ready: Promise<void>; entered(): void }> = [];
   picker: Uri[] | undefined;
+  selectedOutputs: string[] | undefined;
+  readonly inputAnswers: Array<string | undefined> = [];
+  confirmDeletion = false;
+  activeTextEditor: { document: RecordedDocument } | undefined;
+  readonly messages: Array<{ kind: string; text: string }> = [];
+  readonly contexts = new Map<string, unknown>();
   private constructor(readonly directory: string) { this.file = join(directory, 'expec.json'); }
   static async create(configuration: string) {
     if (active) throw new Error('A recorded sidebar host is already owned.');
@@ -190,17 +196,29 @@ export const window = {
   createTreeView(id: string, options: { treeDataProvider: TreeDataProvider<unknown> }) {
     host().providers.set(id, options.treeDataProvider); return host().register('view:' + id);
   },
-  showOpenDialog: async () => host().picker,
+  showOpenDialog: async (_options?: unknown) => host().picker,
   showWorkspaceFolderPick: async () => workspace.workspaceFolders[0],
-  showInformationMessage: async (_message: string) => undefined,
-  showWarningMessage: async (_message: string) => undefined,
-  showErrorMessage: async (_message: string) => undefined,
+  get activeTextEditor() { return host().activeTextEditor; },
+  showTextDocument: async (document: RecordedDocument, _options?: unknown) => { const editor = { document }; host().activeTextEditor = editor; return editor; },
+  showQuickPick: async (items: readonly { id: string; label: string }[], _options?: unknown) => host().selectedOutputs?.map(id => {
+    const item = items.find(item => item.id === id); if (!item) throw new Error('The actual picker did not supply ' + id + '.'); return item;
+  }),
+  showInputBox: async (_options?: unknown): Promise<string | undefined> => host().inputAnswers.shift(),
+  showInformationMessage: async (message: string) => { host().messages.push({ kind: 'information', text: message }); return undefined; },
+  showWarningMessage: async (message: string, _options?: unknown, ...items: string[]) => {
+    host().messages.push({ kind: 'warning', text: message }); return host().confirmDeletion ? items.find(item => /delete/i.test(item)) : undefined;
+  },
+  showErrorMessage: async (message: string) => { host().messages.push({ kind: 'error', text: message }); return undefined; },
 };
 export const commands = {
   registerCommand(name: string, callback: (...arguments_: unknown[]) => unknown) {
-    host().registeredCommands.set(name, callback); return host().register('command:' + name);
+    host().registeredCommands.set(name, callback); return host().register('command:' + name, () => host().registeredCommands.delete(name));
   },
-  executeCommand: async (name: string, ...arguments_: unknown[]) => host().registeredCommands.get(name)?.(...arguments_),
+  executeCommand: async (name: string, ...arguments_: unknown[]) => {
+    if (name === 'setContext') { host().contexts.set(String(arguments_[0]), arguments_[1]); return; }
+    const command = host().registeredCommands.get(name); if (!command) throw new Error('Command not registered: ' + name);
+    return command(...arguments_);
+  },
 };
 export const workspace = {
   get textDocuments() { return host().documents; },

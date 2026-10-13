@@ -2,5 +2,11 @@
   "name": "expec-native-test-host",
   "publisher": "expec-tests",
   "version": "0.0.0",
-  "engines": { "vscode": "^1.100.0" }
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "main": "./run.cjs",
+  "activationEvents": [
+    "onStartupFinished"
+  ]
 }

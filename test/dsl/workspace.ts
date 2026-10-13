@@ -4,6 +4,10 @@ import { WorkspaceDriver } from "../driver/workspace.js";
 import { SourceDocument } from "../../src/core/SourceDocument.js";
 import { OutputTab } from "../../src/core/OutputTab.js";
 import { ConnectionConfiguration } from "../../src/core/ConnectionConfiguration.js";
+import { ConnectionOutputChoice } from "../../src/core/ConnectionOutputChoice.js";
+import { ConnectionOutputGuidance } from "../../src/core/ConnectionOutputGuidance.js";
+
+
 
 export class Workspace {
   constructor(private readonly driver: WorkspaceDriver) {}
@@ -2703,4 +2707,316 @@ readonly runtimeMarkdown: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\
 readonly testPackagePreview: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"test\"]}]}";
 
 readonly runtimePackagePreview: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]}]}";
+
+async attachConnectionWorkObserver(): Promise<void> {
+    return await this.driver.attachConnectionWorkObserver();
+  }
+
+async createProjectConnection(name: string, outputs: Array<ConnectionOutputChoice>, entries: Array<string>): Promise<void> {
+    return await this.driver.createProjectConnection(name, outputs, entries);
+  }
+
+async disconnectProjectConnection(): Promise<void> {
+    return await this.driver.disconnectProjectConnection();
+  }
+
+async reconnectProjectConnection(): Promise<void> {
+    return await this.driver.reconnectProjectConnection();
+  }
+
+async deleteProjectConnection(): Promise<void> {
+    return await this.driver.deleteProjectConnection();
+  }
+
+async keepConnectionSource(path: string, text: string): Promise<void> {
+    return await this.driver.keepConnectionSource(path, text);
+  }
+
+async keepConnectionTargetFile(name: string, path: string, text: string): Promise<void> {
+    return await this.driver.keepConnectionTargetFile(name, path, text);
+  }
+
+async openConnectionActivityBar(): Promise<void> {
+    return await this.driver.openConnectionActivityBar();
+  }
+
+async openSidebarConnectionMenu(): Promise<void> {
+    return await this.driver.openSidebarConnectionMenu();
+  }
+
+async editSidebarConnection(): Promise<void> {
+    return await this.driver.editSidebarConnection();
+  }
+
+async guideNewSidebarConnection(directory: string, outputs: Array<ConnectionOutputChoice>, entries: Array<string>): Promise<void> {
+    return await this.driver.guideNewSidebarConnection(directory, outputs, entries);
+  }
+
+async cancelNewSidebarConnectionAtDestination(directory: string, outputs: Array<string>): Promise<void> {
+    return await this.driver.cancelNewSidebarConnectionAtDestination(directory, outputs);
+  }
+
+async disconnectSidebarConnection(): Promise<void> {
+    return await this.driver.disconnectSidebarConnection();
+  }
+
+async reconnectSidebarConnection(): Promise<void> {
+    return await this.driver.reconnectSidebarConnection();
+  }
+
+async deleteSidebarConnection(confirmed: boolean): Promise<void> {
+    return await this.driver.deleteSidebarConnection(confirmed);
+  }
+
+async keepSidebarSource(path: string, text: string): Promise<void> {
+    return await this.driver.keepSidebarSource(path, text);
+  }
+
+async keepSidebarTargetFile(directory: string, path: string, text: string): Promise<void> {
+    return await this.driver.keepSidebarTargetFile(directory, path, text);
+  }
+
+async previewSidebarSource(path: string): Promise<void> {
+    return await this.driver.previewSidebarSource(path);
+  }
+
+async connectionWorkProjectName(): Promise<string> {
+    return await this.driver.connectionWorkProjectName();
+  }
+
+async connectionSavedText(): Promise<string> {
+    return await this.driver.connectionSavedText();
+  }
+
+async connectionSavedEntries(): Promise<Array<string>> {
+    return await this.driver.connectionSavedEntries();
+  }
+
+async connectionSavedOutputIds(): Promise<Array<string>> {
+    return await this.driver.connectionSavedOutputIds();
+  }
+
+async connectionSavedOutputOptions(id: string): Promise<string> {
+    return await this.driver.connectionSavedOutputOptions(id);
+  }
+
+async connectionSavedVersion(): Promise<string> {
+    return await this.driver.connectionSavedVersion();
+  }
+
+async connectionSavedPackages(): Promise<string> {
+    return await this.driver.connectionSavedPackages();
+  }
+
+async connectionOwnedTreesUnchanged(): Promise<boolean> {
+    return await this.driver.connectionOwnedTreesUnchanged();
+  }
+
+async sidebarActivityBarVisible(): Promise<boolean> {
+    return await this.driver.sidebarActivityBarVisible();
+  }
+
+async sidebarSelectedConfigurationVisible(): Promise<boolean> {
+    return await this.driver.sidebarSelectedConfigurationVisible();
+  }
+
+async sidebarVisibleConnectionActions(): Promise<Array<string>> {
+    return await this.driver.sidebarVisibleConnectionActions();
+  }
+
+async sidebarEditingSelectedConfiguration(): Promise<boolean> {
+    return await this.driver.sidebarEditingSelectedConfiguration();
+  }
+
+async sidebarSavedEntries(): Promise<Array<string>> {
+    return await this.driver.sidebarSavedEntries();
+  }
+
+async sidebarSavedOutputIds(): Promise<Array<string>> {
+    return await this.driver.sidebarSavedOutputIds();
+  }
+
+async sidebarSavedOutputOptions(id: string): Promise<string> {
+    return await this.driver.sidebarSavedOutputOptions(id);
+  }
+
+async sidebarSavedVersion(): Promise<string> {
+    return await this.driver.sidebarSavedVersion();
+  }
+
+async sidebarSavedPackages(): Promise<string> {
+    return await this.driver.sidebarSavedPackages();
+  }
+
+async sidebarOwnedTreesUnchanged(): Promise<boolean> {
+    return await this.driver.sidebarOwnedTreesUnchanged();
+  }
+
+async sidebarPreviewDocumentIncludes(id: string, path: string, text: string): Promise<boolean> {
+    return await this.driver.sidebarPreviewDocumentIncludes(id, path, text);
+  }
+
+async expectConnectionWork(project: string): Promise<void> {
+    const actual = await this.driver.connectionWorkProjectName();
+    expectData(actual, project);
+  }
+
+async expectSavedConnection(entries: Array<string>, outputs: Array<string>): Promise<void> {
+    const actualEntries = await this.driver.connectionSavedEntries();
+    const actualOutputs = await this.driver.connectionSavedOutputIds();
+    expectData(actualEntries, entries);
+    expectData(actualOutputs, outputs);
+  }
+
+async expectSavedConnectionOutput(id: string, options: string): Promise<void> {
+    const actual = await this.driver.connectionSavedOutputOptions(id);
+    expectData(actual, options);
+  }
+
+async expectSavedConnectionSettings(version: string, packages: string): Promise<void> {
+    const actualVersion = await this.driver.connectionSavedVersion();
+    const actualPackages = await this.driver.connectionSavedPackages();
+    expectData(actualVersion, version);
+    expectData(actualPackages, packages);
+  }
+
+async expectConnectionSavedText(expected: string): Promise<void> {
+    const actual = await this.driver.connectionSavedText();
+    expectData(actual, expected);
+  }
+
+async expectConnectionTreesUntouched(): Promise<void> {
+    const unchanged = await this.driver.connectionOwnedTreesUnchanged();
+    expectData(unchanged, true);
+  }
+
+async expectDedicatedConnectionView(actions: Array<string>): Promise<void> {
+    const visible = await this.driver.sidebarActivityBarVisible();
+    const configuration = await this.driver.sidebarSelectedConfigurationVisible();
+    const actualActions = await this.driver.sidebarVisibleConnectionActions();
+    const editing = await this.driver.sidebarEditingSelectedConfiguration();
+    expectData(visible, true);
+    expectData(configuration, true);
+    expectData(actualActions, actions);
+    expectData(editing, true);
+  }
+
+async expectSidebarSavedOutputs(entries: Array<string>, outputs: Array<string>): Promise<void> {
+    const actualEntries = await this.driver.sidebarSavedEntries();
+    const actualOutputs = await this.driver.sidebarSavedOutputIds();
+    expectData(actualEntries, entries);
+    expectData(actualOutputs, outputs);
+  }
+
+async expectSidebarSavedOutput(id: string, options: string): Promise<void> {
+    const actual = await this.driver.sidebarSavedOutputOptions(id);
+    expectData(actual, options);
+  }
+
+async expectSidebarRetainedSettings(version: string, packages: string): Promise<void> {
+    const actualVersion = await this.driver.sidebarSavedVersion();
+    const actualPackages = await this.driver.sidebarSavedPackages();
+    expectData(actualVersion, version);
+    expectData(actualPackages, packages);
+  }
+
+async expectSidebarTreesUntouched(): Promise<void> {
+    const unchanged = await this.driver.sidebarOwnedTreesUnchanged();
+    expectData(unchanged, true);
+  }
+
+async expectSidebarPreviewDocument(id: string, path: string, text: string): Promise<void> {
+    const present = await this.driver.sidebarPreviewDocumentIncludes(id, path, text);
+    expectData(present, true);
+  }
+
+readonly connectionEntries: Array<string> = ["src/model.expec"];
+
+readonly unchangedConnectionEntries: Array<string> = [];
+
+readonly simpleConnectionOutputs: Array<ConnectionOutputChoice> = [{ ["id"]: "typescript", ["directory"]: "." }, { ["id"]: "uml", ["directory"]: "diagrams" }];
+
+readonly retainedConnectionOutputs: Array<ConnectionOutputChoice> = [{ ["id"]: "typescript" }, { ["id"]: "java" }, { ["id"]: "markdown", ["directory"]: "docs" }];
+
+readonly retainedConnectionSettings: string = "{\"formatVersion\":1,\"version\":\"1.2.3\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"sourceRoot\":\".\",\"directory\":\".\",\"configFile\":\"tsconfig.json\"}},{\"id\":\"java\",\"options\":{\"directory\":\"java\",\"package\":\"example.library\"}}],\"packages\":[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"version\":\"1.0.0\",\"phases\":[\"runtime\"]}],\"project\":{\"root\":\"./alpha\"}}";
+
+readonly sidebarEntries: Array<string> = ["src/model.expec"];
+
+readonly retainedSidebarEntries: Array<string> = [];
+
+readonly sidebarNewOutputs: Array<ConnectionOutputChoice> = [{ ["id"]: "typescript", ["directory"]: "." }, { ["id"]: "uml", ["directory"]: "diagrams" }];
+
+readonly sidebarRetainedOutputs: Array<ConnectionOutputChoice> = [{ ["id"]: "typescript" }, { ["id"]: "markdown", ["directory"]: "docs" }];
+
+readonly managedShop: string = "{\"formatVersion\":1,\"version\":\"1.2.3\",\"project\":{\"root\":\"shop\"},\"build\":{\"entries\":[\"src/main.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"sourceRoot\":\".\",\"directory\":\".\",\"configFile\":\"tsconfig.json\"}}],\"packages\":[{\"alias\":\"storage\",\"name\":\"npm:storage\",\"version\":\"1.0.0\",\"phases\":[\"runtime\"]}]}";
+
+readonly previewShop: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"project\":{\"root\":\"shop\"},\"build\":{\"entries\":[\"src/model.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"docs\"}}]}";
+
+async inspectConnectionGuidance(): Promise<void> {
+    return await this.driver.inspectConnectionGuidance();
+  }
+
+async disposeConnectionController(): Promise<void> {
+    return await this.driver.disposeConnectionController();
+  }
+
+async connectionGuidanceAvailable(query: number): Promise<boolean> {
+    return await this.driver.connectionGuidanceAvailable(query);
+  }
+
+async connectionGuidanceRequiresEntries(query: number): Promise<boolean> {
+    return await this.driver.connectionGuidanceRequiresEntries(query);
+  }
+
+async connectionGuidanceHasProject(query: number): Promise<boolean> {
+    return await this.driver.connectionGuidanceHasProject(query);
+  }
+
+async connectionGuidanceOutputs(query: number): Promise<Array<ConnectionOutputGuidance>> {
+    return await this.driver.connectionGuidanceOutputs(query);
+  }
+
+async connectionGuidanceMatchesSavedSnapshot(query: number): Promise<boolean> {
+    return await this.driver.connectionGuidanceMatchesSavedSnapshot(query);
+  }
+
+async connectionGuidancePublications(query: number): Promise<number> {
+    return await this.driver.connectionGuidancePublications(query);
+  }
+
+async connectionGuidanceSaves(query: number): Promise<number> {
+    return await this.driver.connectionGuidanceSaves(query);
+  }
+
+async expectConnectionGuidance(query: number, requiresEntries: boolean, hasProject: boolean, outputs: Array<ConnectionOutputGuidance>): Promise<void> {
+    const available = await this.driver.connectionGuidanceAvailable(query);
+    expectData(available, true);
+    const actualEntries = await this.driver.connectionGuidanceRequiresEntries(query);
+    const actualProject = await this.driver.connectionGuidanceHasProject(query);
+    const actualOutputs = await this.driver.connectionGuidanceOutputs(query);
+    expectData(actualEntries, requiresEntries);
+    expectData(actualProject, hasProject);
+    expectData(actualOutputs, outputs);
+  }
+
+async expectGuidanceSavedSnapshot(query: number): Promise<void> {
+    const matches = await this.driver.connectionGuidanceMatchesSavedSnapshot(query);
+    expectData(matches, true);
+  }
+
+async expectGuidanceNoEffects(query: number): Promise<void> {
+    const publications = await this.driver.connectionGuidancePublications(query);
+    const saves = await this.driver.connectionGuidanceSaves(query);
+    expectData(publications, 0);
+    expectData(saves, 0);
+  }
+
+async expectGuidanceAvailability(query: number, expected: boolean): Promise<void> {
+    const available = await this.driver.connectionGuidanceAvailable(query);
+    expectData(available, expected);
+  }
+
+readonly freshGuidanceOutputs: Array<ConnectionOutputGuidance> = [{ ["id"]: "typescript", ["configured"]: false, ["suggestedDirectory"]: "." }, { ["id"]: "uml", ["configured"]: false, ["suggestedDirectory"]: "diagrams" }, { ["id"]: "markdown", ["configured"]: false, ["suggestedDirectory"]: "docs" }];
+
+readonly retainedGuidanceOutputs: Array<ConnectionOutputGuidance> = [{ ["id"]: "typescript", ["configured"]: true }, { ["id"]: "java", ["configured"]: true }, { ["id"]: "uml", ["configured"]: false, ["suggestedDirectory"]: "diagrams" }, { ["id"]: "markdown", ["configured"]: false, ["suggestedDirectory"]: "docs" }];
 }

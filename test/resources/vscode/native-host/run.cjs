@@ -103,7 +103,7 @@ exports.run = async function run() {
           const sidebar = await openConnectionSidebar(vscode, frame.extensionId, frame);
           connectionSidebars.set(frame.sidebarId, sidebar);
           value = await sidebar.observation();
-        } else if (['sidebarObserve', 'sidebarAction', 'sidebarDispose'].includes(frame.operation) && typeof frame.sidebarId === 'string') {
+        } else if (['sidebarObserve', 'sidebarAction', 'sidebarManage', 'sidebarDispose'].includes(frame.operation) && typeof frame.sidebarId === 'string') {
           const sidebar = connectionSidebars.get(frame.sidebarId);
           if (frame.operation === 'sidebarDispose' && !sidebar) value = null;
           else {
@@ -112,6 +112,9 @@ exports.run = async function run() {
             else if (frame.operation === 'sidebarAction' && ['choose', 'save', 'remove', 'restore', 'edit'].includes(frame.kind)
               && (['choose', 'remove', 'restore'].includes(frame.kind) ? typeof frame.name === 'string' : typeof frame.text === 'string')) {
               value = await sidebar.action(frame.kind, frame.name, frame.text);
+            } else if (frame.operation === 'sidebarManage' && frame.action && typeof frame.action === 'object'
+              && ['activityBar', 'editConnection', 'newConnection', 'disconnect', 'reconnect', 'delete', 'previewSource'].includes(frame.action.kind)) {
+              value = await sidebar.manage(frame.action);
             } else if (frame.operation === 'sidebarDispose') {
               await sidebar.dispose(); connectionSidebars.delete(frame.sidebarId); value = null;
             } else throw new Error('Invalid native sidebar operation.');
@@ -191,9 +194,19 @@ exports.run = async function run() {
   });
 };
 
+// A normal development-extension window retains the real standard dialog service.
+// The extension-test runner deliberately refuses modal prompts before product code runs.
+exports.activate = function activate() {
+  const vscode = require('vscode');
+  void exports.run().then(() => vscode.commands.executeCommand('workbench.action.closeWindow'), error => {
+    console.error(error);
+    return vscode.commands.executeCommand('workbench.action.closeWindow');
+  }).catch(error => console.error(error));
+};
+
 if (require.main === module) {
   (async () => {
-    const { runTests, runVSCodeCommand, downloadAndUnzipVSCode } = require('@vscode/test-electron');
+    const { runVSCodeCommand, downloadAndUnzipVSCode } = require('@vscode/test-electron');
     const requestPath = process.argv[2];
     const request = JSON.parse(await fs.readFile(requestPath, 'utf8'));
     const profile = ['--extensions-dir', request.extensionsDirectory, '--user-data-dir', request.userDataDirectory];
@@ -204,11 +217,14 @@ if (require.main === module) {
       });
       await fs.writeFile(request.receiptPath, JSON.stringify({ executable }));
     } else if (request.command === 'session') {
-      await runTests({
-        vscodeExecutablePath: request.executable,
-        extensionDevelopmentPath: __dirname, extensionTestsPath: __filename,
-        launchArgs: [...profile, request.workspaceDirectory, '--disable-gpu', '--disable-telemetry', '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0'],
-        extensionTestsEnv: { EXPEC_NATIVE_REQUEST: requestPath },
+      const { spawn } = require('node:child_process');
+      const child = spawn(request.executable, [...profile, request.workspaceDirectory, '--new-window', '--no-sandbox',
+        '--extensionDevelopmentPath=' + __dirname, '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust',
+        '--disable-gpu', '--disable-telemetry', '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0'],
+        { env: { ...process.env, EXPEC_NATIVE_REQUEST: requestPath }, windowsHide: true, stdio: 'inherit' });
+      await new Promise((resolveExit, reject) => {
+        child.once('error', reject);
+        child.once('close', code => code === 0 ? resolveExit() : reject(new Error('The owned native window exited ' + code + '.')));
       });
     } else throw new Error('Unsupported owned launcher command.');
   })().catch(error => { console.error(error); process.exitCode = 1; });

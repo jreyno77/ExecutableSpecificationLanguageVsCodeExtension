@@ -5,7 +5,7 @@ import type { ConnectionConfiguration } from "./ConnectionConfiguration.js";
 export interface ConnectionFeedback {
     /**
      * Unverified implementation obligation.
-     * Present this immutable current state. Status is unconfigured, checking, connected, unavailable or invalid. Target is the absolute logical configured or currently requested directory. verifiedDirectory is the actual canonical directory from the existing connector, only while connected. Connected establishes valid configuration and usable filesystem identity; it does not establish native build or dependency readiness.
+     * Present this immutable current state. Status is unconfigured, checking, connected, disconnected, unavailable or invalid. Target is the absolute logical configured or currently requested directory. verifiedDirectory is the actual canonical directory from the existing connector, only while connected. Connected establishes valid configuration and usable filesystem identity; it does not establish native build or dependency readiness. Disconnected means an explicit session-only suspension; saved metadata and target files remain intact.
      */
     present(state: ConnectionState): void;
     /**
