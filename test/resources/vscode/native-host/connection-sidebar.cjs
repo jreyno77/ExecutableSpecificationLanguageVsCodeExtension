@@ -12,19 +12,40 @@ exports.openConnectionSidebar = async function openConnectionSidebar(vscode, ext
   }
   const file = vscode.Uri.file(setup.file);
   let revision = 0, disposed = false;
+  let activeDelete, saveEventsAvailable = false, saveEventsUnavailable;
+  const retain = (records, value, maximum) => { records.push(value); if (records.length > maximum) records.shift(); };
   const events = [];
   const sourceFiles = new Map(), panels = new Set();
   let previewDocument;
   const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(vscode.Uri.file(setup.directory), '*'));
   const received = uri => { events.push(uri.toString()); };
   const resources = [watcher, watcher.onDidCreate(received), watcher.onDidChange(received), watcher.onDidDelete(received),
-    provider.onDidChangeTreeData(() => { revision++; })];
+    provider.onDidChangeTreeData(() => { revision++; if (activeDelete) retain(activeDelete.publications, { at: Date.now(), revision }, 8); })];
+  try {
+    if (typeof vscode.workspace.onDidSaveTextDocument === 'function') {
+      resources.push(vscode.workspace.onDidSaveTextDocument(document => {
+        if (!activeDelete) return;
+        try {
+          if (!samePath(document.uri.fsPath, setup.file)) return;
+          const text = document.getText();
+          retain(activeDelete.saveEvents, { at: Date.now(), revision, dirty: document.isDirty, version: document.version, text }, 4);
+        } catch (error) { retain(activeDelete.saveEvents, { at: Date.now(), revision, unavailable: String(error).slice(0, 300) }, 4); }
+      }));
+      saveEventsAvailable = true;
+    }
+  } catch (error) { saveEventsUnavailable = String(error).slice(0, 300); }
   async function row(filename = setup.file) {
     const captured = revision;
     const children = await provider.getChildren();
     if (revision !== captured) return undefined;
     if (!Array.isArray(children) || children.length !== 1 || children[0].configurationFile !== filename) return undefined;
     const item = await provider.getTreeItem(children[0]);
+    if (activeDelete) try {
+      const tooltip = typeof item.tooltip === 'string' ? item.tooltip : item.tooltip?.value;
+      retain(activeDelete.publicRows, { at: Date.now(), revision: captured, obsolete: revision !== captured,
+        file: children[0].configurationFile, status: item.contextValue, description: typeof item.description === 'string' ? item.description.slice(0, 500) : undefined,
+        tooltip: typeof tooltip === 'string' ? tooltip.slice(0, 600) : undefined }, 8);
+    } catch (error) { activeDelete.publicRowsUnavailable = String(error).slice(0, 300); }
     if (revision !== captured) return undefined;
     if (typeof item.contextValue !== 'string' || item.contextValue === 'checking') return undefined;
     return { revision: captured, status: item.contextValue, project: typeof item.description === 'string' ? basename(item.description) : '',
@@ -66,9 +87,17 @@ exports.openConnectionSidebar = async function openConnectionSidebar(vscode, ext
   }
   async function manage(action) {
     if (disposed) throw new Error('The owned native sidebar case is disposed.');
+    activeDelete = undefined;
     const previous = await observation(), before = revision;
     let deletion;
-    const diagnosed = actual => deletion ? { ...actual, nativeDelete: { ...deletion, observedRevision: revision, savedChanged: actual.saved !== previous.saved } } : actual;
+    const diagnosed = actual => {
+      if (!deletion) return actual;
+      activeDelete = undefined;
+      return { ...actual, nativeDelete: { ...deletion, observedRevision: revision, savedChanged: actual.saved !== previous.saved,
+        publications: deletion.publications.map(event => ({ ...event })), publicRows: deletion.publicRows.map(event => ({ ...event })),
+        saveEvents: deletion.saveEvents.map(({ text, ...event }) => ({ ...event, textPrefix: typeof text === 'string' ? text.slice(0, 800) : undefined,
+          matchesObservedSaved: text === undefined ? undefined : text === actual.saved })) } };
+    };
     if (action.kind === 'activityBar') await vscode.commands.executeCommand('workbench.view.extension.expec');
     else if (action.kind === 'editConnection') await vscode.commands.executeCommand('expec.editConnection');
     else if (action.kind === 'newConnection') {
@@ -76,7 +105,9 @@ exports.openConnectionSidebar = async function openConnectionSidebar(vscode, ext
     } else if (action.kind === 'disconnect') await vscode.commands.executeCommand('expec.disconnectConnection');
     else if (action.kind === 'reconnect') await vscode.commands.executeCommand('expec.reconnectConnection');
     else if (action.kind === 'delete') {
-      deletion = { beforeRevision: before, startedAt: Date.now() };
+      deletion = { beforeRevision: before, startedAt: Date.now(), saveEventsAvailable, ...(saveEventsUnavailable ? { saveEventsUnavailable } : {}),
+        saveEvents: [], publications: [], publicRows: [] };
+      activeDelete = deletion;
       try {
         const appName = vscode.env?.appName, mode = extension?.extensionMode;
         if (typeof appName === 'string') deletion.appName = appName.slice(0, 300);
@@ -84,6 +115,7 @@ exports.openConnectionSidebar = async function openConnectionSidebar(vscode, ext
       }
       catch (error) { deletion.hostFactsUnavailable = String(error).slice(0, 300); }
       try { await vscode.commands.executeCommand('expec.deleteConnection'); }
+      catch (error) { activeDelete = undefined; throw error; }
       finally { deletion.completedRevision = revision; deletion.completedAt = Date.now(); }
     } else if (action.kind === 'previewSource') {
       const uri = ownedSource(action.source), initialTabs = new Set(vscode.window.tabGroups.all.flatMap(group => group.tabs));
