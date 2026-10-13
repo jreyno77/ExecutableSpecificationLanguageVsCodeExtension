@@ -120,38 +120,54 @@ export class ConnectionSidebarCase {
   async activityBarVisible(): Promise<boolean> {
     const page = await this.workbench(), installed = await this.session!.extensionPath(this.extensionId);
     if (!installed) throw new Error('The actual installed extension path is unavailable.');
-    return page.evaluate(async ({ root, windows }) => {
-      for (const labelled of document.querySelectorAll<HTMLElement>('.activitybar [aria-label]')) {
+    const observed = await page.evaluate(async ({ root, windows }) => {
+      const labelledNodes = Array.from(document.querySelectorAll<HTMLElement>('.activitybar [aria-label]'));
+      const labels = labelledNodes.slice(0, 40).map(node => (node.getAttribute('aria-label') ?? '').slice(0, 160));
+      const facts: Record<string, unknown>[] = [];
+      for (const labelled of labelledNodes) {
         if (!/^\.expec(?:\s|$)/.test(labelled.getAttribute('aria-label') ?? '')) continue;
         for (const icon of [labelled, ...labelled.querySelectorAll<HTMLElement>('*')]) {
           const box = icon.getBoundingClientRect(), style = getComputedStyle(icon);
-          if (box.width <= 0 || box.height <= 0 || style.display === 'none' || style.visibility !== 'visible') continue;
+          const fact: Record<string, unknown> = { label: (labelled.getAttribute('aria-label') ?? '').slice(0, 160),
+            tag: icon.tagName, class: (icon.getAttribute('class') ?? '').slice(0, 200),
+            box: { width: box.width, height: box.height }, display: style.display, visibility: style.visibility };
+          if (facts.length < 8) facts.push(fact);
+          if (box.width <= 0 || box.height <= 0 || style.display === 'none' || style.visibility !== 'visible') { fact.reason = 'not-visible'; continue; }
           const paint = [style.maskImage, style.getPropertyValue('-webkit-mask-image'), style.backgroundImage]
             .find(value => value && value !== 'none' && value.includes('url(')) ?? '';
           const match = /url\(["']?(.+?)["']?\)/.exec(paint);
-          if (!match) continue;
+          fact.paint = paint.slice(0, 1000);
+          if (!match) { fact.reason = 'no-css-resource'; continue; }
           let timer: ReturnType<typeof setTimeout> | undefined;
           try {
             const resource = new URL(match[1]);
             const filename = decodeURIComponent(resource.pathname).replace(/^\/([A-Za-z]:\/)/, '$1');
             const actualPath = windows ? filename.toLowerCase() : filename, installedRoot = windows ? root.toLowerCase() : root;
+            fact.resource = resource.href.slice(0, 1000);
+            fact.insideInstallation = actualPath.startsWith(installedRoot + '/');
             if (resource.protocol !== 'vscode-file:' || resource.hostname !== 'vscode-app'
-              || !actualPath.startsWith(installedRoot + '/') || !actualPath.endsWith('.svg')) continue;
+              || !actualPath.startsWith(installedRoot + '/') || !actualPath.endsWith('.svg')) { fact.reason = 'not-installed-svg'; continue; }
             // Decode the actual displayed CSS resource and reject a blank packaged icon.
+            fact.reason = 'decoding';
             const image = new Image(); image.src = resource.href;
             await Promise.race([image.decode(), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Native icon decode did not settle.')), 3_000); })]);
-            if (image.naturalWidth <= 0 || image.naturalHeight <= 0) continue;
+            fact.natural = { width: image.naturalWidth, height: image.naturalHeight };
+            if (image.naturalWidth <= 0 || image.naturalHeight <= 0) { fact.reason = 'decoded-empty'; continue; }
             const canvas = document.createElement('canvas'); canvas.width = 24; canvas.height = 24;
-            const context = canvas.getContext('2d'); if (!context) continue;
+            fact.reason = 'reading-paint';
+            const context = canvas.getContext('2d'); if (!context) { fact.reason = 'no-canvas-context'; continue; }
             context.drawImage(image, 0, 0, 24, 24);
             const pixels = context.getImageData(0, 0, 24, 24).data;
-            if (pixels.some((value, index) => index % 4 === 3 && value > 0)) return true;
-          } catch { /* An unreadable resource cannot prove that the visible icon loaded. */ }
+            if (pixels.some((value, index) => index % 4 === 3 && value > 0)) return { visible: true, root: root.slice(0, 1000), labels, facts };
+            fact.reason = 'blank-pixels';
+          } catch (error) { fact.error = String(error).slice(0, 400); }
           finally { if (timer) clearTimeout(timer); }
         }
       }
-      return false;
+      return { visible: false, root: root.slice(0, 1000), labels, facts };
     }, { root: installed.replaceAll('\\', '/').replace(/\/+$/, ''), windows: process.platform === 'win32' });
+    if (!observed.visible) console.error('Actual installed .expec Activity Bar icon observation failed: ' + JSON.stringify(observed));
+    return observed.visible;
   }
   async selectedConfigurationVisible(): Promise<boolean> {
     const page = await this.workbench(), view = page.locator('[id="workbench.view.extension.expec"]'), file = join(this.directory!, 'expec.json');
