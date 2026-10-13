@@ -21,8 +21,6 @@ import type { ConnectionConfiguration } from "./ConnectionConfiguration.js";
 /**
  * Unverified implementation obligation.
  * Requires package: expec (runtime)
- * Requires package: typescript (build)
- * Requires package: vitest (test)
  */
 export class DocumentAnalysis {
     private readonly configurationReader = new ConfigurationReader([
@@ -197,6 +195,7 @@ export class DocumentAnalysis {
 /**
      * Unverified implementation obligation.
      * Invalidate a requested saved source after creation, change or deletion and recheck affected open entries even when their editor version is unchanged. Ignore unrelated URIs and saved changes hidden by an authoritative open snapshot. Reuse unchanged parsed snapshots and read only the invalidated source plus newly required imports. Track missing imports too, and terminate cyclic import acquisition. Preserve other documents and previous reports; do not let reentrant older work replace current feedback.
+     * When folder/file scopes are in use, a relevant file-route notification also invalidates the cached local-path fact, including for authoritative open unsaved text. Recheck the same retained snapshot if its effective scope ownership changed; do not replace that text with saved bytes. Include actually queried ownership URIs in dependencies so the existing native watch boundary can invalidate them. Unrelated notifications cannot trigger a scan or reset another document's facts.
      */
 sourceChanged(uri: string): void {
         if (this.documents.has(uri)) return;
@@ -210,6 +209,7 @@ sourceChanged(uri: string): void {
      * Unverified implementation obligation.
      * Receive the current selected saved configuration snapshot or absence. Validate its supplied text through the public ConfigurationReader with shipped output profiles, then capture only validated Configuration.packages aliases and phases as the existing SourceComposer's DependencyPackage inputs. Missing text, invalid configuration, switching manifests or withdrawing selection replaces the prior catalog; never retain old supplied packages after an invalid or absent snapshot. Do not use writable as package availability or read unsaved configuration buffers; ConnectionSidebar supplies its actual saved-text policy. These are supplied compiler configuration facts, not proof of package installation, native exports, external declaration models, runtime behavior or generation readiness. Keep genuinely unsupplied aliases and missing phases as the language's actual findings. Do not infer packages from imports, folder names, node_modules or another project.
      * A changed catalog invalidates current open analyses and republishes their exact retained unsaved sources at unchanged editor versions through the same SourceComposer, Compiler and Inspection/Resolution publication. Reuse unchanged parsed sources and saved dependency snapshots. Retain the validated catalog for ordinary source edits rather than revalidating configuration per edit. Preserve current document lifetimes and guard reentrant source/configuration/feedback changes so older work cannot publish with an obsolete catalog. Validation or publication exceptions surface; they are not empty success. Existing configuration consumers retain actual validation explanations. This operation never acquires project/package code, scans, installs, generates, saves or writes; it does not require connected-target verification.
+     * Retain the validated requirements metadata with the same catalog, and include the selected manifest filename and effective scope metadata in configuration currentness even when aliases/phases are unchanged. Prepare requirementsFor over the actual captured workspace source identities and provider-supplied local paths; no resolver, synthetic model or implicit runtime imports are added. Project obligations apply to supplied workspace sources even when a foreign or untitled source has no local path; folder/exact-file obligations require verified local paths. Do not treat acquired external declaration models as workspace sources. Invalid or absent configuration withdraws earlier rows/catalog and publishes the actual configuration findings; failed scope preparation publishes no old rows. A relevant saved scope change rechecks retained unsaved text at the same editor version. Cache source ownership between text edits; invalidate it after a selected configuration change or relevant source-route notification, guard reentrant provider/feedback callbacks, and never run SourceLoader or connected native capture on each keystroke.
      */
 configurationChanged(configuration: ConnectionConfiguration | undefined): void {
         const revision = ++this.configurationRevision;

@@ -49,7 +49,6 @@ import type { SourceCompletionAdapter } from "./SourceCompletionAdapter.js";
  * Requires package: language-server (runtime)
  * Requires package: language-server-document (runtime)
  * Requires package: expec (runtime)
- * Requires package: typescript (build)
  * Depends on: DocumentAnalysis
  * Depends on: OutputPreviews
  * Depends on: SourceNavigation
@@ -170,6 +169,7 @@ export class LanguageServerAdapter {
     }
     /**
      * Unverified implementation obligation.
+     * Preserve current scope findings separately from source diagnostics. Show actual dependencyProblems through standard visible LSP window warnings, including code/message and the selected manifest or supplied-mapping JSON-path origin. Do not invent source ranges for dependency origins or mutate Compilation. Deduplicate unchanged warnings for the same current saved configuration/finding so ordinary typing cannot flood notifications; changed, invalid or withdrawn configuration must not reuse an old warning as current evidence. The same current report still reaches previews before native projection.
      * Retain real syntax and compiler errors whose primary source URI matches this document in its current native pull cache. Foreign primary findings remain in the raw Compilation and output log; an open imported document receives its own entry analysis. Never attach a foreign primary range to the requesting document. Convert each scalar range with the captured text for that range's exact URI, including cross-file related information. Preserve messages and codes. Keep nonlocated problems and deferred requirements observable in the language-client output log without inventing editor positions. Replace old feedback, including an empty full report when findings clear. Give each accepted publication an opaque analysis resultId; editor version alone cannot identify changed imports. Request the SDK diagnostic refresh after dependent feedback changes. Never reparse, generate or make semantic decisions here. Forward this same captured source/version/report to core OutputPreviews before reducing it to native diagnostic data; preserve ordinary diagnostic publication and dependency-watch behavior. Forward this same current source/version/report to one core SourceNavigation before native conversion. Forward this same current source/version/report to one core SourceHover before native conversion, including same-version replacement reports after imported edits. No Inspection or Specification crosses the protocol boundary.
      * Forward the same current captured source/version/report to DocumentOutline before answering native symbol requests. A replacement or rejected report replaces its earlier tree even at the same editor version; transport only plain native symbols, never Inspection or a compiler model.
      * Forward this same current captured source/version/report to SourceCompletion before native conversion, including same-version replacement after imported edits and rejected reports that withdraw old completion facts. Transport only plain native CompletionItems; Inspection and Resolution stay within core.

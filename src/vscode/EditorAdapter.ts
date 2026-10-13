@@ -3,13 +3,7 @@ import type { SourceDocument } from "../core/SourceDocument.js";
 import type { OutputTab } from "../core/OutputTab.js";
 import type { TextDocument } from "vscode";
 
-/**
- * Unverified implementation obligation.
- * Requires package: typescript (build)
- * Requires package: vscode-types (build)
- * Requires package: vite (build)
- * Requires package: vitest (test)
- */
+
 export class EditorAdapter {
     private readonly core: WorkspaceCore;
     constructor(core: WorkspaceCore) {

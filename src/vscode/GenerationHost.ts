@@ -18,11 +18,6 @@ import type { GenerationShutdownFeedback } from "../core/GenerationShutdownFeedb
 
 /**
  * Unverified implementation obligation.
- * Requires package: vscode-types (build)
- * Requires package: node-types (build)
- * Requires package: typescript (build)
- * Requires package: vite (build)
- * Requires package: vscode-test-electron (test)
  * Depends on: GenerationOnSave
  */
 export class GenerationHost {

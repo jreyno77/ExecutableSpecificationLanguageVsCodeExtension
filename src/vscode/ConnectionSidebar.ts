@@ -15,10 +15,7 @@ import type { ConnectionWorkFeedback } from "../core/ConnectionWorkFeedback.js";
 
 /**
  * Unverified implementation obligation.
- * Requires package: vscode-types (build)
- * Requires package: node-types (build)
  * Requires package: expec (runtime)
- * Requires package: vscode-test-electron (test)
  * Depends on: ConnectionController
  */
 export class ConnectionSidebar {

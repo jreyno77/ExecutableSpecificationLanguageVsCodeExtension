@@ -13,8 +13,6 @@ import type { SourceDefinition } from "./SourceDefinition.js";
 /**
  * Unverified implementation obligation.
  * Requires package: expec (runtime)
- * Requires package: typescript (build)
- * Requires package: vitest (test)
  */
 export class SourceNavigation {
     private readonly documents = new Map<string, PreparedDocument>();

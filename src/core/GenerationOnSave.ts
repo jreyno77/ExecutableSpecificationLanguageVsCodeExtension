@@ -22,9 +22,6 @@ import type { SourceDocument } from "./SourceDocument.js";
 /**
  * Unverified implementation obligation.
  * Requires package: expec (runtime)
- * Requires package: node-types (build)
- * Requires package: typescript (build)
- * Requires package: vitest (test)
  */
 export class GenerationOnSave {
     private readonly worker: GenerationWorker;

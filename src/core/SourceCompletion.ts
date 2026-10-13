@@ -14,8 +14,6 @@ type CompletionDocument = { version: number; source: SourceDocument; length: num
 /**
  * Unverified implementation obligation.
  * Requires package: expec (runtime)
- * Requires package: typescript (build)
- * Requires package: vitest (test)
  */
 export class SourceCompletion {
     private readonly documents = new Map<string, CompletionDocument>();

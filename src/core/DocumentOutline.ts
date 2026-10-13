@@ -16,8 +16,6 @@ import type { SourceOutline } from "./SourceOutline.js";
 /**
  * Unverified implementation obligation.
  * Requires package: expec (runtime)
- * Requires package: typescript (build)
- * Requires package: vitest (test)
  */
 export class DocumentOutline {
     private readonly documents = new Map<string, PreparedOutline>();

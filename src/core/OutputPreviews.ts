@@ -23,8 +23,6 @@ import type { DocumentReport } from "./DocumentReport.js";
 /**
  * Unverified implementation obligation.
  * Requires package: expec (runtime)
- * Requires package: typescript (build)
- * Requires package: vitest (test)
  */
 export class OutputPreviews {
     private readonly feedback: PreviewFeedback;
@@ -84,6 +82,7 @@ export class OutputPreviews {
     }
     /**
      * Unverified implementation obligation.
+     * Actual dependencyProblems in this current report block configured outputs with their real codes/messages and dependency-origin paths, withdrawing old documents even when editor version is unchanged. Do not manufacture a compiler failure or ignore an invalid scoped configuration merely because the unchanged source's Compilation has a Specification. Successful scoped requirements permit ordinary previews using the same checked source; they do not install packages, capture a target or prove native generation readiness. Legacy supplied reports without this additive field have no extra scope findings.
      * Receive the real current immutable DocumentAnalysis publication before native diagnostic conversion loses its Compilation. Keep the source/version and complete report inside core; never parse, compile, discover files or rebuild models here. Each publication is a new private report revision even at the same editor version after imported-source changes. Only the selected current report drives previews. Rejected syntax or absent/failed/deferred Compilation blocks configured tabs with actual syntax/compiler codes/messages or requirement reasons/requires and no old documents. From its checked Specification call public Outputs.preview independently for each configured ID/options with captured report source URIs as workspaceModules and the selected manifest filename. Publish pending tabs with no previous documents before starting work; each current completion updates only its tab while others progress. Retain actual document paths/media types/order. Strictly decode supported UTF-8 text media, application/json and image/svg+xml from their exact byte spans; invalid UTF-8 or unsupported binary presentation refuses that output with an explicit unsupported-presentation explanation and no silent replacement. Successful empty documents are ready with No authored documents; refused checks retain actual diagnostic codes/messages or requirement reasons/requires. Provider/contract exceptions are visibly refused rather than fabricated upstream findings or empty success. Status is pending, ready, blocked or refused. Private work currentness covers source lifetime/version, report/configuration/selection revisions and coordinator lifetime; check it after every await and discard stale success/refusal/error. Keep at most one invocation per output ID in flight and only its latest requested report/configuration queued; after settlement render that latest request and skip superseded intermediate edits. Other IDs progress independently. Do not open project adapters, capture a target, plan/apply writes, generate acceptance output, execute scenarios or claim handwritten preservation/write readiness.
      */
     published(source: SourceDocument, version: number, report: DocumentReport): void {
