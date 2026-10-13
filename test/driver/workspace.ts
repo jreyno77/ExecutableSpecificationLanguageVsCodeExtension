@@ -1,3 +1,4 @@
+import { FileScopes } from './file-scopes.js';
 import { NativeCompletionRecording } from './vscode/native-completion.js';
 import { SourceCompletionRecording } from './source-completion.js';
 import { SourceCompletionConversion } from './source-completion-conversion.js';
@@ -37,6 +38,7 @@ import { ConnectionOutputGuidance } from "../../src/core/ConnectionOutputGuidanc
 
 
 export class WorkspaceDriver {
+  private scopeFiles!: FileScopes;
   private nativeCompletionRecording!: NativeCompletionRecording;
   private sourceCompletionRecording!: SourceCompletionRecording;
   private completionConversionRecording!: SourceCompletionConversion;
@@ -1973,11 +1975,11 @@ async connectionGuidanceSaves(query: number): Promise<number> {
   }
 
 async scopedSourceComparison(configuration: ConnectionConfiguration, sourcePath: string, text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.scopedSourceComparison");
+    this.scopeFiles = await FileScopes.comparison(configuration, sourcePath, text);
   }
 
 async scopeFileDirectory(): Promise<void> {
-    throw new Error("Not implemented: workspace.scopeFileDirectory");
+    this.scopeFiles = await FileScopes.open();
   }
 
 async semanticSourcePath(uri: string, path: string): Promise<void> {
@@ -1987,12 +1989,14 @@ async semanticSourcePath(uri: string, path: string): Promise<void> {
 async tryMutatingSemanticRequirements(uri: string, publication: number): Promise<void> {
     const rows = this.analysisRecording.atPublication(uri, publication).report.requirements;
     if (!rows?.length) throw new Error('No actual requirements were published.');
+    const before = JSON.stringify(rows);
     try { rows.splice(0); } catch (error) { if (!(error instanceof TypeError)) throw error; }
     try { (rows[0]!.at as unknown as { path: unknown[] }).path.splice(0); } catch (error) { if (!(error instanceof TypeError)) throw error; }
+    if (JSON.stringify(rows) !== before) throw new Error('Caller mutation changed published requirements.');
   }
 
 async compareCapturedAndLiveScopes(): Promise<void> {
-    throw new Error("Not implemented: workspace.compareCapturedAndLiveScopes");
+    await this.scopeFiles.compare();
   }
 
 async previewSourcePath(uri: string, path: string): Promise<void> {
@@ -2000,27 +2004,27 @@ async previewSourcePath(uri: string, path: string): Promise<void> {
   }
 
 async keepScopeSource(path: string, text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.keepScopeSource");
+    await this.scopeFiles.keepSource(path, text);
   }
 
 async keepScopeFolder(path: string): Promise<void> {
-    throw new Error("Not implemented: workspace.keepScopeFolder");
+    await this.scopeFiles.keepFolder(path);
   }
 
 async keepEscapingScopeLink(linkPath: string, outsidePath: string, text: string): Promise<void> {
-    throw new Error("Not implemented: workspace.keepEscapingScopeLink");
+    await this.scopeFiles.keepEscapingLink(linkPath, outsidePath, text);
   }
 
 async queryScopePath(path: string): Promise<void> {
-    throw new Error("Not implemented: workspace.queryScopePath");
+    await this.scopeFiles.query(path);
   }
 
 async saveScopedPreviewConfiguration(configuration: string): Promise<void> {
-    throw new Error("Not implemented: workspace.saveScopedPreviewConfiguration");
+    await this.nativePreview.saveScopedConfiguration(configuration);
   }
 
 async observeVisibleScopeWarning(): Promise<void> {
-    throw new Error("Not implemented: workspace.observeVisibleScopeWarning");
+    await this.nativePreview.observeScopeWarning();
   }
 
 async semanticRequirementAliases(uri: string, publication: number, phase: string): Promise<Array<string>> {
@@ -2046,19 +2050,19 @@ async semanticDependencyProblemCount(uri: string, publication: number): Promise<
   }
 
 async capturedAndLiveRequirementsAgree(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.capturedAndLiveRequirementsAgree");
+    return this.scopeFiles.requirementsAgree();
   }
 
 async capturedScopeAliases(phase: string): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.capturedScopeAliases");
+    return this.scopeFiles.capturedAliases(phase);
   }
 
 async liveScopeAliases(phase: string): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.liveScopeAliases");
+    return this.scopeFiles.liveAliases(phase);
   }
 
 async scopedComparisonFilesUnchanged(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.scopedComparisonFilesUnchanged");
+    return this.scopeFiles.filesUnchanged();
   }
 
 async previewBeforeScopeStatus(id: string): Promise<string> {
@@ -2066,26 +2070,26 @@ async previewBeforeScopeStatus(id: string): Promise<string> {
   }
 
 async queriedScopePath(): Promise<string | undefined> {
-    throw new Error("Not implemented: workspace.queriedScopePath");
+    return this.scopeFiles.queriedPath();
   }
 
 async queriedScopePathAvailable(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.queriedScopePathAvailable");
+    return this.scopeFiles.available();
   }
 
 async queriedScopeFileExists(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.queriedScopeFileExists");
+    return this.scopeFiles.queriedFileExists();
   }
 
 async scopeQueryFilesUnchanged(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.scopeQueryFilesUnchanged");
+    return this.scopeFiles.filesUnchanged();
   }
 
 async nativeScopeWarningIncludes(text: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.nativeScopeWarningIncludes");
+    return this.nativePreview.scopeWarningIncludes(text);
   }
 
 async nativeScopeWarningMatches(code: string, path: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.nativeScopeWarningMatches");
+    return this.nativePreview.scopeWarningMatches(code, path);
   }
 }

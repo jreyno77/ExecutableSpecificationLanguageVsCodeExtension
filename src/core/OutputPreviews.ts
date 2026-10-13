@@ -33,6 +33,7 @@ export class OutputPreviews {
     private configuration: Configuration | undefined;
     private configurationToken = {};
     private manifest: string | undefined;
+    private configurationBlocked = false;
     private configurationMessage = 'Choose a saved .expec configuration to preview outputs.';
     private selection: string | undefined;
     private view: PreviewView | undefined;
@@ -57,12 +58,14 @@ export class OutputPreviews {
         for (const work of this.work.values()) work.queued = undefined;
         this.configuration = undefined;
         this.manifest = configuration?.file;
+        this.configurationBlocked = false;
         this.configurationMessage = 'Choose a saved .expec configuration to preview outputs.';
         if (configuration?.text !== undefined) {
             try {
                 const checked = this.reader.read({ sourceId: configuration.file, text: configuration.text });
                 if (this.disposed || this.configurationToken !== token) return;
                 this.configuration = checked.value;
+                this.configurationBlocked = checked.value === undefined && checked.problems.length > 0;
                 this.configurationMessage = this.findings(checked) || 'Configuration is unavailable.';
             } catch (error) {
                 if (this.disposed || this.configurationToken !== token) return;
@@ -124,7 +127,10 @@ export class OutputPreviews {
             publication: { ...(this.selection === undefined ? {} : { uri: this.selection }), ...(report ? { version: report.version } : {}), tabs: [] },
         };
         this.view = view;
-        if (!view.configuration) view.publication.message = this.configurationMessage;
+        if (!view.configuration) {
+            view.publication.message = this.configurationMessage;
+            if (this.configurationBlocked) view.publication.blocked = true;
+        }
         else if (this.selection === undefined) view.publication.message = 'Select an authored .expec document to preview.';
         else if (!report) view.publication.message = 'Waiting for analysis of the selected authored document.';
         else {

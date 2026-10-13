@@ -83,6 +83,8 @@ export class LanguageServerAdapter {
     private warnedWatchSupport = false;
     private reportSequence = 0;
     private configurationRevision = 0;
+    private warningConfigurationKey = 'null';
+    private scopeWarnings = new Set<string>();
     private readonly publicationTokens = new Map<string, object>();
     private started = false;
     private disposed = false;
@@ -112,6 +114,11 @@ export class LanguageServerAdapter {
                     file: configuration.file, ...(configuration.text === undefined ? {} : { text: configuration.text }),
                     writable: configuration.writable,
                 });
+                const warningKey = JSON.stringify(snapshot ? [snapshot.file, snapshot.text] : null);
+                if (warningKey !== this.warningConfigurationKey) {
+                    this.warningConfigurationKey = warningKey;
+                    this.scopeWarnings = new Set();
+                }
                 this.previews.configurationChanged(snapshot);
                 if (!this.disposed && this.configurationRevision === revision) this.analysis.configurationChanged(snapshot);
             }),
@@ -177,13 +184,36 @@ export class LanguageServerAdapter {
     publish(source: SourceDocument, version: number, report: DocumentReport): void {
         if (this.disposed) return;
         const token = {};
+        const configurationRevision = this.configurationRevision;
         this.publicationTokens.set(source.uri, token);
         this.navigation.published(source, version, report);
         this.hover.published(source, version, report);
         this.outline.published(source, version, report);
         this.completion.published(source, version, report);
         this.previews.published(source, version, report);
-        if (this.disposed || this.publicationTokens.get(source.uri) !== token) return;
+        if (this.disposed || this.publicationTokens.get(source.uri) !== token || this.configurationRevision !== configurationRevision) return;
+        const warnings = this.scopeWarnings;
+        for (const problem of report.dependencyProblems ?? []) {
+            const key = JSON.stringify(problem);
+            if (warnings.has(key)) continue;
+            warnings.add(key);
+            try {
+                const reply = this.connection.window.showWarningMessage('[' + problem.code + '] ' + problem.message + ' ' + JSON.stringify(problem.at)
+                    + (problem.related.length ? ' Related: ' + JSON.stringify(problem.related) : ''));
+                void Promise.resolve(reply).catch(error => {
+                    warnings.delete(key);
+                    const message = 'Scoped configuration warning failed: ' + String(error);
+                    try { this.connection.console.error(message); }
+                    catch (loggingError) {
+                        try { console.error(message, loggingError); } catch {}
+                    }
+                });
+            } catch (error) {
+                warnings.delete(key);
+                throw error;
+            }
+            if (this.disposed || this.publicationTokens.get(source.uri) !== token || this.configurationRevision !== configurationRevision) return;
+        }
         const snapshots = new Map(report.sources.map(snapshot => [snapshot.uri, snapshot]));
         snapshots.set(source.uri, source);
         const positions = new Map<string, { document: TextDocument; offsets: number[] }>();

@@ -263,7 +263,9 @@ configurationChanged(configuration: ConnectionConfiguration | undefined): void {
         this.packageKey = key;
         this.packages = Object.freeze(packages);
         this.configuration = checked?.value === undefined ? undefined : this.captureFacts(checked.value);
-        this.configurationProblems = this.captureFacts([...(checked?.problems ?? [])]);
+        this.configurationProblems = this.captureFacts((checked?.problems ?? []).filter(problem =>
+            !(['unknown-output', 'invalid-output-options'].includes(problem.code) && problem.at.kind === 'dependency'
+                && problem.at.path[0] === 'manifest' && problem.at.path[1] === snapshot?.file && problem.at.path[2] === 'outputs')));
         this.ownership.clear();
         this.run([...this.documents.values()].map(document => ({ document, revision: ++document.revision })));
     }

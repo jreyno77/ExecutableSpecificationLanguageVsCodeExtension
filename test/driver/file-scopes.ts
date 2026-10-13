@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { lstat, mkdir, readFile, readdir, readlink, symlink, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, readdir, readlink, realpath, symlink, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { onTestFinished } from 'vitest';
@@ -43,9 +43,10 @@ export class FileScopes {
     if (configuration.text === undefined) throw new TypeError('The scoped comparison needs actual saved configuration text.');
     await recording.keepSource('expec.json', configuration.text);
     await recording.keepSource(sourcePath, text);
+    const sourceFile = await realpath(recording.fixture(recording.directory, sourcePath));
     recording.input = {
       configuration: { file: recording.manifest, text: configuration.text, writable: configuration.writable },
-      source: { uri: pathToFileURL(recording.fixture(recording.directory, sourcePath)).href, text },
+      source: { uri: pathToFileURL(sourceFile).href, text },
     };
     return recording;
   }
