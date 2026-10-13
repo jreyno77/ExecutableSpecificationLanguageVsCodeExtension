@@ -75,7 +75,7 @@ export class GenerationHost {
     }
     /**
      * Unverified implementation obligation.
-     * Receive the same raw selected saved ConnectionConfiguration as previews, independently of directory status. Withdraw the old selection before switching; load only the new manifest's explicit opt-in and forward both facts to core. Dirty configuration events retain saved text and notify core of actual buffer changes. Restart may replay configuration and current buffer facts, never previous save intents. Do not edit the language manifest or infer enabled from writable/connected.
+     * Receive the actual active saved ConnectionConfiguration through the selected sidebar's ConnectionWorkFeedback observer, or absence on explicit session-only disconnect, deletion, unavailable selection or transition. Authored previews and live package analysis independently retain the raw selected saved configuration; generation is no longer routed through that preview callback. Withdraw old admission and clear queued save intents before switching or suspension, while continuing to record actual terminal results and partial receipts. Load and retain only the manifest's prior explicit opt-in, never erase or grant it because of generic absence, disconnect or reconnection. A previously disabled manifest stays disabled; restoring an earlier true opt-in still needs a later genuine source save. Dirty configuration events retain saved text and notify core of actual buffer changes. Restart may replay active configuration and current buffer facts, never previous save intents. Do not edit the language manifest or infer enabled from writable/connected.
      */
     configurationChanged(configuration: ConnectionConfiguration | undefined): void {
         if (this.closing) return;

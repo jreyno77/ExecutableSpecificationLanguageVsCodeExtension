@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createServer, type Server, type Socket } from 'node:net';
-import { lstat, readFile, readdir } from 'node:fs/promises';
+import { lstat, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Browser } from 'playwright';
 import { NativeCleanupError, NativeLauncher, ownTemporaryDirectory, removeOwnedDirectory, within } from './native-process.js';
@@ -19,7 +19,9 @@ export type DiagnosticObservation = {
 };
 export type DiagnosticMiddlewareObservation = { cancellationError: boolean; nextCalls: number; runtime: { node: string; vscode: string } };
 
-export type SidebarObservation = { readonly status: string; readonly project: string; readonly explanation: string; readonly saved?: string; readonly unsaved?: string };
+export type SidebarObservation = { readonly status: string; readonly project: string; readonly explanation: string; readonly saved?: string; readonly unsaved?: string; readonly activeFile?: string; readonly sourceUri?: string; readonly sourceVersion?: number };
+export type SidebarManagementAction = { kind: 'activityBar' | 'editConnection' | 'newConnection' | 'disconnect' | 'reconnect' | 'delete' | 'previewSource';
+  target?: string; outputs?: readonly { id: string; directory?: string }[]; entries?: readonly string[]; cancelDestination?: boolean; confirmed?: boolean; source?: string };
 export type PreviewEditorObservation = { readonly uri: string; readonly version: number; readonly text: string; readonly dirty: boolean; readonly savedText: string;
   readonly resultId: string; readonly diagnosticCount: number };
 
@@ -49,7 +51,7 @@ export type NativeCompletionObservation = NativeDefinitionObservation & {
   items: readonly { label: string; insertion: string; range: DiagnosticRange }[]; aggregate?: unknown;
 };
 export type NativeCompletionDocumentObservation = NativeDefinitionObservation & { entryText: string };
-type Operation = 'definitionOpen' | 'definitionEdit' | 'definitionGoTo' | 'definitionHover' | 'definitionSymbols' | 'definitionCompletion' | 'definitionApplyCompletion' | 'definitionDispose' | 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
+type Operation = 'definitionOpen' | 'definitionEdit' | 'definitionGoTo' | 'definitionHover' | 'definitionSymbols' | 'definitionCompletion' | 'definitionApplyCompletion' | 'definitionDispose' | 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarManage' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
 type Pending = { promise: Promise<unknown>; resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> };
 
 /** One owned native host, with only the observations needed by its test consumers. */
@@ -81,6 +83,9 @@ export class VsCodeSession {
   static async start(executable: string, extensionsDirectory: string, workspaceDirectory: string): Promise<VsCodeSession> {
     const session = new VsCodeSession(await ownTemporaryDirectory('expec-vscode-session-'));
     try {
+      const preferences = join(session.directory, 'profile', 'User');
+      await mkdir(preferences, { recursive: true });
+      await writeFile(join(preferences, 'settings.json'), JSON.stringify({ 'files.simpleDialog.enable': true, 'window.dialogStyle': 'custom' }));
       await within((async () => {
         await new Promise<void>((resolveReady, reject) => {
           session.server.once('error', reject);
@@ -316,6 +321,9 @@ export class VsCodeSession {
   changeConnectionSidebar(sidebarId: string, kind: 'choose' | 'save' | 'remove' | 'restore' | 'edit', name?: string, text?: string): Promise<SidebarObservation> {
     return this.sidebarRequest('sidebarAction', { sidebarId, kind, name, text });
   }
+  manageConnectionSidebar(sidebarId: string, action: SidebarManagementAction): Promise<SidebarObservation> {
+    return this.sidebarRequest('sidebarManage', { sidebarId, action });
+  }
   async disposeConnectionSidebar(sidebarId: string): Promise<void> {
     const value = await this.request('sidebarDispose', { sidebarId });
     if (value !== null) throw new Error('The native sidebar disposal returned an invalid receipt.');
@@ -324,7 +332,9 @@ export class VsCodeSession {
     const value = await this.request(operation, values);
     if (!value || typeof value !== 'object' || !('status' in value) || typeof value.status !== 'string'
       || !('project' in value) || typeof value.project !== 'string' || !('explanation' in value) || typeof value.explanation !== 'string'
-      || ('saved' in value && typeof value.saved !== 'string') || ('unsaved' in value && typeof value.unsaved !== 'string')) {
+      || ('saved' in value && typeof value.saved !== 'string') || ('unsaved' in value && typeof value.unsaved !== 'string')
+      || ('activeFile' in value && typeof value.activeFile !== 'string') || ('sourceUri' in value && typeof value.sourceUri !== 'string')
+      || ('sourceVersion' in value && (!Number.isInteger(value.sourceVersion) || Number(value.sourceVersion) < 1))) {
       const error = new Error('The native host returned an invalid sidebar observation.');
       await this.poison(error); throw error;
     }

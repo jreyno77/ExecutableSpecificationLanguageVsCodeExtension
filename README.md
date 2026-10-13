@@ -30,9 +30,13 @@ Open VS Code's **Outline** view to navigate the current document's nested compon
 
 With `type Book {}` declared, request completion inside or immediately after `Boo` in `type Basket { book: Boo }`. Suggestions use the actual visible types and aliases and replace only that token, including quotes where needed. Unsaved source and imported changes replace earlier suggestions. Completion does not generate files. This first completion scope covers existing type-reference tokens; arbitrary grammar gaps, values, members and signature help are separate features.
 
-Open **.expec Project Connection** in the Explorer and use **Choose Project** to select a local directory. Its status follows saved configuration changes and directory disappearance or restoration automatically. Save or revert unsaved configuration edits before choosing another project. `expec.configurationFile` selects the workspace manifest and defaults to `expec.json`; multiple workspace folders require a folder choice.
+## Project connections
 
-A connected status verifies the directory is available. Compilation, dependencies and generated outputs have their own checks. Creating a new manifest sets `src/main.expec` as its initial build entry; configure your actual source entry before compilation.
+Open the **.expec** icon in the Activity Bar. **New Connection** guides you through choosing an empty or existing target directory and selecting outputs. New TypeScript, UML and Markdown outputs ask for a destination relative to that target. TypeScript's suggested destination, a dot, mirrors your source folders into the target root. For a missing manifest, select your actual saved .expec source entries.
+
+Right-click the connection for **Edit Connection**, **New Connection**, **Disconnect**, **Reconnect** or **Delete Connection**. New Connection updates the selected manifest. Editing opens the selected manifest, including advanced output options. Disconnect suspends connection-owned generation for this session while keeping saved settings and previews. Reconnect verifies the target again. Delete removes only saved project connection metadata; source files, target files, output settings and packages remain.
+
+Status follows saved configuration and directory changes automatically. Save or revert dirty metadata before changing a connection. `expec.configurationFile` defaults to `expec.json` in the selected workspace folder; opening the folder containing that file works directly. Multiple workspace folders require a choice. A connected status establishes directory availability; build prerequisites and generation have their own checks. Generation on save needs its separate explicit opt-in.
 ## Output previews
 
 Run **.expec: Show Output Previews** from the Command Palette. Add the desired outputs to your saved `expec.json`, for example:
