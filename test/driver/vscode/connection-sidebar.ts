@@ -173,6 +173,10 @@ export class ConnectionSidebarCase {
     const page = await this.workbench(), view = page.locator('[id="workbench.view.extension.expec"]'), file = join(this.directory!, 'expec.json');
     if (!await view.isVisible() || !(await view.innerText()).includes(basename(file))) return false;
     const row = view.getByRole('treeitem').filter({ hasText: basename(file) }).first();
+    const bounds = await row.boundingBox();
+    if (!bounds) return false;
+    // A dismissed native hover stays suppressed while its pointer remains on the row.
+    await page.mouse.move(bounds.x + bounds.width + 1, bounds.y + bounds.height + 1);
     await row.hover();
     const deadline = Date.now() + 3_000;
     while (Date.now() < deadline) {

@@ -604,7 +604,14 @@ deleteConnection(): void {
         const answer = await vscode.window.showWarningMessage('Delete the project connection from ' + guidance.configuration.file
             + '? Only project metadata will be removed. Target files, sources, output settings and packages will be retained.',
             { modal: true }, 'Delete Connection');
-        if (!current() || answer !== 'Delete Connection') return;
+        if (answer !== 'Delete Connection' || !this.intentCurrent(intent) || controller !== this.controller
+            || guidance.configuration.file !== this.filename) return;
+        const savedBeforeRefresh = this.saved;
+        const expectedReading = this.reading + 1;
+        await this.readSaved();
+        if (this.reading !== expectedReading || this.saved === savedBeforeRefresh || this.hostFailure !== undefined) return;
+        const refreshedCurrent = this.choiceCurrent(controller, guidance.configuration, intent);
+        if (!refreshedCurrent()) return;
         this.choicePending = false;
         controller.deleteConnection();
     }

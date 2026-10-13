@@ -270,3 +270,105 @@ describe('legacy and guided connection commands share the author intent', () => 
     } finally { fail(new Error('Obsolete editor failure.')); await oldEdit; }
   });
 });
+
+describe('Delete rechecks the confirmed saved selection after native read events', () => {
+  async function pendingDelete() {
+    const fixture = await start(), confirmation = heldAnswer<string | undefined>();
+    vi.spyOn(window, 'showWarningMessage').mockImplementation(() => confirmation.answer());
+    const command = commands.executeCommand('expec.deleteConnection');
+    await confirmation.started;
+    return { ...fixture, confirmation, command };
+  }
+  async function removedProject(host: RecordedSidebarHost) {
+    expect(JSON.parse(await host.savedConfiguration())).toEqual({
+      formatVersion: 1, version: '0.1.0', build: { entries: ['src/main.expec'] }, outputs: [],
+    });
+    expect(await host.rows()).toContainEqual(expect.objectContaining({ contextValue: 'unconfigured' }));
+  }
+  it('an identical-byte notification completed during confirmation still permits actual deletion', async () => {
+    const { host, sidebar, confirmation, command } = await pendingDelete();
+    let publications = 0;
+    const observation = sidebar.onDidChangeTreeData(() => { publications++; });
+    try {
+      await host.replaceSavedConfiguration(shop); await host.settleRequestedSave();
+      expect(await host.savedConfiguration()).toBe(shop);
+      expect(publications).toBeGreaterThan(0);
+      confirmation.release('Delete Connection'); await command; await host.settleRequestedSave();
+      await removedProject(host);
+    } finally { observation.dispose(); confirmation.release(undefined); await command; }
+  });
+  it('the accepted fresh read supersedes an identical-byte read still in flight', async () => {
+    const { host, confirmation, command } = await pendingDelete(), oldRead = host.holdNextRead(host.file);
+    try {
+      await host.replaceSavedConfiguration(shop); await oldRead.started;
+      confirmation.release('Delete Connection'); await command; await host.settleRequestedSave([oldRead]);
+      await removedProject(host);
+      oldRead.release(); await host.settleRequestedSave();
+      await removedProject(host);
+    } finally { oldRead.release(); confirmation.release(undefined); await command; }
+  });
+  it('a dirty document during confirmation keeps both saved and unsaved configuration', async () => {
+    const { host, confirmation, command } = await pendingDelete();
+    try {
+      await host.editWithoutSaving(library); await host.settleRequestedSave();
+      confirmation.release('Delete Connection'); await command; await host.settleRequestedSave();
+      expect(await host.savedConfiguration()).toBe(shop);
+      expect(host.documents[0]!.getText()).toBe(library);
+      expect(host.documents[0]!.isDirty).toBe(true);
+      expect(host.writes).toEqual([]);
+    } finally { confirmation.release(undefined); await command; }
+  });
+  it('a replacement selection during confirmation cannot delete either manifest', async () => {
+    const { host, sidebar, confirmation, command } = await pendingDelete();
+    const selected = await host.addConfiguration('selected.json', library);
+    try {
+      sidebar.start(selected); await host.settleRequestedSave();
+      confirmation.release('Delete Connection'); await command; await host.settleRequestedSave();
+      expect(await host.savedConfiguration()).toBe(shop);
+      expect(await readFile(selected, 'utf8')).toBe(library);
+      expect(host.writes).toEqual([]);
+    } finally { confirmation.release(undefined); await command; }
+  });
+  it('disposal during confirmation prevents a late deletion', async () => {
+    const { host, sidebar, confirmation, command } = await pendingDelete();
+    try {
+      sidebar.dispose(); confirmation.release('Delete Connection'); await command; await host.settleRequestedSave();
+      expect(await host.savedConfiguration()).toBe(shop);
+      expect(host.writes).toEqual([]);
+      expect(host.registrations.every(resource => resource.disposed)).toBe(true);
+      expect(host.watchers.every(watcher => watcher.disposed)).toBe(true);
+    } finally { confirmation.release(undefined); await command; }
+  });
+  it('failure of the accepted saved read leaves the original bytes untouched', async () => {
+    const { host, confirmation, command } = await pendingDelete();
+    vi.spyOn(workspace.fs, 'readFile').mockRejectedValueOnce(new Error('Selected manifest read failed.'));
+    try {
+      confirmation.release('Delete Connection'); await command; await host.settleRequestedSave();
+      expect(await host.savedConfiguration()).toBe(shop);
+      expect(host.writes).toEqual([]);
+    } finally { confirmation.release(undefined); await command; }
+  });
+  it('a newer notification supersedes the accepted read without forwarding a late deletion', async () => {
+    const { host, confirmation, command } = await pendingDelete(), acceptedRead = host.holdNextRead(host.file);
+    try {
+      confirmation.release('Delete Connection'); await acceptedRead.started;
+      await host.replaceSavedConfiguration(shop); await host.settleRequestedSave([acceptedRead]);
+      acceptedRead.release(); await command; await host.settleRequestedSave();
+      expect(await host.savedConfiguration()).toBe(shop);
+      expect(host.writes).toEqual([]);
+    } finally { acceptedRead.release(); confirmation.release(undefined); await command; }
+  });
+  it('selection replacement during the accepted read cannot refresh or delete the new selection', async () => {
+    const { host, sidebar, confirmation, command } = await pendingDelete();
+    const selected = await host.addConfiguration('selected.json', library), acceptedRead = host.holdNextRead(host.file);
+    try {
+      confirmation.release('Delete Connection'); await acceptedRead.started;
+      sidebar.start(selected); await host.settleRequestedSave([acceptedRead]);
+      acceptedRead.release(); await command; await host.settleRequestedSave();
+      expect(await host.savedConfiguration()).toBe(shop);
+      expect(await readFile(selected, 'utf8')).toBe(library);
+      expect(host.writes).toEqual([]);
+      await connected('library');
+    } finally { acceptedRead.release(); confirmation.release(undefined); await command; }
+  });
+});
