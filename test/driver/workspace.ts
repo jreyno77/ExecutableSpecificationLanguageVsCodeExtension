@@ -1971,4 +1971,112 @@ async connectionGuidancePublications(query: number): Promise<number> {
 async connectionGuidanceSaves(query: number): Promise<number> {
     return await this.connectionRecording.guidanceSaves(query);
   }
+
+async scopedSourceComparison(configuration: ConnectionConfiguration, sourcePath: string, text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.scopedSourceComparison");
+  }
+
+async scopeFileDirectory(): Promise<void> {
+    throw new Error("Not implemented: workspace.scopeFileDirectory");
+  }
+
+async semanticSourcePath(uri: string, path: string): Promise<void> {
+    throw new Error("Not implemented: workspace.semanticSourcePath");
+  }
+
+async tryMutatingSemanticRequirements(uri: string, publication: number): Promise<void> {
+    throw new Error("Not implemented: workspace.tryMutatingSemanticRequirements");
+  }
+
+async compareCapturedAndLiveScopes(): Promise<void> {
+    throw new Error("Not implemented: workspace.compareCapturedAndLiveScopes");
+  }
+
+async previewSourcePath(uri: string, path: string): Promise<void> {
+    throw new Error("Not implemented: workspace.previewSourcePath");
+  }
+
+async keepScopeSource(path: string, text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.keepScopeSource");
+  }
+
+async keepScopeFolder(path: string): Promise<void> {
+    throw new Error("Not implemented: workspace.keepScopeFolder");
+  }
+
+async keepEscapingScopeLink(linkPath: string, outsidePath: string, text: string): Promise<void> {
+    throw new Error("Not implemented: workspace.keepEscapingScopeLink");
+  }
+
+async queryScopePath(path: string): Promise<void> {
+    throw new Error("Not implemented: workspace.queryScopePath");
+  }
+
+async saveScopedPreviewConfiguration(configuration: string): Promise<void> {
+    throw new Error("Not implemented: workspace.saveScopedPreviewConfiguration");
+  }
+
+async observeVisibleScopeWarning(): Promise<void> {
+    throw new Error("Not implemented: workspace.observeVisibleScopeWarning");
+  }
+
+async semanticRequirementAliases(uri: string, publication: number, phase: string): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.semanticRequirementAliases");
+  }
+
+async semanticDependencyProblemCode(uri: string, publication: number): Promise<string> {
+    throw new Error("Not implemented: workspace.semanticDependencyProblemCode");
+  }
+
+async semanticDependencyProblemPath(uri: string, publication: number): Promise<string> {
+    throw new Error("Not implemented: workspace.semanticDependencyProblemPath");
+  }
+
+async semanticDependencyProblemCount(uri: string, publication: number): Promise<number> {
+    throw new Error("Not implemented: workspace.semanticDependencyProblemCount");
+  }
+
+async capturedAndLiveRequirementsAgree(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.capturedAndLiveRequirementsAgree");
+  }
+
+async capturedScopeAliases(phase: string): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.capturedScopeAliases");
+  }
+
+async liveScopeAliases(phase: string): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.liveScopeAliases");
+  }
+
+async scopedComparisonFilesUnchanged(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.scopedComparisonFilesUnchanged");
+  }
+
+async previewBeforeScopeStatus(id: string): Promise<string> {
+    throw new Error("Not implemented: workspace.previewBeforeScopeStatus");
+  }
+
+async queriedScopePath(): Promise<string | undefined> {
+    throw new Error("Not implemented: workspace.queriedScopePath");
+  }
+
+async queriedScopePathAvailable(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.queriedScopePathAvailable");
+  }
+
+async queriedScopeFileExists(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.queriedScopeFileExists");
+  }
+
+async scopeQueryFilesUnchanged(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.scopeQueryFilesUnchanged");
+  }
+
+async nativeScopeWarningIncludes(text: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.nativeScopeWarningIncludes");
+  }
+
+async nativeScopeWarningMatches(code: string, path: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.nativeScopeWarningMatches");
+  }
 }

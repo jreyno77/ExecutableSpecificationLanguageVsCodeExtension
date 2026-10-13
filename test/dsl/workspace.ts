@@ -3019,4 +3019,208 @@ async expectGuidanceAvailability(query: number, expected: boolean): Promise<void
 readonly freshGuidanceOutputs: Array<ConnectionOutputGuidance> = [{ ["id"]: "typescript", ["configured"]: false, ["suggestedDirectory"]: "." }, { ["id"]: "uml", ["configured"]: false, ["suggestedDirectory"]: "diagrams" }, { ["id"]: "markdown", ["configured"]: false, ["suggestedDirectory"]: "docs" }];
 
 readonly retainedGuidanceOutputs: Array<ConnectionOutputGuidance> = [{ ["id"]: "typescript", ["configured"]: true }, { ["id"]: "java", ["configured"]: true }, { ["id"]: "uml", ["configured"]: false, ["suggestedDirectory"]: "diagrams" }, { ["id"]: "markdown", ["configured"]: false, ["suggestedDirectory"]: "docs" }];
+
+async scopedSourceComparison(configuration: ConnectionConfiguration, sourcePath: string, text: string): Promise<void> {
+    return await this.driver.scopedSourceComparison(configuration, sourcePath, text);
+  }
+
+async scopeFileDirectory(): Promise<void> {
+    return await this.driver.scopeFileDirectory();
+  }
+
+async semanticSourcePath(uri: string, path: string): Promise<void> {
+    return await this.driver.semanticSourcePath(uri, path);
+  }
+
+async tryMutatingSemanticRequirements(uri: string, publication: number): Promise<void> {
+    return await this.driver.tryMutatingSemanticRequirements(uri, publication);
+  }
+
+async compareCapturedAndLiveScopes(): Promise<void> {
+    return await this.driver.compareCapturedAndLiveScopes();
+  }
+
+async previewSourcePath(uri: string, path: string): Promise<void> {
+    return await this.driver.previewSourcePath(uri, path);
+  }
+
+async keepScopeSource(path: string, text: string): Promise<void> {
+    return await this.driver.keepScopeSource(path, text);
+  }
+
+async keepScopeFolder(path: string): Promise<void> {
+    return await this.driver.keepScopeFolder(path);
+  }
+
+async keepEscapingScopeLink(linkPath: string, outsidePath: string, text: string): Promise<void> {
+    return await this.driver.keepEscapingScopeLink(linkPath, outsidePath, text);
+  }
+
+async queryScopePath(path: string): Promise<void> {
+    return await this.driver.queryScopePath(path);
+  }
+
+async saveScopedPreviewConfiguration(configuration: string): Promise<void> {
+    return await this.driver.saveScopedPreviewConfiguration(configuration);
+  }
+
+async observeVisibleScopeWarning(): Promise<void> {
+    return await this.driver.observeVisibleScopeWarning();
+  }
+
+async semanticRequirementAliases(uri: string, publication: number, phase: string): Promise<Array<string>> {
+    return await this.driver.semanticRequirementAliases(uri, publication, phase);
+  }
+
+async semanticDependencyProblemCode(uri: string, publication: number): Promise<string> {
+    return await this.driver.semanticDependencyProblemCode(uri, publication);
+  }
+
+async semanticDependencyProblemPath(uri: string, publication: number): Promise<string> {
+    return await this.driver.semanticDependencyProblemPath(uri, publication);
+  }
+
+async semanticDependencyProblemCount(uri: string, publication: number): Promise<number> {
+    return await this.driver.semanticDependencyProblemCount(uri, publication);
+  }
+
+async capturedAndLiveRequirementsAgree(): Promise<boolean> {
+    return await this.driver.capturedAndLiveRequirementsAgree();
+  }
+
+async capturedScopeAliases(phase: string): Promise<Array<string>> {
+    return await this.driver.capturedScopeAliases(phase);
+  }
+
+async liveScopeAliases(phase: string): Promise<Array<string>> {
+    return await this.driver.liveScopeAliases(phase);
+  }
+
+async scopedComparisonFilesUnchanged(): Promise<boolean> {
+    return await this.driver.scopedComparisonFilesUnchanged();
+  }
+
+async previewBeforeScopeStatus(id: string): Promise<string> {
+    return await this.driver.previewBeforeScopeStatus(id);
+  }
+
+async queriedScopePath(): Promise<string | undefined> {
+    return await this.driver.queriedScopePath();
+  }
+
+async queriedScopePathAvailable(): Promise<boolean> {
+    return await this.driver.queriedScopePathAvailable();
+  }
+
+async queriedScopeFileExists(): Promise<boolean> {
+    return await this.driver.queriedScopeFileExists();
+  }
+
+async scopeQueryFilesUnchanged(): Promise<boolean> {
+    return await this.driver.scopeQueryFilesUnchanged();
+  }
+
+async nativeScopeWarningIncludes(text: string): Promise<boolean> {
+    return await this.driver.nativeScopeWarningIncludes(text);
+  }
+
+async nativeScopeWarningMatches(code: string, path: string): Promise<boolean> {
+    return await this.driver.nativeScopeWarningMatches(code, path);
+  }
+
+async expectScopedRequirements(uri: string, publication: number, phase: string, aliases: Array<string>): Promise<void> {
+    const actual = await this.driver.semanticRequirementAliases(uri, publication, phase);
+    expectData(actual, aliases);
+  }
+
+async expectScopeProblem(uri: string, publication: number, code: string, path: string): Promise<void> {
+    const actualCode = await this.driver.semanticDependencyProblemCode(uri, publication);
+    const actualPath = await this.driver.semanticDependencyProblemPath(uri, publication);
+    const count = await this.driver.semanticDependencyProblemCount(uri, publication);
+    expectData(actualCode, code);
+    expectData(actualPath, path);
+    expectData(count, 1);
+  }
+
+async expectNoScopeProblems(uri: string, publication: number): Promise<void> {
+    const count = await this.driver.semanticDependencyProblemCount(uri, publication);
+    expectData(count, 0);
+  }
+
+async expectCapturedAndLiveScopes(): Promise<void> {
+    const same = await this.driver.capturedAndLiveRequirementsAgree();
+    const capturedBuild = await this.driver.capturedScopeAliases("build");
+    const liveBuild = await this.driver.liveScopeAliases("build");
+    const capturedRuntime = await this.driver.capturedScopeAliases("runtime");
+    const liveRuntime = await this.driver.liveScopeAliases("runtime");
+    const capturedTest = await this.driver.capturedScopeAliases("test");
+    const liveTest = await this.driver.liveScopeAliases("test");
+    const unchanged = await this.driver.scopedComparisonFilesUnchanged();
+    expectData(same, true);
+    expectData(capturedBuild, ["typescript"]);
+    expectData(liveBuild, ["typescript"]);
+    expectData(capturedRuntime, ["react"]);
+    expectData(liveRuntime, ["react"]);
+    expectData(capturedTest, ["vitest", "playwright"]);
+    expectData(liveTest, ["vitest", "playwright"]);
+    expectData(unchanged, true);
+  }
+
+async expectPriorScopePreviewReady(id: string): Promise<void> {
+    const status = await this.driver.previewBeforeScopeStatus(id);
+    expectData(status, "ready");
+  }
+
+async expectNativeScopePath(path: string): Promise<void> {
+    const actual = await this.driver.queriedScopePath();
+    const unchanged = await this.driver.scopeQueryFilesUnchanged();
+    expectData(actual, path);
+    expectData(unchanged, true);
+  }
+
+async expectNamedSourceNotCreated(): Promise<void> {
+    const exists = await this.driver.queriedScopeFileExists();
+    expectData(exists, false);
+  }
+
+async expectNoNativeScopePath(): Promise<void> {
+    const available = await this.driver.queriedScopePathAvailable();
+    const unchanged = await this.driver.scopeQueryFilesUnchanged();
+    expectData(available, false);
+    expectData(unchanged, true);
+  }
+
+async expectVisibleScopeWarning(code: string, path: string): Promise<void> {
+    const actualCode = await this.driver.nativeScopeWarningIncludes(code);
+    const actualPath = await this.driver.nativeScopeWarningIncludes(path);
+    const sameOwnedMessage = await this.driver.nativeScopeWarningMatches(code, path);
+    expectData(actualCode, true);
+    expectData(actualPath, true);
+    expectData(sameOwnedMessage, true);
+  }
+
+async expectNativeScopePreviewRecovered(): Promise<void> {
+    const previous = await this.driver.nativePreviewBeforeConfigurationStatus();
+    const unchangedVersion = await this.driver.nativePreviewEntryVersionUnchanged();
+    const hasDiagnostics = await this.driver.nativePreviewHasDiagnostics();
+    expectData(previous, "blocked");
+    expectData(unchangedVersion, true);
+    expectData(hasDiagnostics, false);
+  }
+
+readonly scopedView: SourceDocument = { ["uri"]: "file:///workspace/src/ui/view.expec", ["text"]: "component ReactView { requires package \"react\" for runtime }" };
+
+readonly scopedTools: ConnectionConfiguration = { ["file"]: "C:/workspace/expec.json", ["text"]: "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/ui/view.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/ui\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"src/ui/view.expec\",\"test\":[\"playwright\"]}]}}", ["writable"]: true };
+
+readonly movedFolderTools: ConnectionConfiguration = { ["file"]: "C:/workspace/expec.json", ["text"]: "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/ui/view.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/core\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"src/ui/view.expec\",\"test\":[\"playwright\"]}]}}", ["writable"]: true };
+
+readonly unknownScopedAlias: ConnectionConfiguration = { ["file"]: "C:/workspace/expec.json", ["text"]: "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/ui/view.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/ui\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"unreached/view.expec\",\"test\":[\"storage\"]}]}}", ["writable"]: true };
+
+readonly wrongScopedPhase: ConnectionConfiguration = { ["file"]: "C:/workspace/expec.json", ["text"]: "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/ui/view.expec\"]},\"outputs\":[],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/ui\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"unreached/view.expec\",\"test\":[\"react\"]}]}}", ["writable"]: true };
+
+readonly scopedMarkdown: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/ui\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"src/library.expec\",\"test\":[\"playwright\"]}]}}";
+
+readonly scopedSavedPreview: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/ui\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"src/library.expec\",\"test\":[\"playwright\"]}]}}";
+
+readonly invalidScopedSavedPreview: string = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"typescript\",\"name\":\"npm:typescript\",\"version\":\"5.9.3\",\"phases\":[\"build\"]},{\"alias\":\"vitest\",\"name\":\"npm:vitest\",\"version\":\"5.0.2\",\"phases\":[\"test\"]},{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]},{\"alias\":\"playwright\",\"name\":\"npm:playwright\",\"version\":\"1.63.0\",\"phases\":[\"test\"]}],\"requirements\":{\"project\":{\"build\":[\"typescript\"],\"test\":[\"vitest\"]},\"folders\":[{\"path\":\"src/ui\",\"runtime\":[\"react\"]}],\"files\":[{\"path\":\"src/library.expec\",\"test\":[\"react\"]}]}}";
 }

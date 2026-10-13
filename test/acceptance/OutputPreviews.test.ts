@@ -251,3 +251,18 @@ test("unsupported binary presentation remains visibly refused", async ({ workspa
   await workspace.expectPreviewExplanation("binary", "unsupported-presentation");
   await workspace.expectNoPreviewDocuments("binary");
 });
+
+/* @expec-test "a5c065ee-4c87-4929-a702-01c42f188148" */
+test("a refused current source scope withdraws preview documents without inventing a compiler error", async ({ workspace }) => {
+  await workspace.previewAuthoring(workspace.scopedMarkdown);
+  await workspace.previewSourcePath("file:///workspace/src/library.expec", "src/library.expec");
+  await workspace.openPreviewSource({ ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book { title: Text }" }, 1);
+  await workspace.settleCurrentPreviews();
+  await workspace.previewSourcePath("file:///workspace/src/library.expec", "src/../library.expec");
+  await workspace.settleCurrentPreviews();
+  await workspace.expectPriorScopePreviewReady("markdown");
+  await workspace.expectPreviewStatus("markdown", "blocked");
+  await workspace.expectPreviewExplanation("markdown", "invalid-dependency-input");
+  await workspace.expectCurrentPreviewSource("file:///workspace/src/library.expec", 1);
+  await workspace.expectTargetsPreserved();
+});

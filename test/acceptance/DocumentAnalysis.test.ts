@@ -259,3 +259,109 @@ test("switched invalid and absent saved configurations cannot reuse the previous
   await workspace.expectSemanticProblem((workspace.packageView)["uri"], "unavailable-package", 1, 40, 47);
   await workspace.expectSemanticPublications((workspace.packageView)["uri"], 6, 5);
 });
+
+/* @expec-test "edf0b704-6dbf-4d59-a132-3470104dbd4e" */
+test("a current UI source inherits shared tools folder runtime and its exact file test driver", async ({ workspace }) => {
+  await workspace.semanticAnalysis();
+  await workspace.semanticSourcePath((workspace.scopedView)["uri"], "src/ui/view.expec");
+  await workspace.changeSemanticConfiguration(workspace.scopedTools);
+  await workspace.openSemanticSource(workspace.scopedView, 4);
+  await workspace.expectScopedRequirements((workspace.scopedView)["uri"], 1, "build", ["typescript"]);
+  await workspace.expectScopedRequirements((workspace.scopedView)["uri"], 1, "runtime", ["react"]);
+  await workspace.expectScopedRequirements((workspace.scopedView)["uri"], 1, "test", ["vitest", "playwright"]);
+  await workspace.expectNoScopeProblems((workspace.scopedView)["uri"], 1);
+  await workspace.expectCheckedSource((workspace.scopedView)["uri"]);
+});
+
+/* @expec-test "26b33f5b-f143-4584-ae1b-af9faf7c4956" */
+test("a sibling folder does not inherit a prefix-matching UI scope or another file's driver", async ({ workspace }) => {
+  await workspace.semanticAnalysis();
+  await workspace.semanticSourcePath("file:///workspace/src/ui-other/view.expec", "src/ui-other/view.expec");
+  await workspace.changeSemanticConfiguration(workspace.scopedTools);
+  await workspace.openSemanticSource({ ["uri"]: "file:///workspace/src/ui-other/view.expec", ["text"]: "type Book { title: Text }" }, 1);
+  await workspace.expectScopedRequirements("file:///workspace/src/ui-other/view.expec", 1, "build", ["typescript"]);
+  await workspace.expectScopedRequirements("file:///workspace/src/ui-other/view.expec", 1, "runtime", []);
+  await workspace.expectScopedRequirements("file:///workspace/src/ui-other/view.expec", 1, "test", ["vitest"]);
+  await workspace.expectCheckedSource("file:///workspace/src/ui-other/view.expec");
+});
+
+/* @expec-test "38f542a9-64bb-42a3-a0be-3eb32a22e076" */
+test("foreign and untitled snapshots use shared tools without invented folder ownership", async ({ workspace }) => {
+  await workspace.semanticAnalysis();
+  await workspace.changeSemanticConfiguration(workspace.scopedTools);
+  await workspace.openSemanticSource({ ["uri"]: "file:///elsewhere/src/ui/view.expec", ["text"]: "type Book {}" }, 1);
+  await workspace.openSemanticSource({ ["uri"]: "untitled:Draft", ["text"]: "type Draft {}" }, 1);
+  await workspace.expectScopedRequirements("file:///elsewhere/src/ui/view.expec", 1, "build", ["typescript"]);
+  await workspace.expectScopedRequirements("file:///elsewhere/src/ui/view.expec", 1, "runtime", []);
+  await workspace.expectScopedRequirements("untitled:Draft", 1, "build", ["typescript"]);
+  await workspace.expectScopedRequirements("untitled:Draft", 1, "runtime", []);
+  await workspace.expectCheckedSource("file:///elsewhere/src/ui/view.expec");
+  await workspace.expectCheckedSource("untitled:Draft");
+});
+
+/* @expec-test "e1e2c69e-5a5b-447a-8fec-4752a14e7497" */
+test("saved scope replacement rechecks unchanged unsaved text and preserves earlier rows", async ({ workspace }) => {
+  await workspace.semanticAnalysis();
+  await workspace.semanticSourcePath((workspace.scopedView)["uri"], "src/ui/view.expec");
+  await workspace.changeSemanticConfiguration(workspace.scopedTools);
+  await workspace.openSemanticSource(workspace.scopedView, 7);
+  await workspace.changeSemanticConfiguration(workspace.movedFolderTools);
+  await workspace.tryMutatingSemanticRequirements((workspace.scopedView)["uri"], 1);
+  await workspace.expectScopedRequirements((workspace.scopedView)["uri"], 1, "runtime", ["react"]);
+  await workspace.expectScopedRequirements((workspace.scopedView)["uri"], 2, "runtime", []);
+  await workspace.expectScopedRequirements((workspace.scopedView)["uri"], 2, "test", ["vitest", "playwright"]);
+  await workspace.expectSemanticPublications((workspace.scopedView)["uri"], 2, 7);
+  await workspace.expectCheckedSource((workspace.scopedView)["uri"]);
+});
+
+/* @expec-test "8420bbd0-0a00-44d8-af9d-6b2088356996" */
+test("an invalid declared alias withdraws old scope rows and catalog with its actual manifest origin", async ({ workspace }) => {
+  await workspace.semanticAnalysis();
+  await workspace.semanticSourcePath((workspace.scopedView)["uri"], "src/ui/view.expec");
+  await workspace.changeSemanticConfiguration(workspace.scopedTools);
+  await workspace.openSemanticSource(workspace.scopedView, 5);
+  await workspace.changeSemanticConfiguration(workspace.unknownScopedAlias);
+  await workspace.expectScopedRequirements((workspace.scopedView)["uri"], 1, "runtime", ["react"]);
+  await workspace.expectScopedRequirements((workspace.scopedView)["uri"], 2, "runtime", []);
+  await workspace.expectScopeProblem((workspace.scopedView)["uri"], 2, "unknown-package-alias", "[\"manifest\",\"C:/workspace/expec.json\",\"requirements\",\"files\",0,\"test\",0]");
+  await workspace.expectSemanticProblem((workspace.scopedView)["uri"], "unavailable-package", 1, 40, 47);
+  await workspace.expectSemanticPublications((workspace.scopedView)["uri"], 2, 5);
+});
+
+/* @expec-test "04df2fc2-b270-462f-915e-44f3d06ff95e" */
+test("a wrong phase in an unreached file scope is still an honest located configuration failure", async ({ workspace }) => {
+  await workspace.semanticAnalysis();
+  await workspace.changeSemanticConfiguration(workspace.wrongScopedPhase);
+  await workspace.openSemanticSource({ ["uri"]: "untitled:Draft", ["text"]: "type Draft {}" }, 2);
+  await workspace.expectScopeProblem("untitled:Draft", 1, "unavailable-package", "[\"manifest\",\"C:/workspace/expec.json\",\"requirements\",\"files\",0,\"test\",0]");
+  await workspace.expectScopedRequirements("untitled:Draft", 1, "build", []);
+});
+
+/* @expec-test "c5551839-a664-423d-b205-8d7296d15af3" */
+test("a malformed supplied ownership path refuses scope facts without changing actual compilation", async ({ workspace }) => {
+  await workspace.semanticAnalysis();
+  await workspace.semanticSourcePath((workspace.scopedView)["uri"], "src/ui/../view.expec");
+  await workspace.changeSemanticConfiguration(workspace.scopedTools);
+  await workspace.openSemanticSource(workspace.scopedView, 3);
+  await workspace.expectScopeProblem((workspace.scopedView)["uri"], 1, "invalid-dependency-input", "[\"sources\",0,\"localPath\"]");
+  await workspace.expectScopedRequirements((workspace.scopedView)["uri"], 1, "runtime", []);
+  await workspace.expectCheckedSource((workspace.scopedView)["uri"]);
+});
+
+/* @expec-test "0bb37f50-bf3e-45d8-9ad4-df800b635b92" */
+test("a named unsaved source uses supplied verified ancestry without needing saved source contents", async ({ workspace }) => {
+  await workspace.semanticAnalysis();
+  await workspace.semanticSourcePath("file:///workspace/src/ui/new.expec", "src/ui/new.expec");
+  await workspace.changeSemanticConfiguration(workspace.scopedTools);
+  await workspace.openSemanticSource({ ["uri"]: "file:///workspace/src/ui/new.expec", ["text"]: "component NewView { requires package \"react\" for runtime }" }, 1);
+  await workspace.expectScopedRequirements("file:///workspace/src/ui/new.expec", 1, "runtime", ["react"]);
+  await workspace.expectScopedRequirements("file:///workspace/src/ui/new.expec", 1, "test", ["vitest"]);
+  await workspace.expectCheckedSource("file:///workspace/src/ui/new.expec");
+});
+
+/* @expec-test "d66d25f7-484e-4aaa-8c3c-1d8b55a34fe6" */
+test("live checking and the real source loader prepare the same owned scope obligations", async ({ workspace }) => {
+  await workspace.scopedSourceComparison(workspace.scopedTools, "src/ui/view.expec", "component ReactView { requires package \"react\" for runtime }");
+  await workspace.compareCapturedAndLiveScopes();
+  await workspace.expectCapturedAndLiveScopes();
+});
