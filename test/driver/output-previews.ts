@@ -26,6 +26,11 @@ export class OutputPreviewsRecording {
   private root = '';
   private initialTree = '';
   private readonly publications: PreviewPublication[] = [];
+  private readonly sourcePaths = new Map<string, string>();
+  sourcePath(uri: string, path: string): void {
+    for (const tab of this.current.tabs) this.remember(tab.id);
+    this.sourcePaths.set(uri, path); this.analysis.sourceChanged(uri);
+  }
   private readonly saved = new Map<string, SourceDocument>();
   private readonly work = new Map<string, Work>();
   private readonly armed = new Map<string, Gate>();
@@ -60,7 +65,7 @@ export class OutputPreviewsRecording {
       this.publications.push(structuredClone(publication)); for (const notify of [...this.changed]) notify();
     } }, registrations.map(registration => this.decorate(registration)));
     this.analysis = new DocumentAnalysis({ publish: (source, version, report) => this.previews!.published(source, version, report),
-      clear: uri => this.previews!.closed(uri) }, { localPath: () => undefined, read: uri => this.saved.get(uri) });
+      clear: uri => this.previews!.closed(uri) }, { localPath: uri => this.sourcePaths.get(uri), read: uri => this.saved.get(uri) });
     this.configure(configuration);
   }
   private binary(kind: 'text' | 'binary'): OutputRegistration {

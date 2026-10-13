@@ -2,6 +2,7 @@ import { ConfigurationReader, acceptanceOutput, contractListOutput, javaAcceptan
     kotlinAcceptanceOutput, kotlinOutput, markdownOutput, pythonAcceptanceOutput, pythonOutput, structureListOutput,
     typescriptOutput, umlOutput, type DependencyPackage } from 'executable-specification-language';
 import { Compiler, LangiumModel, QueryInspection, SourceComposer, type ModuleModel, type ReadResult } from 'executable-specification-language';
+import { requirementsFor, type Configuration, type Diagnostic } from 'executable-specification-language';
 import type { DocumentReport } from './DocumentReport.js';
 
 type OpenDocument = { source: SourceDocument; version: number; revision: number; dependencies: Set<string>; pending?: Set<string> };
@@ -28,7 +29,10 @@ export class DocumentAnalysis {
         acceptanceOutput, javaOutput, javaAcceptanceOutput, kotlinOutput, kotlinAcceptanceOutput, pythonOutput, pythonAcceptanceOutput,
     ]);
     private packages: readonly DependencyPackage[] = [];
-    private packageKey = '[]';
+    private packageKey = '';
+    private configuration: Configuration | undefined;
+    private configurationProblems: Diagnostic[] = [];
+    private readonly ownership = new Map<string, string | undefined>();
     private configurationRevision = 0;
     private readonly reader = new LangiumReader();
     private readonly compiler = new Compiler();
@@ -100,6 +104,7 @@ export class DocumentAnalysis {
             for (const uri of document.dependencies) retained.add(uri);
             for (const uri of document.pending ?? []) retained.add(uri);
         }
+        for (const uri of this.ownership.keys()) if (!retained.has(uri)) this.ownership.delete(uri);
         for (const uri of this.saved.keys()) if (!retained.has(uri)) this.saved.delete(uri);
         for (const uri of this.parsed.keys()) if (!retained.has(uri)) this.parsed.delete(uri);
     }
@@ -147,6 +152,27 @@ export class DocumentAnalysis {
         this.saved.set(uri, captured);
         return captured;
     }
+    private localPath(uri: string, dependencies: Set<string>, current: () => void): string | undefined {
+        const configuration = this.configuration!;
+        if (!configuration.requirements?.folders?.length && !configuration.requirements?.files?.length) return undefined;
+        dependencies.add(uri);
+        if (!this.ownership.has(uri)) {
+            const path = this.sources.localPath(uri, configuration.sourceId);
+            current();
+            this.ownership.set(uri, path);
+        }
+        return this.ownership.get(uri);
+    }
+    private captureFacts<T>(value: T): T {
+        const captured = structuredClone(value);
+        const freeze = (data: unknown): void => {
+            if (data === null || typeof data !== 'object') return;
+            for (const child of Object.values(data)) freeze(child);
+            Object.freeze(data);
+        };
+        freeze(captured);
+        return captured;
+    }
     private check(document: OpenDocument, revision: number): void {
         const dependencies = new Set<string>();
         document.pending = dependencies;
@@ -174,7 +200,15 @@ export class DocumentAnalysis {
             const compilation = resolution ? this.compiler.compile({ resolution }) : undefined;
             const inspection = resolution ? new QueryInspection(resolution.model) : undefined;
             current();
+            const requirements = this.configuration ? requirementsFor(this.configuration,
+                [...captures.keys()].map(sourceId => {
+                    const localPath = this.localPath(sourceId, dependencies, current);
+                    return { sourceId, ...(localPath === undefined ? {} : { localPath }) };
+                })) : undefined;
+            current();
             const report: DocumentReport = {
+                requirements: this.captureFacts([...(requirements?.value ?? [])]),
+                dependencyProblems: this.captureFacts([...(requirements?.problems ?? this.configurationProblems)]),
                 syntax: [...captures.values()].flatMap(parsed => parsed.result.status === 'rejected' ? [...parsed.result.diagnostics] : []),
                 ...(compilation === undefined ? {} : { compilation }),
                 ...(inspection === undefined ? {} : { inspection }),
@@ -198,7 +232,8 @@ export class DocumentAnalysis {
      * When folder/file scopes are in use, a relevant file-route notification also invalidates the cached local-path fact, including for authoritative open unsaved text. Recheck the same retained snapshot if its effective scope ownership changed; do not replace that text with saved bytes. Include actually queried ownership URIs in dependencies so the existing native watch boundary can invalidate them. Unrelated notifications cannot trigger a scan or reset another document's facts.
      */
 sourceChanged(uri: string): void {
-        if (this.documents.has(uri)) return;
+        if (this.documents.has(uri) && !this.ownership.has(uri)) return;
+        this.ownership.delete(uri);
         const affected = this.affected(uri);
         if (!affected.length) return;
         this.saved.delete(uri);
@@ -222,10 +257,14 @@ configurationChanged(configuration: ConnectionConfiguration | undefined): void {
         const packages = (checked?.value?.packages ?? []).map(({ alias, phases }) => Object.freeze({
             alias, phases: Object.freeze([...phases].sort()),
         })).sort((first, second) => first.alias.localeCompare(second.alias));
-        const key = JSON.stringify(packages);
+        const key = JSON.stringify({ packages, file: snapshot?.file, requirements: checked?.value?.requirements,
+            problems: checked?.problems ?? [] });
         if (key === this.packageKey) return;
         this.packageKey = key;
         this.packages = Object.freeze(packages);
+        this.configuration = checked?.value === undefined ? undefined : this.captureFacts(checked.value);
+        this.configurationProblems = this.captureFacts([...(checked?.problems ?? [])]);
+        this.ownership.clear();
         this.run([...this.documents.values()].map(document => ({ document, revision: ++document.revision })));
     }
 }

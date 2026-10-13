@@ -1981,11 +1981,14 @@ async scopeFileDirectory(): Promise<void> {
   }
 
 async semanticSourcePath(uri: string, path: string): Promise<void> {
-    throw new Error("Not implemented: workspace.semanticSourcePath");
+    this.analysisRecording.sourcePath(uri, path);
   }
 
 async tryMutatingSemanticRequirements(uri: string, publication: number): Promise<void> {
-    throw new Error("Not implemented: workspace.tryMutatingSemanticRequirements");
+    const rows = this.analysisRecording.atPublication(uri, publication).report.requirements;
+    if (!rows?.length) throw new Error('No actual requirements were published.');
+    try { rows.splice(0); } catch (error) { if (!(error instanceof TypeError)) throw error; }
+    try { (rows[0]!.at as unknown as { path: unknown[] }).path.splice(0); } catch (error) { if (!(error instanceof TypeError)) throw error; }
   }
 
 async compareCapturedAndLiveScopes(): Promise<void> {
@@ -1993,7 +1996,7 @@ async compareCapturedAndLiveScopes(): Promise<void> {
   }
 
 async previewSourcePath(uri: string, path: string): Promise<void> {
-    throw new Error("Not implemented: workspace.previewSourcePath");
+    this.previewRecording.sourcePath(uri, path);
   }
 
 async keepScopeSource(path: string, text: string): Promise<void> {
@@ -2021,19 +2024,25 @@ async observeVisibleScopeWarning(): Promise<void> {
   }
 
 async semanticRequirementAliases(uri: string, publication: number, phase: string): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.semanticRequirementAliases");
+    const rows = this.analysisRecording.atPublication(uri, publication).report.requirements;
+    if (!rows) throw new Error('No requirement list was published.');
+    return rows.filter(row => row.sourceId === uri && row.phase === phase).map(row => row.alias);
   }
 
 async semanticDependencyProblemCode(uri: string, publication: number): Promise<string> {
-    throw new Error("Not implemented: workspace.semanticDependencyProblemCode");
+    const problem = this.analysisRecording.atPublication(uri, publication).report.dependencyProblems?.[0];
+    if (!problem) throw new Error('No actual dependency problem was published.'); return problem.code;
   }
 
 async semanticDependencyProblemPath(uri: string, publication: number): Promise<string> {
-    throw new Error("Not implemented: workspace.semanticDependencyProblemPath");
+    const problem = this.analysisRecording.atPublication(uri, publication).report.dependencyProblems?.[0];
+    if (!problem || problem.at.kind !== 'dependency') throw new Error('No actual dependency path was published.');
+    return JSON.stringify(problem.at.path);
   }
 
 async semanticDependencyProblemCount(uri: string, publication: number): Promise<number> {
-    throw new Error("Not implemented: workspace.semanticDependencyProblemCount");
+    const problems = this.analysisRecording.atPublication(uri, publication).report.dependencyProblems;
+    if (!problems) throw new Error('No dependency problem list was published.'); return problems.length;
   }
 
 async capturedAndLiveRequirementsAgree(): Promise<boolean> {
@@ -2053,7 +2062,7 @@ async scopedComparisonFilesUnchanged(): Promise<boolean> {
   }
 
 async previewBeforeScopeStatus(id: string): Promise<string> {
-    throw new Error("Not implemented: workspace.previewBeforeScopeStatus");
+    return this.previewRecording.earlier(id).status;
   }
 
 async queriedScopePath(): Promise<string | undefined> {

@@ -129,10 +129,13 @@ export class OutputPreviews {
         else if (!report) view.publication.message = 'Waiting for analysis of the selected authored document.';
         else {
             const compilation = report.report.compilation;
-            const blocked = report.report.syntax.length || !compilation?.value || compilation.problems.length || compilation.deferred.length || compilation.syntax.length;
+            const blocked = report.report.dependencyProblems?.length || report.report.syntax.length || !compilation?.value || compilation.problems.length || compilation.deferred.length || compilation.syntax.length;
             const message = [...new Set([
                 ...report.report.syntax, ...(compilation?.syntax ?? []),
-            ].map(item => item.category + ': ' + item.explanation).concat(compilation ? this.findings(compilation) : []).filter(Boolean))].join('; ')
+            ].map(item => item.category + ': ' + item.explanation).concat(
+                (report.report.dependencyProblems ?? []).map(problem => problem.code + ': ' + problem.message
+                    + (problem.at.kind === 'dependency' ? ' ' + JSON.stringify(problem.at.path) : '')),
+                compilation ? this.findings(compilation) : []).filter(Boolean))].join('; ')
                 || 'Compilation is unavailable.';
             view.publication.tabs = view.configuration.outputs.map(output => ({
                 id: output.id, label: this.label(output.id), status: blocked ? 'blocked' : 'pending', documents: [],
