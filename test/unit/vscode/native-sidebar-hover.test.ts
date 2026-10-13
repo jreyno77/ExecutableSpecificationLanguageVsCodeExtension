@@ -5,29 +5,39 @@ import { ownTemporaryDirectory, removeOwnedDirectory } from '../../driver/vscode
 import type { VsCodeSession } from '../../driver/vscode/vscode-session.js';
 
 /** Recorded UI operations isolate pointer/tooltip mechanics; installed behavior has native examples. */
-async function sidebarHover(tooltip: (selectedFile: string) => readonly string[]) {
+async function sidebarHover(tooltip: (selectedFile: string) => readonly string[], mode: 'immediate' | 'delayed' | 'rebound' | 'covered' | 'transport-failed' | 'absent' = 'immediate', delay = 500) {
   const workspace = await ownTemporaryDirectory('expec-sidebar-hover-');
   const pointer: Array<{ kind: 'move' | 'hover'; x?: number; y?: number }> = [];
-  let file = '';
+  let file = '', entries = 0, hoverReady = mode === 'immediate', timer: ReturnType<typeof setTimeout> | undefined;
   const box = { x: 48, y: 70, width: 300, height: 22 };
   const row = {
     async boundingBox() { return { ...box }; },
-    async hover() { pointer.push({ kind: 'hover' }); },
+    async hover(options?: { timeout?: number }) {
+      pointer.push({ kind: 'hover' }); entries++;
+      if (mode === 'covered' || mode === 'transport-failed') {
+        if (entries > 1) return new Promise<void>((_resolve, reject) => setTimeout(() => reject(mode === 'covered' ? Object.assign(new Error('The covered row did not receive a hover.'), { name: 'TimeoutError' }) : new Error('Workbench mouse transport closed.')), options?.timeout ?? 30_000));
+        return;
+      }
+      if (mode !== 'immediate') {
+        timer = setTimeout(() => { hoverReady = true; }, delay);
+        if (mode === 'rebound' && entries === 1) setTimeout(() => { clearTimeout(timer); hoverReady = false; }, 100);
+      }
+    },
   };
   const view = {
     async isVisible() { return true; },
-    async innerText() { return basename(file) + ' — connected'; },
+    async innerText() { return mode === 'absent' ? 'Another view' : basename(file) + ' — connected'; },
     getByRole(role: string) {
       if (role !== 'treeitem') throw new Error('Unexpected recorded view role.');
       return { filter: () => ({ first: () => row }) };
     },
   };
   const page = {
-    mouse: { async move(x: number, y: number) { pointer.push({ kind: 'move', x, y }); } },
+    mouse: { async move(x: number, y: number) { pointer.push({ kind: 'move', x, y }); if (mode !== 'immediate') { clearTimeout(timer); hoverReady = false; } } },
     locator(selector: string) {
       if (selector === '.monaco-workbench') return { count: async () => 1 };
       if (selector === '[id="workbench.view.extension.expec"]') return view;
-      if (selector === '.monaco-hover:visible') return { allTextContents: async () => [...tooltip(file)] };
+      if (selector === '.monaco-hover:visible') return { allTextContents: async () => hoverReady ? [...tooltip(file)] : [] };
       throw new Error('Unexpected recorded workbench selector: ' + selector);
     },
   };
@@ -74,6 +84,69 @@ describe('selected manifest hover mechanics', () => {
       const observed = actual.sidebar.selectedConfigurationVisible();
       await vi.runAllTimersAsync();
       expect(await observed).toBe(false);
+    } finally { vi.useRealTimers(); }
+  });
+});
+
+describe('native hover registration after row publications', () => {
+  it('re-enters after a publication invalidates the first hover and observes the actual delayed full-path tooltip', async () => {
+    const actual = await sidebarHover(file => [file + '\nConnected.'], 'rebound');
+    vi.useFakeTimers();
+    try {
+      const began = Date.now(), observed = actual.sidebar.selectedConfigurationVisible();
+      await vi.runAllTimersAsync();
+      expect(await observed).toBe(true);
+      expect(Date.now() - began).toBeLessThanOrEqual(3_000);
+      expect(actual.pointer.filter(action => action.kind === 'hover').length).toBeGreaterThan(1);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('gives the normal 500 ms tooltip time to appear without resetting its timer', async () => {
+    const actual = await sidebarHover(file => [file + '\nConnected.'], 'delayed');
+    vi.useFakeTimers();
+    try {
+      const observed = actual.sidebar.selectedConfigurationVisible();
+      await vi.runAllTimersAsync();
+      expect(await observed).toBe(true);
+      expect(actual.pointer.map(action => action.kind)).toEqual(['move', 'hover']);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('keeps a covered row false within the original deadline when re-entry cannot reach it', async () => {
+    const actual = await sidebarHover(file => [file + '\nConnected.'], 'covered');
+    vi.useFakeTimers();
+    try {
+      const began = Date.now(), observed = actual.sidebar.selectedConfigurationVisible();
+      await vi.runAllTimersAsync();
+      expect(await observed).toBe(false);
+      expect(Date.now() - began).toBeLessThanOrEqual(3_000);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('does not hover another view when the selected manifest label is absent', async () => {
+    const actual = await sidebarHover(file => [file + '\nConnected.'], 'absent');
+    expect(await actual.sidebar.selectedConfigurationVisible()).toBe(false);
+    expect(actual.pointer).toEqual([]);
+  });
+  it('retains a normal 1500 ms tooltip inside the original three-second deadline', async () => {
+    const actual = await sidebarHover(file => [file + '\nConnected.'], 'delayed', 1500);
+    vi.useFakeTimers();
+    try {
+      const began = Date.now(), observed = actual.sidebar.selectedConfigurationVisible();
+      await vi.runAllTimersAsync();
+      expect(await observed).toBe(true);
+      expect(Date.now() - began).toBeLessThanOrEqual(3_000);
+    } finally { vi.useRealTimers(); }
+  });
+  it('preserves a real non-timeout transport failure after the deadline instead of reporting a missing tooltip', async () => {
+    const actual = await sidebarHover(file => [file + '\nConnected.'], 'transport-failed');
+    vi.useFakeTimers();
+    try {
+      const outcome = actual.sidebar.selectedConfigurationVisible().then(value => ({ value, error: undefined }), error => ({ value: undefined, error }));
+      await vi.runAllTimersAsync();
+      const observed = await outcome;
+      expect(observed.error).toBeInstanceOf(Error);
+      expect(observed.error?.message).toBe('Workbench mouse transport closed.');
     } finally { vi.useRealTimers(); }
   });
 });

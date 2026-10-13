@@ -208,12 +208,27 @@ export class ConnectionSidebarCase {
     const exitedPointer = { x: bounds.x + bounds.width + 1, y: bounds.y + bounds.height + 1 };
     await page.mouse.move(exitedPointer.x, exitedPointer.y);
     await row.hover();
-    const deadline = Date.now() + 3_000;
-    let visible = initialText, hover: string[] = [], polls = 0;
+    const deadline = Date.now() + 3_000, reenterAt = deadline - 2_000;
+    let visible = initialText, hover: string[] = [], polls = 0, reentered = false;
     while (Date.now() < deadline) {
       visible = await view.innerText();
       hover = await page.locator('.monaco-hover:visible').allTextContents(); polls++;
       if ([visible, ...hover].some(text => text.includes(file))) return true;
+      // A provider publication can replace the managed hover on the same DOM row.
+      // One re-entry lets both the pinned 500 ms and 1500 ms hovers finish within this deadline.
+      if (!reentered && Date.now() >= reenterAt) {
+        reentered = true;
+        try {
+          const currentBounds = await row.boundingBox({ timeout: Math.max(1, deadline - Date.now()) });
+          if (currentBounds && Date.now() < deadline) {
+            await page.mouse.move(currentBounds.x + currentBounds.width + 1, currentBounds.y + currentBounds.height + 1);
+            if (Date.now() < deadline) await row.hover({ timeout: Math.max(1, deadline - Date.now()) });
+          }
+        } catch (error) {
+          if (Date.now() >= deadline && error instanceof Error && error.name === 'TimeoutError') break;
+          throw error;
+        }
+      }
       await new Promise(resolve => setTimeout(resolve, 20));
     }
     return failed('hover-deadline', { initialText: initialText.slice(0, 1500), visible: visible.slice(0, 1500),
