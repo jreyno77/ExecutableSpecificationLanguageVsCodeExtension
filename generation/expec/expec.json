@@ -27,7 +27,9 @@
       "src/core/source-completion.expec",
       "src/vscode/source-completion.expec",
       "src/core/source-references.expec",
-      "src/vscode/source-references.expec"
+      "src/vscode/source-references.expec",
+      "src/core/source-rename.expec",
+      "src/vscode/source-rename.expec"
     ]
   },
   "outputs": [
@@ -163,6 +165,20 @@
             ],
             "from": "executable-specification-language",
             "name": "Diagnostic"
+          },
+          {
+            "declaration": [
+              "NativeRenameTarget"
+            ],
+            "from": "vscode-languageserver",
+            "name": "PrepareRenameResult"
+          },
+          {
+            "declaration": [
+              "NativeRenameEdit"
+            ],
+            "from": "vscode-languageserver",
+            "name": "WorkspaceEdit"
           }
         ]
       }
