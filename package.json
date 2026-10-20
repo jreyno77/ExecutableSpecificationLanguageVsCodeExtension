@@ -35,7 +35,7 @@
   },
   "packageManager": "npm@11.20.0",
   "dependencies": {
-    "executable-specification-language": "file:generation/tooling/executable-specification-language-da613b4.tgz",
+    "executable-specification-language": "file:generation/tooling/executable-specification-language-c9f3d53-development.tgz",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "vscode-languageclient": "10.1.2",
