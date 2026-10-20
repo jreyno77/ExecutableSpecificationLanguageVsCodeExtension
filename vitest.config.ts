@@ -8,17 +8,18 @@ const hoverMiddlewareUnit = 'test/unit/vscode/hover-middleware.test.ts';
 const outlineMiddlewareUnit = 'test/unit/vscode/outline-middleware.test.ts';
 const completionMiddlewareUnit = 'test/unit/vscode/completion-middleware.test.ts';
 const referenceMiddlewareUnit = 'test/unit/vscode/reference-middleware.test.ts';
+const renameMiddlewareUnit = 'test/unit/vscode/rename-middleware.test.ts';
 const savedGeneration = 'test/acceptance/GenerationOnSave.test.ts';
 const ui = ['test/acceptance/OutputTabs.test.ts', 'test/unit/ui/**/*.test.{ts,tsx}'];
 const svg = ['test/acceptance/OutputPreviews.test.ts', 'test/unit/core/output-preview-failures.test.ts', 'test/unit/vscode/svg-labels.test.ts'];
 export default defineConfig({
   test: { maxWorkers: 2, projects: [
     { test: { name: 'syntax', include: ['test/acceptance/native-editor.test.ts'], testTimeout: 90_000, maxWorkers: 1 } },
-    { test: { name: 'core', include: ['test/{unit,acceptance}/**/*.test.{ts,tsx}'], exclude: ['test/acceptance/SourceDefinitionAdapter.test.ts', 'test/acceptance/SourceHoverAdapter.test.ts', 'test/acceptance/SourceOutlineAdapter.test.ts', 'test/acceptance/SourceCompletionAdapter.test.ts', 'test/acceptance/SourceReferenceAdapter.test.ts', 'test/acceptance/GenerationHost.test.ts', 'test/acceptance/OutputPreviewHost.test.ts', sidebarUnit, sidebarManagementUnit, definitionMiddlewareUnit, hoverMiddlewareUnit, outlineMiddlewareUnit, completionMiddlewareUnit, referenceMiddlewareUnit, savedGeneration, 'test/acceptance/ConnectionSidebar.test.ts', ...ui, ...svg, 'test/acceptance/workspace.test.ts', 'test/acceptance/EditorLanguageSupport.test.ts', 'test/acceptance/native-editor.test.ts', 'test/unit/vscode/diagnostic-middleware.test.ts'] } },
+    { test: { name: 'core', include: ['test/{unit,acceptance}/**/*.test.{ts,tsx}'], exclude: ['test/acceptance/SourceDefinitionAdapter.test.ts', 'test/acceptance/SourceHoverAdapter.test.ts', 'test/acceptance/SourceOutlineAdapter.test.ts', 'test/acceptance/SourceCompletionAdapter.test.ts', 'test/acceptance/SourceReferenceAdapter.test.ts', 'test/acceptance/SourceRenameAdapter.test.ts', 'test/acceptance/GenerationHost.test.ts', 'test/acceptance/OutputPreviewHost.test.ts', sidebarUnit, sidebarManagementUnit, definitionMiddlewareUnit, hoverMiddlewareUnit, outlineMiddlewareUnit, completionMiddlewareUnit, referenceMiddlewareUnit, renameMiddlewareUnit, savedGeneration, 'test/acceptance/ConnectionSidebar.test.ts', ...ui, ...svg, 'test/acceptance/workspace.test.ts', 'test/acceptance/EditorLanguageSupport.test.ts', 'test/acceptance/native-editor.test.ts', 'test/unit/vscode/diagnostic-middleware.test.ts'] } },
     { test: { name: 'saved-generation', include: [savedGeneration], testTimeout: 30_000 } },
     { test: { name: 'svg', include: svg, globalSetup: ['test/driver/svg-browser-setup.ts'] } },
     { resolve: { alias: { vscode: fileURLToPath(new URL('./test/resources/vscode/recorded-sidebar-api.ts', import.meta.url)) } }, test: { name: 'connection-sidebar', include: [sidebarUnit, sidebarManagementUnit] } },
-    { resolve: { alias: { vscode: fileURLToPath(new URL('./test/resources/vscode/recorded-language-api.ts', import.meta.url)) } }, test: { name: 'language-support', include: [definitionMiddlewareUnit, hoverMiddlewareUnit, outlineMiddlewareUnit, completionMiddlewareUnit, referenceMiddlewareUnit] } },
+    { resolve: { alias: { vscode: fileURLToPath(new URL('./test/resources/vscode/recorded-language-api.ts', import.meta.url)) } }, test: { name: 'language-support', include: [definitionMiddlewareUnit, hoverMiddlewareUnit, outlineMiddlewareUnit, completionMiddlewareUnit, referenceMiddlewareUnit, renameMiddlewareUnit] } },
     { test: { name: 'ui', include: ui, globalSetup: ['test/driver/output-tabs-setup.ts'] } },
   ] },
 });

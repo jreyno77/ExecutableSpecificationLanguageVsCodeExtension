@@ -11,6 +11,7 @@ import { NativeDefinitionCase } from './native-definition.js';
 import { ConnectionSidebarCase } from './connection-sidebar.js';
 import { NativePreviewCase } from './native-preview.js';
 import { NativeGenerationCase } from './native-generation.js';
+import { NativeRenameCase } from './native-rename.js';
 import { acquireNativeVsix, completeNativeVsix, type NativeVsix } from './native-vsix.js';
 
 const project = fileURLToPath(new URL('../../../', import.meta.url));
@@ -26,6 +27,7 @@ export class InstalledExpecEditor {
   private readonly connectionSidebars = new Set<ConnectionSidebarCase>();
   private readonly previewEditors = new Set<NativePreviewCase>();
   private readonly generationEditors = new Set<NativeGenerationCase>();
+  private readonly renameEditors = new Set<NativeRenameCase>();
   private session: Promise<VsCodeSession> | undefined;
   private activeSession: VsCodeSession | undefined;
   private disposal: Promise<void> | undefined;
@@ -166,6 +168,19 @@ export class InstalledExpecEditor {
     }
   }
 
+  async renameEditor(book: string, basket: string): Promise<NativeRenameCase> {
+    if (this.disposal) throw new Error('The installed rename editor is disposing.');
+    const editor = new NativeRenameCase(() => this.nativeSession(), this.extensionId, book, basket, this.workspace);
+    this.renameEditors.add(editor);
+    onTestFinished(async () => { await editor.dispose(); this.renameEditors.delete(editor); }, 40_000);
+    try { await editor.open(); return editor; }
+    catch (error) {
+      try { await editor.dispose(); }
+      catch (cleanup) { throw new AggregateError([error, cleanup], 'Native rename setup and cleanup failed.', { cause: error }); }
+      this.renameEditors.delete(editor); throw error;
+    }
+  }
+
   async generationEditor(source: string, otherEntry: string, enabled: boolean, outputs = false, missingRuntime = false): Promise<NativeGenerationCase> {
     if (this.disposal) throw new Error('The installed editor is disposing.');
     const editor = new NativeGenerationCase(() => this.nativeSession(), this.extensionId, source, otherEntry, enabled, outputs, missingRuntime, this.workspace);
@@ -207,7 +222,7 @@ export class InstalledExpecEditor {
       for (const result of opened) if (result.status === 'rejected') failures.push(result.reason);
     } catch (error) { failures.push(error); }
     const disposed = await Promise.allSettled([...this.diagnosticDocuments].map(document => document.dispose())
-      .concat([...this.sourceDefinitions].map(definition => definition.dispose()), [...this.connectionSidebars].map(sidebar => sidebar.dispose()), [...this.previewEditors].map(editor => editor.dispose()), [...this.generationEditors].map(editor => editor.dispose())));
+      .concat([...this.sourceDefinitions].map(definition => definition.dispose()), [...this.connectionSidebars].map(sidebar => sidebar.dispose()), [...this.previewEditors].map(editor => editor.dispose()), [...this.generationEditors].map(editor => editor.dispose()), [...this.renameEditors].map(editor => editor.dispose())));
     for (const result of disposed) if (result.status === 'rejected') failures.push(result.reason);
     try { await this.activeSession?.dispose(); } catch (error) { failures.push(error); }
     if (failures.length) this.cleanupUnconfirmed = true;

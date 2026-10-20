@@ -1,3 +1,4 @@
+import { previewChannel } from './output-preview-channel.js';
 import { CancellationError, workspace } from 'vscode';
 import type { LanguageServerAdapter } from "./LanguageServerAdapter.js";
 import type { ExtensionContext } from "vscode";
@@ -16,6 +17,7 @@ export class EditorLanguageSupport {
     private started = false;
     private disposed = false;
     private releaseMiddleware?: () => void;
+    private renameConfigurationRevision = 0;
     constructor(context: ExtensionContext, client: LanguageClient) {
         this.context = context;
         this.client = client;
@@ -26,6 +28,7 @@ export class EditorLanguageSupport {
      * Guard standard provideDocumentSymbols middleware with the requesting native document identity/version around awaiting next. Preserve prior middleware and restore only the wrapper this adapter owns. Cancel an obsolete, closed, disposed or cancelled response rather than returning an old outline or invented empty success. Other unchanged documents remain usable. The native SDK owns the outline UI and scheduling; this adapter owns only native request currentness.
      * Guard the public provideCompletionItem middleware around awaiting the prior middleware or real continuation, preserving its exact replies. Capture the requesting document identity/version and currently open expec buffer identities/versions. Cancel a pending reply after requester or captured import-buffer change, close or replacement, token cancellation or disposal. Other-language buffer changes do not cancel completion. Release only this adapter's own wrapper. This protects a pending response; it does not promise editor/filesystem atomicity or safety when a user later chooses an already returned item. Core owns candidate policy and prepared facts.
      * Guard standard provideReferences middleware around awaiting its prior middleware or next, preserving the actual includeDeclaration context and returned locations. Capture the requesting document and all currently open expec buffer identities/versions; cancel if the requester or any captured buffer changed, closed or was replaced, or if disposed/token-cancelled. Preserve prior middleware and restore only this wrapper on disposal. The native LanguageClient handles standard server ShowMessageRequests for the visible bounded coverage summary/action; no separate coverage channel or business model is added here. Native SDK owns reference navigation and selection. This is a point-in-time report, not editor/filesystem atomicity; no native scans, saves or generation are added.
+     * Guard the standard prepareRename and provideRenameEdits middleware around awaiting the previous middleware or real continuation. Preserve decoded newName and the exact native result; capture requesting document identity/version plus all currently open .expec buffer identities/versions. Cancel if a captured buffer changes, closes or is replaced, the request token is cancelled, the selected configuration notification revision changes, or this adapter is disposed. Restore only owned wrappers and preserve prior middleware. Standard VS Code owns rename input, preview/apply, optional preview selection and undo; never write files or claim atomicity after a returned response. No duplicate native edit application or generated-output invocation.
      */
     start(): void {
         if (this.started || this.disposed) return;
@@ -115,6 +118,38 @@ export class EditorLanguageSupport {
             return result;
         };
         middleware.provideReferences = referencesGuard;
+        const previousSend = middleware.sendNotification;
+        const sendGuard: NonNullable<typeof previousSend> = (type, next, params) => {
+            if ((typeof type === 'string' ? type : type.method) === previewChannel.configuration) ++this.renameConfigurationRevision;
+            return previousSend ? previousSend(type, next, params) : next(type, params);
+        };
+        middleware.sendNotification = sendGuard;
+        const captureRename = (document: import('vscode').TextDocument, token: import('vscode').CancellationToken) => {
+            const revision = this.renameConfigurationRevision;
+            const captured = new Map(workspace.textDocuments.filter(open => !open.isClosed && open.languageId === 'expec').map(open => [open, open.version]));
+            captured.set(document, document.version);
+            const current = () => {
+                if (this.disposed || token.isCancellationRequested || revision !== this.renameConfigurationRevision
+                    || [...captured].some(([buffer, version]) => buffer.isClosed || buffer.version !== version || !workspace.textDocuments.includes(buffer))) {
+                    throw new CancellationError();
+                }
+            };
+            current(); return current;
+        };
+        const previousPrepare = middleware.prepareRename;
+        const prepareGuard: NonNullable<typeof previousPrepare> = async (document, position, token, next) => {
+            const current = captureRename(document, token);
+            const result = await (previousPrepare ? previousPrepare(document, position, token, next) : next(document, position, token));
+            current(); return result;
+        };
+        middleware.prepareRename = prepareGuard;
+        const previousRename = middleware.provideRenameEdits;
+        const renameGuard: NonNullable<typeof previousRename> = async (document, position, newName, token, next) => {
+            const current = captureRename(document, token);
+            const result = await (previousRename ? previousRename(document, position, newName, token, next) : next(document, position, newName, token));
+            current(); return result;
+        };
+        middleware.provideRenameEdits = renameGuard;
         this.releaseMiddleware = () => {
             if (middleware.provideDiagnostics === guard) middleware.provideDiagnostics = previous;
             if (middleware.provideDefinition === definitionGuard) middleware.provideDefinition = previousDefinition;
@@ -122,6 +157,9 @@ export class EditorLanguageSupport {
             if (middleware.provideDocumentSymbols === symbolGuard) middleware.provideDocumentSymbols = previousSymbols;
             if (middleware.provideCompletionItem === completionGuard) middleware.provideCompletionItem = previousCompletion;
             if (middleware.provideReferences === referencesGuard) middleware.provideReferences = previousReferences;
+            if (middleware.prepareRename === prepareGuard) middleware.prepareRename = previousPrepare;
+            if (middleware.provideRenameEdits === renameGuard) middleware.provideRenameEdits = previousRename;
+            if (middleware.sendNotification === sendGuard) middleware.sendNotification = previousSend;
         };
         this.context.subscriptions.push(this);
         void this.client.start().catch(error => this.client.error('.expec language server failed to start.', error, true));

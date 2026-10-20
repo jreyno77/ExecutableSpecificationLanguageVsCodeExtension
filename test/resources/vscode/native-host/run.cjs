@@ -8,6 +8,8 @@ exports.run = async function run() {
   const diagnosticDocuments = new Map();
   const { openSourceDefinition } = require('./source-definition.cjs');
   const sourceDefinitions = new Map();
+  const { openSourceRename } = require('./source-rename.cjs');
+  const sourceRenames = new Map();
   const { openConnectionSidebar } = require('./connection-sidebar.cjs');
   const connectionSidebars = new Map();
   const { openPreviewEditor } = require('./preview-editor.cjs');
@@ -49,6 +51,24 @@ exports.run = async function run() {
             value = { cancellationError: false, nextCalls, runtime };
           } catch (error) { value = { cancellationError: error instanceof vscode.CancellationError, nextCalls, runtime }; }
           finally { cancellation.dispose(); }
+        } else if (frame.operation === 'renameOpen' && typeof frame.renameId === 'string' && typeof frame.extensionId === 'string'
+          && ['book', 'basket', 'configurationFile', 'resetFile'].every(key => typeof frame[key] === 'string')) {
+          if (sourceRenames.has(frame.renameId)) throw new Error('The owned native rename case already exists.');
+          const rename = await openSourceRename(vscode, frame.extensionId, frame);
+          sourceRenames.set(frame.renameId, rename); value = rename.observation();
+        } else if (['renamePrepare', 'renameApply', 'renameObserve', 'renameDispose'].includes(frame.operation) && typeof frame.renameId === 'string') {
+          const rename = sourceRenames.get(frame.renameId);
+          if (frame.operation === 'renameDispose' && !rename) value = null;
+          else {
+            if (!rename) throw new Error('The owned native rename case is unavailable.');
+            if (frame.operation === 'renameDispose') { await rename.dispose(); sourceRenames.delete(frame.renameId); value = null; }
+            else if (frame.operation === 'renameObserve') value = rename.observation();
+            else if (Number.isInteger(frame.line) && frame.line >= 0 && Number.isInteger(frame.character) && frame.character >= 0) {
+              if (frame.operation === 'renamePrepare') value = await rename.prepare(frame.line, frame.character);
+              else if (typeof frame.newName === 'string') value = await rename.rename(frame.line, frame.character, frame.newName);
+              else throw new Error('Invalid native rename spelling.');
+            } else throw new Error('Invalid native rename coordinates.');
+          }
         } else if (frame.operation === 'definitionOpen' && typeof frame.definitionId === 'string' && typeof frame.extensionId === 'string'
           && frame.files && typeof frame.files === 'object' && typeof frame.files['entry.expec'] === 'string'
           && Object.values(frame.files).every(file => typeof file === 'string')) {
@@ -168,6 +188,8 @@ exports.run = async function run() {
           previewEditors.clear();
           for (const document of diagnosticDocuments.values()) await document.dispose();
           diagnosticDocuments.clear();
+          for (const rename of sourceRenames.values()) await rename.dispose();
+          sourceRenames.clear();
           for (const definition of sourceDefinitions.values()) await definition.dispose();
           sourceDefinitions.clear();
           for (const sidebar of connectionSidebars.values()) await sidebar.dispose();

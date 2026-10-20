@@ -3573,4 +3573,209 @@ readonly nativeReferencesEntry: string = "use Book as Novel from \"./book.expec\
 readonly nativeReferencesBook: string = "type Book {}\ntype Shelf { book: Book }";
 
 readonly nativeReferencesChangedBook: string = "type Marker { label: Text = \"📚\" }\n\ntype Book {}\ntype Shelf { book: Book }";
+
+async renameProject(entries: Array<string>): Promise<void> {
+    return await this.driver.renameProject(entries);
+  }
+
+async nativeRenameProject(book: string, basket: string): Promise<void> {
+    return await this.driver.nativeRenameProject(book, basket);
+  }
+
+async saveRenameSource(source: SourceDocument): Promise<void> {
+    return await this.driver.saveRenameSource(source);
+  }
+
+async openRenameSource(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.openRenameSource(source, version);
+  }
+
+async prepareSourceRename(uri: string, version: number, line: number, column: number): Promise<void> {
+    return await this.driver.prepareSourceRename(uri, version, line, column);
+  }
+
+async requestSourceRename(uri: string, version: number, line: number, column: number, newName: string): Promise<void> {
+    return await this.driver.requestSourceRename(uri, version, line, column, newName);
+  }
+
+async changeRenameSourceDuringNextRead(source: SourceDocument, version: number): Promise<void> {
+    return await this.driver.changeRenameSourceDuringNextRead(source, version);
+  }
+
+async prepareNativeRename(line: number, column: number): Promise<void> {
+    return await this.driver.prepareNativeRename(line, column);
+  }
+
+async applyNativeRename(line: number, column: number, newName: string): Promise<void> {
+    return await this.driver.applyNativeRename(line, column, newName);
+  }
+
+async renamePreparedName(): Promise<string> {
+    return await this.driver.renamePreparedName();
+  }
+
+async renamePreparedStartOffset(): Promise<number> {
+    return await this.driver.renamePreparedStartOffset();
+  }
+
+async renamePreparedEndOffset(): Promise<number> {
+    return await this.driver.renamePreparedEndOffset();
+  }
+
+async renameChangedUris(): Promise<Array<string>> {
+    return await this.driver.renameChangedUris();
+  }
+
+async renameAfterText(uri: string): Promise<string> {
+    return await this.driver.renameAfterText(uri);
+  }
+
+async renameEditVersion(uri: string): Promise<number | undefined> {
+    return await this.driver.renameEditVersion(uri);
+  }
+
+async renameEditHasOpenVersion(uri: string): Promise<boolean> {
+    return await this.driver.renameEditHasOpenVersion(uri);
+  }
+
+async renameRefused(): Promise<boolean> {
+    return await this.driver.renameRefused();
+  }
+
+async renameExplanationIncludes(text: string): Promise<boolean> {
+    return await this.driver.renameExplanationIncludes(text);
+  }
+
+async renameInputsUnchanged(): Promise<boolean> {
+    return await this.driver.renameInputsUnchanged();
+  }
+
+async renameCurrentText(uri: string): Promise<string> {
+    return await this.driver.renameCurrentText(uri);
+  }
+
+async nativeRenamePlaceholder(): Promise<string> {
+    return await this.driver.nativeRenamePlaceholder();
+  }
+
+async nativeRenamedBookText(): Promise<string> {
+    return await this.driver.nativeRenamedBookText();
+  }
+
+async nativeRenamedBasketText(): Promise<string> {
+    return await this.driver.nativeRenamedBasketText();
+  }
+
+async nativeRenamedBuffersDirty(): Promise<boolean> {
+    return await this.driver.nativeRenamedBuffersDirty();
+  }
+
+async nativeRenameSavedFilesUnchanged(): Promise<boolean> {
+    return await this.driver.nativeRenameSavedFilesUnchanged();
+  }
+
+async nativeRenameWasRefused(): Promise<boolean> {
+    return await this.driver.nativeRenameWasRefused();
+  }
+
+async nativeRenameExplanationIncludes(text: string): Promise<boolean> {
+    return await this.driver.nativeRenameExplanationIncludes(text);
+  }
+
+async expectRenamePrepared(name: string): Promise<void> {
+    const actual = await this.driver.renamePreparedName();
+    expectData(actual, name);
+  }
+
+async expectPreparedRenameRange(start: number, end: number): Promise<void> {
+    const actualStart = await this.driver.renamePreparedStartOffset();
+    const actualEnd = await this.driver.renamePreparedEndOffset();
+    expectData(actualStart, start);
+    expectData(actualEnd, end);
+  }
+
+async expectRenameText(uri: string, text: string): Promise<void> {
+    const actual = await this.driver.renameAfterText(uri);
+    expectData(actual, text);
+  }
+
+async expectRenameDocuments(uris: Array<string>): Promise<void> {
+    const actual = await this.driver.renameChangedUris();
+    expectData(actual, uris);
+  }
+
+async expectRenameVersion(uri: string, version: number | undefined): Promise<void> {
+    const actual = await this.driver.renameEditVersion(uri);
+    expectData(actual, version);
+  }
+
+async expectSavedOnlyRename(uri: string): Promise<void> {
+    const hasVersion = await this.driver.renameEditHasOpenVersion(uri);
+    expectData(hasVersion, false);
+  }
+
+async expectRenameRefused(detail: string): Promise<void> {
+    const refused = await this.driver.renameRefused();
+    const explained = await this.driver.renameExplanationIncludes(detail);
+    const changes = await this.driver.renameChangedUris();
+    expectData(refused, true);
+    expectData(explained, true);
+    expectData(changes, this.noRenameDocuments);
+  }
+
+async expectRenameInputsUnchanged(): Promise<void> {
+    const actual = await this.driver.renameInputsUnchanged();
+    expectData(actual, true);
+  }
+
+async expectCurrentRenameText(uri: string, text: string): Promise<void> {
+    const actual = await this.driver.renameCurrentText(uri);
+    expectData(actual, text);
+  }
+
+async expectNativeRenamePrepared(name: string): Promise<void> {
+    const actual = await this.driver.nativeRenamePlaceholder();
+    expectData(actual, name);
+  }
+
+async expectNativeRenameText(book: string, basket: string): Promise<void> {
+    const actualBook = await this.driver.nativeRenamedBookText();
+    const actualBasket = await this.driver.nativeRenamedBasketText();
+    expectData(actualBook, book);
+    expectData(actualBasket, basket);
+  }
+
+async expectUnsavedNativeRename(): Promise<void> {
+    const dirty = await this.driver.nativeRenamedBuffersDirty();
+    const saved = await this.driver.nativeRenameSavedFilesUnchanged();
+    expectData(dirty, true);
+    expectData(saved, true);
+  }
+
+async expectNativeRenameRefused(detail: string): Promise<void> {
+    const refused = await this.driver.nativeRenameWasRefused();
+    const explained = await this.driver.nativeRenameExplanationIncludes(detail);
+    const saved = await this.driver.nativeRenameSavedFilesUnchanged();
+    expectData(refused, true);
+    expectData(explained, true);
+    expectData(saved, true);
+  }
+
+readonly noRenameDocuments: Array<string> = [];
+
+readonly renameBook: SourceDocument = { ["uri"]: "file:///workspace/book.expec", ["text"]: "type Book {}" };
+
+readonly renameBasket: SourceDocument = { ["uri"]: "file:///workspace/basket.expec", ["text"]: "use Book from \"./book.expec\"\ntype Basket { book: Book }" };
+
+async identifyRenameSource(uri: string, identity: string): Promise<void> {
+    return await this.driver.identifyRenameSource(uri, identity);
+  }
+
+async withholdRenameSourceIdentity(uri: string): Promise<void> {
+    return await this.driver.withholdRenameSourceIdentity(uri);
+  }
+
+async changeRenameIdentityDuringNextRead(uri: string, identity: string): Promise<void> {
+    return await this.driver.changeRenameIdentityDuringNextRead(uri, identity);
+  }
 }

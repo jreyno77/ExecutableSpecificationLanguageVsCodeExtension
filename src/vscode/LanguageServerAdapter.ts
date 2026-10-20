@@ -1,3 +1,6 @@
+import { SourceRename as CoreSourceRename } from '../core/SourceRename.js';
+import { SourceRenameAdapter as NativeSourceRenameAdapter } from './SourceRenameAdapter.js';
+import { LSPErrorCodes, ResponseError } from 'vscode-languageserver/node';
 import { SourceReferences as CoreSourceReferences } from '../core/SourceReferences.js';
 import { SourceReferenceAdapter as NativeSourceReferenceAdapter } from './SourceReferenceAdapter.js';
 import { SourceCompletion as CoreSourceCompletion } from '../core/SourceCompletion.js';
@@ -38,6 +41,14 @@ import type { SourceCompletionAdapter } from "./SourceCompletionAdapter.js";
 import type { SourceReferences } from "../core/SourceReferences.js";
 
 import type { SourceReferenceAdapter } from "./SourceReferenceAdapter.js";
+import type { SourceRename } from "../core/SourceRename.js";
+
+import type { RenameWorkspace } from "../core/RenameWorkspace.js";
+
+import type { SourceRenameAdapter } from "./SourceRenameAdapter.js";
+import type { SourceIdentities } from "../core/SourceIdentities.js";
+
+
 
 
 
@@ -67,6 +78,10 @@ import type { SourceReferenceAdapter } from "./SourceReferenceAdapter.js";
  * Depends on: SourceCompletionAdapter
  * Depends on: SourceReferences
  * Depends on: SourceReferenceAdapter
+ * Depends on: SourceRename
+ * Depends on: SourceIdentities
+ * Depends on: RenameWorkspace
+ * Depends on: SourceRenameAdapter
  */
 export class LanguageServerAdapter {
     private readonly connection: Connection;
@@ -83,6 +98,10 @@ export class LanguageServerAdapter {
     private readonly referenceSearch = new CoreSourceReferences();
     private readonly referenceAdapter = new NativeSourceReferenceAdapter(this.referenceSearch);
     private latestReferenceSearch: object | undefined;
+    private readonly renamer: SourceRename;
+    private readonly renameAdapter: SourceRenameAdapter;
+    private renameConfiguration?: ConnectionConfiguration;
+    private canRename = false;
     private readonly documents = new TextDocuments(TextDocument);
     private readonly subscriptions: Disposable[] = [];
     private readonly reports = new Map<string, { resultId: string; items: Diagnostic[]; dependencies: readonly string[] }>();
@@ -99,12 +118,20 @@ export class LanguageServerAdapter {
     private readonly publicationTokens = new Map<string, object>();
     private started = false;
     private disposed = false;
-    constructor(connection: Connection, sources: DocumentSources) {
+    constructor(connection: Connection, sources: DocumentSources, identities: SourceIdentities) {
         this.connection = connection;
         this.previews = new CoreOutputPreviews({ present: publication => {
             if (!this.disposed) void this.connection.sendNotification(previewChannel.publication, publication).catch(error => this.connection.console.error('Preview publication failed: ' + String(error)));
         } }, undefined);
         this.analysis = new CoreDocumentAnalysis(this, sources);
+        const workspace: RenameWorkspace = {
+            configuration: () => this.renameConfiguration,
+            openDocuments: () => this.documents.all().filter(document => document.languageId === 'expec').map(document => ({
+                source: { uri: document.uri, text: document.getText() }, version: document.version,
+            })),
+        };
+        this.renamer = new CoreSourceRename(workspace, sources, identities);
+        this.renameAdapter = new NativeSourceRenameAdapter(this.renamer);
     }
     /**
      * Unverified implementation obligation.
@@ -113,6 +140,7 @@ export class LanguageServerAdapter {
      * Advertise completionProvider without trigger characters or resolve support and register standard textDocument/completion once. Use the actual current TextDocuments entry and delegate to one SourceCompletionAdapter with one core SourceCompletion. Cancelled, missing or disposed requests return an empty list. Reuse the same existing DocumentAnalysis publication; do not parse, resolve, acquire, generate or construct a second analysis for completion.
      * Capture each existing saved preview-configuration notification's exact file/text/writable scalars or absence and advance an owned latest-notification identity. Forward that captured snapshot first to the same OutputPreviews.configurationChanged to invalidate old preview work and prepare selection/options, then to the same DocumentAnalysis.configurationChanged so its new reports drive that configuration. Recheck the notification identity and adapter lifetime between forwards: a synchronous newer notification or disposal from preview feedback prevents the older snapshot from restoring package facts. Preserve currentness after reentrant analysis/feedback as well. Keep selection withdrawal and saved-text behavior; native callback exceptions remain observable. Never validate JSON in this adapter or wait for a connected target before supplying authored package facts. Configuration changes refresh current semantic reports at unchanged editor versions through the one existing analysis; no second reader/compiler, native package inspection, installation, project capture, file scan or new report identity field is introduced.
      * Advertise referencesProvider and register standard textDocument/references once. Use the current TextDocuments snapshot and delegate to one SourceReferenceAdapter with one core SourceReferences, preserving context.includeDeclaration. Missing, cancelled, disposed or currently unavailable documents return no locations. A successful presentation returns only its standard Location list through LSP. Keep its captured coverage as a point-in-time snapshot with this request lifetime, exact native analysis resultId and URI/version. Through standard connection.window.showInformationMessage display 'Reference search covers captured sources only; workspace importers were not scanned.' with a 'Show coverage' action, without delaying the Location response until a user chooses. When that choice settles, recheck the same document lifetime/version, analysis resultId, request cancellation, disposal and latest search before presenting a second standard information message listing the actual coveredUris and prerequisite entries. Entry version alone cannot identify a replacement import report; stale/superseded choices do nothing. Keep native request failures observable. No custom coverage protocol, QuickPick API, Inspection, NodeId or compiler model crosses transport. This search covers only the requester and reachable captured imports/includes, never reverse workspace importers or an undiscovered workspace.
+     * Register exactly one standard prepareRename/rename handler and advertise renameProvider with prepareProvider only when the client supports WorkspaceEdit.documentChanges. Supply one core SourceRename with the existing DocumentSources, the explicitly injected SourceIdentities port, and a RenameWorkspace port adapting this server lifetime: current selected saved configuration notifications and current TextDocuments open .expec URI/text/version facts. Do not substitute unsaved JSON proposals or infer rename permission from metadata writable. Neither a connected generated-output target nor generation is required. The adapter never enumerates folders or composes models. Translate actual prepare/rename replies through SourceRenameAdapter; core owns all configured-entry acquisition, naming, collision, completeness and refusal policy. Refuse unsupported versioned-edit capability with an explanation instead of returning unversioned edits. Capture request document identity/version and configuration revision; suppress cancelled, superseded, closed or disposed responses. Dispose owned registrations once and keep errors observable. Existing diagnostics, previews, definition, hover, outline, completion and references retain their contracts.
      */
     start(): void {
         if (this.started || this.disposed) return;
@@ -126,6 +154,7 @@ export class LanguageServerAdapter {
                     file: configuration.file, ...(configuration.text === undefined ? {} : { text: configuration.text }),
                     writable: configuration.writable,
                 });
+                this.renameConfiguration = snapshot;
                 const warningKey = JSON.stringify(snapshot ? [snapshot.file, snapshot.text] : null);
                 if (warningKey !== this.warningConfigurationKey) {
                     this.warningConfigurationKey = warningKey;
@@ -139,6 +168,7 @@ export class LanguageServerAdapter {
                 const watches = capabilities.workspace?.didChangeWatchedFiles;
                 this.canWatch = watches?.dynamicRegistration === true && watches.relativePatternSupport === true;
                 this.canRefresh = capabilities.workspace?.diagnostics?.refreshSupport === true;
+                this.canRename = capabilities.workspace?.workspaceEdit?.documentChanges === true;
                 return { capabilities: {
                     positionEncoding: 'utf-16',
                     textDocumentSync: TextDocumentSyncKind.Incremental,
@@ -148,6 +178,7 @@ export class LanguageServerAdapter {
                     documentSymbolProvider: true,
                     completionProvider: {},
                     referencesProvider: true,
+                    ...(this.canRename ? { renameProvider: { prepareProvider: true } } : {}),
                 } };
             }),
             this.connection.onInitialized(() => {
@@ -180,6 +211,10 @@ export class LanguageServerAdapter {
                 const document = this.documents.get(textDocument.uri);
                 return document ? this.completions.items(document, position) : [];
             }),
+            this.connection.onPrepareRename(({ textDocument, position }, token) =>
+                this.currentRename(textDocument.uri, token, document => this.renameAdapter.prepare(document, position))),
+            this.connection.onRenameRequest(({ textDocument, position, newName }, token) =>
+                this.currentRename(textDocument.uri, token, document => this.renameAdapter.rename(document, position, newName))),
             this.connection.onReferences(({ textDocument, position, context }, token) => {
                 const request = this.latestReferenceSearch = {};
                 if (this.disposed || token.isCancellationRequested) return undefined;
@@ -361,6 +396,22 @@ export class LanguageServerAdapter {
         this.unsupportedWatches.clear();
         for (const failure of failures.slice(1)) this.connection.console.error('Additional shutdown failure: ' + String(failure));
         if (failures.length) throw failures[0];
+    }
+    private currentRename<T>(uri: string, token: import('vscode-languageserver/node').CancellationToken, operation: (document: TextDocument) => T): T {
+        if (!this.canRename) throw new ResponseError(LSPErrorCodes.RequestFailed, 'Safe Rename requires client WorkspaceEdit.documentChanges support.');
+        const document = this.documents.get(uri), revision = this.configurationRevision;
+        const captured = this.documents.all().filter(open => open.languageId === 'expec').map(open => ({ document: open, version: open.version }));
+        const current = () => {
+            if (token.isCancellationRequested) throw new ResponseError(LSPErrorCodes.RequestCancelled, 'Rename request was cancelled.');
+            if (this.disposed || !document || this.documents.get(uri) !== document || revision !== this.configurationRevision
+                || captured.some(open => this.documents.get(open.document.uri) !== open.document || open.document.version !== open.version)) {
+                throw new ResponseError(LSPErrorCodes.RequestFailed, 'Rename inputs changed or the requesting document is unavailable.');
+            }
+        };
+        current();
+        const result = operation(document!);
+        current();
+        return result;
     }
     private referenceFailure(error: unknown): void {
         const message = 'Reference coverage request failed: ' + String(error);

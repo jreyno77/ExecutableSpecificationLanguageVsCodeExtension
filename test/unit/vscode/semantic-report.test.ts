@@ -28,7 +28,7 @@ function recordedServer(sources: DocumentSources = { localPath: () => undefined,
     return { dispose: () => { released.push(name); } };
   };
   const connection = {
-    onInitialize: listen('initialize'), onInitialized: listen('initialized'), onDefinition: listen('definition'), onHover: listen('hover'), onDocumentSymbol: listen('documentSymbols'), onCompletion: listen('completion'), onReferences: listen('references'),
+    onInitialize: listen('initialize'), onInitialized: listen('initialized'), onDefinition: listen('definition'), onHover: listen('hover'), onDocumentSymbol: listen('documentSymbols'), onCompletion: listen('completion'), onReferences: listen('references'), onPrepareRename: listen('prepareRename'), onRenameRequest: listen('rename'),
     onNotification: (method: string, callback: (params: any) => void) => listen(method)(callback),
     sendNotification: (_method: string, value: PreviewPublication) => { publications.push(value); for (const receive of [...publicationListeners]) receive(); return Promise.resolve(); },
     onDidChangeWatchedFiles: listen('watched'),
@@ -50,7 +50,7 @@ function recordedServer(sources: DocumentSources = { localPath: () => undefined,
     console: { warn: (message: string) => { warnings.push(message); }, error: (message: string) => { errors.push(message); if (logFailure !== undefined) throw logFailure; } },
     client: { register: (_type: unknown, options: unknown) => new Promise<Disposable>(complete => { registrations.push({ options, complete }); }) },
   } as unknown as Connection;
-  const adapter = new LanguageServerAdapter(connection, sources);
+  const adapter = new LanguageServerAdapter(connection, sources, { keyOf: () => undefined });
   adapter.start();
   const initialization = callbacks.get('initialize')!({ capabilities: { workspace: {
     didChangeWatchedFiles: { dynamicRegistration: true, relativePatternSupport: true },
@@ -488,7 +488,7 @@ describe('native semantic feedback at its protocol boundary', () => {
     expect(server.pull(source.uri).items).toEqual([]);
     expect(server.pull(source.uri).resultId).toBeUndefined();
     expect(releases).toBe(1);
-    expect(new Set(server.released)).toEqual(new Set(['initialize', 'initialized', 'watched', 'diagnostics', 'opened', 'changed', 'closed', 'willSave', 'willSaveWaitUntil', 'saved', 'expec/previewConfiguration', 'expec/previewSelection', 'definition', 'hover', 'documentSymbols', 'completion', 'references']));
+    expect(new Set(server.released)).toEqual(new Set(['initialize', 'initialized', 'watched', 'diagnostics', 'opened', 'changed', 'closed', 'willSave', 'willSaveWaitUntil', 'saved', 'expec/previewConfiguration', 'expec/previewSelection', 'definition', 'hover', 'documentSymbols', 'completion', 'references', 'prepareRename', 'rename']));
     expect(() => server.adapter.dispose()).not.toThrow();
   });
 });

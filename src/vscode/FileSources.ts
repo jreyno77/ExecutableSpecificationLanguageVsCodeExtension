@@ -102,4 +102,64 @@ localPath(uri: string, manifestFile: string): string | undefined {
         try { return lstatSync(file, { bigint: true }); }
         catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined; throw error; }
     }
+
+/**
+     * Unverified implementation obligation.
+     * Supply SourceIdentities from verified native physical file facts under this selected primary manifest root. For an existing ordinary file, return an opaque key whose equality identifies the same physical file through supported drive/URI spellings, filename-case aliases or hardlinks; distinct physical files remain distinct even on a case-sensitive filesystem. Verify root/ancestors and the source identity before and after acquisition, reject unsupported identities, escaping/symlink routes and changed facts, and keep unexpected filesystem errors observable. A never-saved named file or unavailable/unprovable physical identity has no key; create nothing and allow the rename caller to explain that saving is needed. Do not derive identity from URI text, path case folding, canonical pathname alone, source contents or a global cache. Preserve localPath's literal scoped-path semantics. The key is comparable only within this manifest/request and its final recheck, never a durable ID or transport value. No folder scan, parser, project capture, installation, save or generation.
+     */
+keyOf(uri: string, manifestFile: string): string | undefined {
+    let file: string;
+    try {
+        const location = new URL(uri);
+        if (location.protocol !== 'file:' || location.search || location.hash) return undefined;
+        file = fileURLToPath(location);
+    } catch (error) {
+        if (error instanceof TypeError) return undefined;
+        throw error;
+    }
+    if (!this.absolutePath(file) || !this.absolutePath(manifestFile)) return undefined;
+    const selectedRoot = dirname(manifestFile);
+    try {
+        const root = realpathSync.native(selectedRoot);
+        const selectedRelative = this.childPath(selectedRoot, file);
+        const path = selectedRelative ?? this.childPath(root, file);
+        if (path === undefined) return undefined;
+        const facts: Array<{ path: string; stat: BigIntStats; directory: boolean; follow: boolean }> = [];
+        const capture = (path: string, directory: boolean, follow = false): BigIntStats | undefined => {
+            const stat = follow ? statSync(path, { bigint: true }) : lstatSync(path, { bigint: true });
+            if (stat.isSymbolicLink() || (directory ? !stat.isDirectory() : !stat.isFile())
+                || !this.sameIdentity(stat, stat)) return undefined;
+            facts.push({ path, stat, directory, follow });
+            return stat;
+        };
+        const selectedIdentity = capture(selectedRoot, true, true);
+        const rootIdentity = capture(root, true);
+        if (!selectedIdentity || !rootIdentity || !this.sameIdentity(selectedIdentity, rootIdentity)) return undefined;
+        let route = selectedRelative === undefined ? root : selectedRoot;
+        let canonical = root;
+        let source: BigIntStats | undefined;
+        const segments = path.split(sep);
+        for (let index = 0; index < segments.length; index++) {
+            route = join(route, segments[index]!);
+            canonical = join(canonical, segments[index]!);
+            const directory = index < segments.length - 1;
+            const actual = capture(route, directory);
+            const mapped = capture(canonical, directory);
+            if (!actual || !mapped || !this.sameIdentity(actual, mapped)) return undefined;
+            if (!directory) source = actual;
+        }
+        if (!source || this.localPath(uri, manifestFile) !== path.split(sep).join('/')) return undefined;
+        if (!this.samePath(realpathSync.native(selectedRoot), root)) return undefined;
+        for (const before of facts) {
+            const after = before.follow ? statSync(before.path, { bigint: true }) : lstatSync(before.path, { bigint: true });
+            if (after.isSymbolicLink() || (before.directory ? !after.isDirectory() : !after.isFile())
+                || !this.sameIdentity(before.stat, after)) return undefined;
+        }
+        return `native-file:${source.dev}:${source.ino}`;
+    } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === 'ENOENT' || code === 'ENOTDIR') return undefined;
+        throw error;
+    }
+}
 }
