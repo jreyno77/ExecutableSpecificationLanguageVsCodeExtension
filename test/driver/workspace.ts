@@ -1,3 +1,5 @@
+import type { NativeRenameCase } from './vscode/native-rename.js';
+import { SourceRenameRecording } from './source-rename.js';
 import { NativeReferencesRecording } from './vscode/native-references.js';
 import { SourceReferencesRecording } from './source-references.js';
 import { SourceReferenceConversion } from './source-reference-conversion.js';
@@ -41,6 +43,8 @@ import { ConnectionOutputGuidance } from "../../src/core/ConnectionOutputGuidanc
 
 
 export class WorkspaceDriver {
+  private nativeRenameCase!: NativeRenameCase;
+  private sourceRenameRecording!: SourceRenameRecording;
   private nativeReferencesRecording!: NativeReferencesRecording;
 
   private referenceRecording!: SourceReferencesRecording;
@@ -2242,4 +2246,124 @@ async convertedReferenceStartCharacter(request: number, location: number): Promi
 async convertedReferenceEndLine(request: number, location: number): Promise<number> { return this.referenceConversionRecording.location(request, location).range.end.line; }
 
 async convertedReferenceEndCharacter(request: number, location: number): Promise<number> { return this.referenceConversionRecording.location(request, location).range.end.character; }
+
+async renameProject(entries: Array<string>): Promise<void> {
+    this.sourceRenameRecording = new SourceRenameRecording(entries);
+  }
+
+async nativeRenameProject(book: string, basket: string): Promise<void> {
+    this.nativeRenameCase = await (await InstalledExpecEditor.prepare()).renameEditor(book, basket);
+}
+
+async saveRenameSource(source: SourceDocument): Promise<void> {
+    this.sourceRenameRecording.savedSource(source);
+  }
+
+async openRenameSource(source: SourceDocument, version: number): Promise<void> {
+    this.sourceRenameRecording.openedSource(source, version);
+  }
+
+async prepareSourceRename(uri: string, version: number, line: number, column: number): Promise<void> {
+    this.sourceRenameRecording.prepare(uri, version, line, column);
+  }
+
+async requestSourceRename(uri: string, version: number, line: number, column: number, newName: string): Promise<void> {
+    this.sourceRenameRecording.rename(uri, version, line, column, newName);
+  }
+
+async changeRenameSourceDuringNextRead(source: SourceDocument, version: number): Promise<void> {
+    this.sourceRenameRecording.changeDuringNextRead(source, version);
+  }
+
+async prepareNativeRename(line: number, column: number): Promise<void> {
+    await this.nativeRenameCase.prepare(line, column);
+}
+
+async applyNativeRename(line: number, column: number, newName: string): Promise<void> {
+    await this.nativeRenameCase.rename(line, column, newName);
+}
+
+async renamePreparedName(): Promise<string> {
+    return this.sourceRenameRecording.prepared().name;
+  }
+
+async renamePreparedStartOffset(): Promise<number> {
+    return this.sourceRenameRecording.prepared().location.startOffset;
+  }
+
+async renamePreparedEndOffset(): Promise<number> {
+    return this.sourceRenameRecording.prepared().location.endOffset;
+  }
+
+async renameChangedUris(): Promise<Array<string>> {
+    return this.sourceRenameRecording.changedUris();
+  }
+
+async renameAfterText(uri: string): Promise<string> {
+    return this.sourceRenameRecording.afterText(uri);
+  }
+
+async renameEditVersion(uri: string): Promise<number | undefined> {
+    return this.sourceRenameRecording.editVersion(uri);
+  }
+
+async renameEditHasOpenVersion(uri: string): Promise<boolean> {
+    return this.sourceRenameRecording.editHasOpenVersion(uri);
+  }
+
+async renameRefused(): Promise<boolean> {
+    return this.sourceRenameRecording.refused();
+  }
+
+async renameExplanationIncludes(text: string): Promise<boolean> {
+    return this.sourceRenameRecording.explanationIncludes(text);
+  }
+
+async renameInputsUnchanged(): Promise<boolean> {
+    return this.sourceRenameRecording.inputsUnchanged();
+  }
+
+async renameCurrentText(uri: string): Promise<string> {
+    return this.sourceRenameRecording.currentText(uri);
+  }
+
+async nativeRenamePlaceholder(): Promise<string> {
+    return this.nativeRenameCase.placeholder();
+}
+
+async nativeRenamedBookText(): Promise<string> {
+    return this.nativeRenameCase.bookText();
+}
+
+async nativeRenamedBasketText(): Promise<string> {
+    return this.nativeRenameCase.basketText();
+}
+
+async nativeRenamedBuffersDirty(): Promise<boolean> {
+    return this.nativeRenameCase.buffersDirty();
+}
+
+async nativeRenameSavedFilesUnchanged(): Promise<boolean> {
+    return this.nativeRenameCase.filesUnchanged();
+}
+
+async nativeRenameWasRefused(): Promise<boolean> {
+    return this.nativeRenameCase.wasRefused();
+}
+
+async nativeRenameExplanationIncludes(text: string): Promise<boolean> {
+    return this.nativeRenameCase.explanationIncludes(text);
+}
+
+async identifyRenameSource(uri: string, identity: string): Promise<void> {
+    this.sourceRenameRecording.identify(uri, identity);
+  }
+
+async withholdRenameSourceIdentity(uri: string): Promise<void> {
+    this.sourceRenameRecording.withholdIdentity(uri);
+  }
+
+async changeRenameIdentityDuringNextRead(uri: string, identity: string): Promise<void> {
+    this.sourceRenameRecording.changeIdentityDuringNextRead(uri, identity);
+  }
 }

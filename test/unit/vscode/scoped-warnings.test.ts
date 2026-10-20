@@ -26,7 +26,7 @@ function warningServer(onWarning?: (message: string) => unknown, onError?: (mess
   };
   const connection = {
     onInitialize: listen('initialize'), onInitialized: listen('initialized'),
-    onDefinition: listen('definition'), onHover: listen('hover'), onDocumentSymbol: listen('symbols'), onCompletion: listen('completion'), onReferences: listen('references'),
+    onDefinition: listen('definition'), onHover: listen('hover'), onDocumentSymbol: listen('symbols'), onCompletion: listen('completion'), onReferences: listen('references'), onPrepareRename: listen('prepareRename'), onRenameRequest: listen('rename'),
     onNotification: (name: string, callback: (...args: any[]) => any) => listen(name)(callback),
     onDidChangeWatchedFiles: listen('watched'),
     onDidOpenTextDocument: listen('opened'), onDidChangeTextDocument: listen('changed'), onDidCloseTextDocument: listen('closed'),
@@ -36,7 +36,7 @@ function warningServer(onWarning?: (message: string) => unknown, onError?: (mess
     console: { warn: (message: string) => logged.push(message), error: (message: string) => { logged.push(message); onError?.(message); } },
     window: { showWarningMessage: (message: string) => { visible.push(message); return onWarning?.(message); } },
   } as unknown as Connection;
-  const adapter = new LanguageServerAdapter(connection, { read: () => undefined, localPath: () => undefined });
+  const adapter = new LanguageServerAdapter(connection, { read: () => undefined, localPath: () => undefined }, { keyOf: () => undefined });
   adapter.start();
   return {
     adapter, visible, logged,

@@ -55,7 +55,14 @@ export type NativeCompletionObservation = NativeDefinitionObservation & {
   items: readonly { label: string; insertion: string; range: DiagnosticRange }[]; aggregate?: unknown;
 };
 export type NativeCompletionDocumentObservation = NativeDefinitionObservation & { entryText: string };
-type Operation = 'definitionReferences' | 'definitionReferenceObserve' | 'definitionOpen' | 'definitionEdit' | 'definitionGoTo' | 'definitionHover' | 'definitionSymbols' | 'definitionCompletion' | 'definitionApplyCompletion' | 'definitionDispose' | 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarManage' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
+export type NativeRenameObservation = {
+  readonly book: { readonly uri: string; readonly version: number; readonly text: string; readonly dirty: boolean };
+  readonly basket: { readonly uri: string; readonly version: number; readonly text: string; readonly dirty: boolean };
+  readonly placeholder: string; readonly refused: boolean; readonly explanation: string;
+};
+export type NativeRenameSetup = { book: string; basket: string; configurationFile: string; resetFile: string };
+
+type Operation = 'renameOpen' | 'renamePrepare' | 'renameApply' | 'renameObserve' | 'renameDispose' | 'definitionReferences' | 'definitionReferenceObserve' | 'definitionOpen' | 'definitionEdit' | 'definitionGoTo' | 'definitionHover' | 'definitionSymbols' | 'definitionCompletion' | 'definitionApplyCompletion' | 'definitionDispose' | 'generationOpen' | 'generationAction' | 'generationObserve' | 'generationDispose' | 'previewOpen' | 'previewShow' | 'previewEdit' | 'previewSaveConfiguration' | 'previewObserve' | 'previewClosePanel' | 'previewDispose' | 'sidebarOpen' | 'sidebarObserve' | 'sidebarAction' | 'sidebarManage' | 'sidebarDispose' | 'missingDocumentDiagnostics' | 'readDocument' | 'extensionPath' | 'shutdown' | 'diagnosticOpen' | 'diagnosticEdit' | 'diagnosticObserve' | 'diagnosticClose' | 'diagnosticDispose' | 'diagnosticDependency';
 type Pending = { promise: Promise<unknown>; resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> };
 
 /** One owned native host, with only the observations needed by its test consumers. */
@@ -153,6 +160,31 @@ export class VsCodeSession {
         profile, profileEntries, launcher: this.launcher?.diagnostics(),
       }), { cause: error });
     });
+  }
+
+  openNativeRename(renameId: string, extensionId: string, setup: NativeRenameSetup): Promise<NativeRenameObservation> {
+    return this.renameRequest('renameOpen', { renameId, extensionId, ...setup });
+  }
+  prepareNativeRename(renameId: string, line: number, character: number): Promise<NativeRenameObservation> {
+    return this.renameRequest('renamePrepare', { renameId, line, character });
+  }
+  applyNativeRename(renameId: string, line: number, character: number, newName: string): Promise<NativeRenameObservation> {
+    return this.renameRequest('renameApply', { renameId, line, character, newName });
+  }
+  observeNativeRename(renameId: string): Promise<NativeRenameObservation> { return this.renameRequest('renameObserve', { renameId }); }
+  async disposeNativeRename(renameId: string): Promise<void> {
+    if (await this.request('renameDispose', { renameId }) !== null) throw new Error('The native rename disposal returned an invalid receipt.');
+  }
+  private async renameRequest(operation: Operation, values: Record<string, unknown>): Promise<NativeRenameObservation> {
+    const value = await this.request(operation, values);
+    if (!value || typeof value !== 'object') throw new Error('The native rename observation is absent.');
+    const actual = value as Partial<NativeRenameObservation>;
+    const valid = (document: NativeRenameObservation['book'] | undefined) => document
+      && typeof document.uri === 'string' && Number.isInteger(document.version) && document.version >= 0
+      && typeof document.text === 'string' && typeof document.dirty === 'boolean';
+    if (!valid(actual.book) || !valid(actual.basket) || typeof actual.placeholder !== 'string'
+      || typeof actual.refused !== 'boolean' || typeof actual.explanation !== 'string') throw new Error('The native rename observation is malformed.');
+    return actual as NativeRenameObservation;
   }
 
   openGenerationEditor(generationId: string, extensionId: string, setup: GenerationEditorSetup): Promise<GenerationEditorObservation> {

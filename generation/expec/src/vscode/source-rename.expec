@@ -1,0 +1,86 @@
+use SourceRename from "../core/source-rename.expec"
+use DefinitionTextDocument, DefinitionPosition from "./source-navigation.expec"
+
+opaque type NativeRenameTarget
+opaque type NativeRenameEdit
+
+component SourceRenameAdapter {
+  requires package "language-server" for runtime
+  requires package "language-server-document" for runtime
+  requires package "vscode-test-electron" for test
+  depends on SourceRename
+  construction(renamer: SourceRename)
+  public prepare, rename
+  capability prepare(document: DefinitionTextDocument, position: DefinitionPosition) returns NativeRenameTarget {
+    promises "Convert this exact standard TextDocument's UTF-16 position to a zero-based Unicode-scalar cursor and call core prepare once with the exact URI/version. Reject fractional, negative, out-of-line and surrogate-splitting coordinates rather than clamp. Validate the returned whole authored token against this same captured requesting text before returning the standard prepareRename range/decoded placeholder. Map an explained core refusal to standard LSP RequestFailed, without invented partial success. Native types and coordinate conversion stay here; no source acquisition, parsing, name policy, generation or writes."
+  }
+  capability rename(document: DefinitionTextDocument, position: DefinitionPosition, newName: Text) returns NativeRenameEdit {
+    promises "Convert the current standard document/position once and forward decoded newName unchanged to core rename. Validate all returned exact source/scalar ranges, nonoverlap, distinct document URIs and nonnegative integer optional versions, and requester URI/text/version equality when affected, before producing standard WorkspaceEdit.documentChanges with versioned TextDocumentEdits; saved-only sources have null version. Invalid results refuse the whole edit, never silently filter occurrences or guess saved versions. Preserve actual URI/text/newText and edit ordering. No custom apply, save, selection, parser, resolver or generated output. Standard VS Code owns preview/apply and undo; null-version edits and later preview selection carry no invented atomicity guarantee. Core/provider errors remain observable as explained standard refusal."
+  }
+}
+
+// Official standard prepareRename/rename and documentChanges contracts:
+// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareRename
+// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rename
+// https://code.visualstudio.com/docs/editing/refactoring
+// Use the existing reusable installed extension host and fresh owned files/buffers.
+// Call this extension's actual registered native prepare/provideRenameEdits feature,
+// not an aggregate provider or a driver resolver. Apply its real WorkspaceEdit through
+// workspace.applyEdit; inspect actual open document text/dirty state and saved bytes.
+// Setup saves both owned files and a selected expec.json naming both build entries,
+// opens both author buffers, awaits actual configuration/current analysis and leaves
+// generation disabled. Display positions are one-based UTF-16 in the owned book.
+// Both dirty states and the complete saved owned tree including manifest are real
+// observations, not inferred from a returned plan.
+// Driver cleanup discards owned dirty buffers, settles callbacks and closes only
+// owned resources. Unsafe cleanup retains evidence rather than deleting uncertainty.
+examples for SourceRenameAdapter {
+  setup nativeRenameProject(book: Text, basket: Text) returns Nothing
+  action prepareNativeRename(line: Number, column: Number) returns Nothing
+  action applyNativeRename(line: Number, column: Number, newName: Text) returns Nothing
+  observation nativeRenamePlaceholder() returns Text
+  observation nativeRenamedBookText() returns Text
+  observation nativeRenamedBasketText() returns Text
+  observation nativeRenamedBuffersDirty() returns Boolean
+  observation nativeRenameSavedFilesUnchanged() returns Boolean
+  observation nativeRenameWasRefused() returns Boolean
+  observation nativeRenameExplanationIncludes(text: Text) returns Boolean
+  check expectNativeRenamePrepared(name: Text) {
+    let actual = nativeRenamePlaceholder()
+    assert actual == name
+  }
+  check expectNativeRenameText(book: Text, basket: Text) {
+    let actualBook = nativeRenamedBookText()
+    let actualBasket = nativeRenamedBasketText()
+    assert actualBook == book
+    assert actualBasket == basket
+  }
+  check expectUnsavedNativeRename() {
+    let dirty = nativeRenamedBuffersDirty()
+    let saved = nativeRenameSavedFilesUnchanged()
+    assert dirty == true
+    assert saved == true
+  }
+  check expectNativeRenameRefused(detail: Text) {
+    let refused = nativeRenameWasRefused()
+    let explained = nativeRenameExplanationIncludes(detail)
+    let saved = nativeRenameSavedFilesUnchanged()
+    assert refused == true
+    assert explained == true
+    assert saved == true
+  }
+  scenario "native rename applies the real versioned edit to both current author buffers" {
+    given nativeRenameProject("type Book {}", "use Book from \"./book.expec\"\ntype Basket { book: Book }")
+    when prepareNativeRename(1, 6)
+    when applyNativeRename(1, 6, "Publication")
+    then expectNativeRenamePrepared("Book")
+    then expectNativeRenameText("type Publication {}", "use Publication from \"./book.expec\"\ntype Basket { book: Publication }")
+    then expectUnsavedNativeRename()
+  }
+  scenario "native rename reports a collision and applies no partial edit" {
+    given nativeRenameProject("type Book {}\ntype Publication {}", "use Book from \"./book.expec\"\ntype Basket { book: Book }")
+    when applyNativeRename(1, 6, "Publication")
+    then expectNativeRenameRefused("Publication")
+    then expectNativeRenameText("type Book {}\ntype Publication {}", "use Book from \"./book.expec\"\ntype Basket { book: Book }")
+  }
+}

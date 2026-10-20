@@ -1,0 +1,328 @@
+// Requires the CORE-37 checked source-name query (SDK 0.1.0-pr.118).
+use SourceDocument from "./workspace.expec"
+use SourceDefinition from "./source-navigation.expec"
+use DocumentSources from "./document-analysis.expec"
+use ConnectionConfiguration from "./project-connection.expec"
+
+type RenameBuffer {
+  source: SourceDocument
+  version: Number
+}
+type RenameTarget {
+  location: SourceDefinition
+  name: Text
+}
+type RenameTextEdit {
+  startOffset: Number
+  endOffset: Number
+  newText: Text
+}
+type RenameDocumentEdit {
+  source: SourceDocument
+  version: Number?
+  edits: List<RenameTextEdit>
+}
+
+// Current editor facts are supplied through this small host-independent port.
+// Source acquisition stays with the existing DocumentSources boundary.
+interface RenameWorkspace {
+  public configuration, openDocuments
+  capability configuration() returns ConnectionConfiguration? {
+    promises "Return the currently selected saved manifest snapshot, or absence. Never invent a default entry, discover a project or substitute an old selection. Use the active saved configuration, not unsaved JSON editor proposals. An unavailable selected manifest is not usable. writable is metadata-save permission and is not rename permission; this operation never edits that manifest. Returned facts are caller-isolated; they do not prove that a generated-output project is connected."
+  }
+  capability openDocuments() returns List<RenameBuffer> {
+    promises "Return a fresh complete snapshot of the current open .expec text documents, including hidden unsaved buffers, with their exact URI/text and actual nonnegative integer version. No duplicate URI or guessed saved version. Closed documents are absent. No writes, parsing, source discovery, generation or editor selection."
+  }
+}
+
+// A portable scope path is not physical identity: case aliases and hardlinks
+// can name one file while retaining distinct requirement-scope paths.
+interface SourceIdentities {
+  public keyOf
+  capability keyOf(uri: Text, manifestFile: Text) returns Text? {
+    promises "Return the current opaque physical source identity within this selected manifest, or absence when native facts cannot establish it. Equal known keys establish the same actual file; different known keys establish different actual files in this capture. The provider owns filesystem observation and ancestry checks; core receives no native handles or filesystem APIs. Never derive a key from URI spelling, decoded or case-folded strings, localPath, source text or declaration names. Keys are only equality facts for the current capture, never persistent or cross-project identifiers. A native file that has never been saved may have no identity: preserve absence so rename can explain its actual URI and ask the author to save first. No project scan, package capture, parsing, generation or writes. Unexpected provider errors surface. Return current facts on every query so the caller can recheck all acquired and routed source identities before returning a plan."
+  }
+}
+
+// A plain caller supplies existing source acquisition and independent identity facts:
+// const rename = new SourceRename(workspace, sources, identities);
+// rename.rename(uri, version, scalarOffset, "Publication");
+
+component SourceRename {
+  requires package "expec" for runtime
+  depends on RenameWorkspace
+  depends on DocumentSources
+  depends on SourceIdentities
+  construction(workspace: RenameWorkspace, sources: DocumentSources, identities: SourceIdentities)
+  public prepare, rename
+
+  capability prepare(uri: Text, version: Number, offset: Number) returns RenameTarget {
+    promises "Check one explicit rename request against the selected manifest's actual build.entries and every transitive use/include/examples attachment reached from those entries, including reverse users reached from another entry. This is configured-build scope, not arbitrary workspace files or other projects. Read validated configuration through the public ConfigurationReader; a generated-output connection is not required. Use current open text before saved DocumentSources text, including new unsaved import locators. Capture each exact URI/text once per analysis and terminate cycles; never reuse an accepted model after rejected text. Ask SourceIdentities.keyOf for actual physical equality independently of DocumentSources.localPath, which remains literal requirement-scope metadata. A resolved route may use one current open buffer only when both its verified primary manifest-relative path and its known physical key agree with that buffer. Preserve the exact open URI/text/version in captured sources, models and returned edits. Refuse multiple open identities for one physical file, an equal path with different or unknown physical keys, or distinct effective acquired URIs sharing one physical key. Different paths with the same key, including native case aliases and hardlinks, refuse rather than merge requirement scopes. Unknown identities of unrelated uncaptured foreign open buffers do not match and do not block an otherwise complete rename. Never infer physical equality from URI or path spelling, case-folding, percent decoding or equal text. Use public LangiumReader, LangiumModel, SourceComposer and Compiler for one shared batch of all configured entries, with the same captured module objects and supplied package aliases/phases. Resolve configured entry paths relative to the selected manifest URI or absolute native filename, never the generated project.root. Do not create another parser or resolver. Ordinary live diagnostics and bounded references remain unchanged; only explicit prepare/rename can acquire this configured source set. Never use native project capture, SourceLoader's saved-only snapshots, package installation, JVMs, output generation or writes."
+    promises "Require the requesting exact URI/version to be open in this captured configured scope. Require finite nonnegative integer version/offset, otherwise throw RangeError. Select the actual named source declaration or checked source-name use (including a record field label or bound final reference segment) containing the zero-based Unicode-scalar cursor; return its whole authored token range in the requesting source and decoded target name. Comments, punctuation, qualified-reference prefix segments, builtin/external/unnamed targets, unresolved/ambiguous targets and foreign source ownership refuse with an explained Error. Every acquired configured source must have a verified primary manifest-relative path from DocumentSources.localPath and a known physical key from SourceIdentities.keyOf. An unknown acquired identity refuses with the actual URI; explain save first when a new native file has no identity. A selected alias-use cursor or a same-spelled explicit alias to this target refuses rather than guessing which introduction supplied that spelling. A direct declaration or import source-name remains eligible beside a distinct explicit alias."
+    promises "Refuse incomplete or invalid checked analysis: missing required source, rejected syntax, actual compiler problems, deferred compilation prerequisites or invalid requirementsFor findings remain explained, never repaired by scanning. Use Specification.names.at, inSource and occurrencesOf for the actual checked spelling owner, not raw contextual Inspection.resolution. Require complete finding-free source-name queries even after compilation succeeds; ambiguous-source-name and source-name-selection findings refuse. Structurally empty-name captured input models need no invented query source identity. Contextual resolver deferrals already discharged by Compiler are not independent failures. Before returning, require the selected configuration and all captured open URI/text/version facts to remain equal and freshly re-read saved-only captures to match exactly. After the final saved-only rereads, requery every acquired URI and every resolved alias route that was mapped to an open buffer through SourceIdentities.keyOf using the same captured manifest; each known physical key must still agree with its captured key. Recheck current configuration and open facts after identity-provider callbacks. A changed, missing or contradictory identity refuses instead of returning an older routing plan. Explain changed input instead of returning older facts. There is no cross-call target handle: rename performs fresh capture and selection. Expected refusals use ordinary Error messages naming the actual unavailable URI, declined alias/name or changed/conflicting input; do not fabricate an empty successful edit. Unexpected provider/SDK errors surface."
+  }
+  capability rename(uri: Text, version: Number, offset: Number, newName: Text) returns List<RenameDocumentEdit> {
+    promises "Apply prepare's same source-scope, selection, validity and final-currentness rules to fresh inputs. newName is the decoded name, not source syntax. Reject empty names, control characters and unpaired surrogates with an explained Error; do not trim or normalize Unicode or whitespace. Use the real reader to admit an ordinary single-name spelling consuming the entire candidate token; otherwise render a backtick name escaping backticks/backslashes and validate that complete token with the reader. A temporary inert synthetic source may validate spelling only: require exactly one declaration, its whole nameOrigin consuming the candidate token and its decoded name equal to newName. Reject injected trailing declarations/tokens. Never accept unchecked interpolation or use a second keyword/identifier grammar. An unchanged decoded name returns an empty edit list after validation."
+    promises "Plan the declaration name and all safely identified bound occurrences of that same declaration across the captured configured entries. Edit import source-name tokens, keeping distinct explicit aliases and their uses unchanged. Do not replace every location from bounded reference search, edit strings/comments, rename an unrelated same-named declaration, alter manifest metadata, generate files or execute a save. Same-spelled explicit alias routing refuses; selected qualifier renames and any other unproven routing refuse rather than dropping affected occurrences. Return only affected documents in URI code-unit order, each with exact captured source, its actual open version or absence for saved-only text, and distinct nonoverlapping scalar edits in descending start order. Return caller-isolated facts."
+    promises "Check the hypothetical edited source snapshots through the same real language pipeline before returning. Clean compilation alone is insufficient: match source declarations by their mapped authored provenance/kind and every actual checked source-name token's spelling-owner declaration by mapped source/name ranges, including unchanged references that a new name could capture. Require a full two-way correspondence of complete before/after name sets: compare actual source owner kind and mapped nameOrigin (actual Name origin for aliases/captures), and stable builtin/external provenance where applicable. Unchanged tokens retain spelling/owner, while edited target-owned tokens have the decoded newName and mapped owner. Opaque NodeIds are valid only inside their own analysis and must not be compared across reparses. Refuse duplicate declarations, changed binding, lost qualified uses, new ambiguity or any new/retained prerequisite; expose the conflicting newName or actual finding. No partial plan escapes a refusal. This promises a complete intended edit against captured sources and detects supersession while computing; the ordinary editor owns later preview/apply, optional edit selection and undo. It does not promise filesystem/editor atomicity after the response."
+  }
+}
+
+// The driver assembles actual public SourceRename, public SDK and in-memory
+// RenameWorkspace/DocumentSources. After-text applies only returned real edits to
+// their captured scalar ranges; expected text below is independent authored data.
+// renameProject installs this fixed literal identity table under file:///workspace/:
+// book.expec="fixture-book", basket.expec="fixture-basket", first.expec="fixture-first",
+// second.expec="fixture-second", store.expec="fixture-store", saving.expec="fixture-saving",
+// examples.expec="fixture-examples", empty.expec="fixture-empty", missing.expec="fixture-missing".
+// These are independent host facts, never keys computed from URI, text or scope paths.
+// identifyRenameSource overrides a fact; withholding removes it and later save/open never restores it.
+// changeRenameIdentityDuringNextRead waits until keyOf(uri) actually returned its old key,
+// then changes only that identity during a later real DocumentSources.read. The request
+// fails its driver if the scheduled transition never fires; it never fabricates a refusal.
+// The driver input baseline includes those identity facts as well as saved/open/configuration facts.
+// No helper reconstructs resolution, derives expectations from the parser or writes.
+// Positions below are one-based Unicode scalars; selected manifest is
+// file:///workspace/expec.json with these literal build.entries. Saved sources
+// are supplied only by saveRenameSource, open buffers override them exactly.
+// Driver after-text preserves the actual returned document/edit order, without
+// sorting, deduplicating or filtering the plan; refusal resets the current reply.
+examples for SourceRename {
+  fixture noRenameDocuments: List<Text> = []
+  fixture renameBook: SourceDocument = { uri: "file:///workspace/book.expec", text: "type Book {}" }
+  fixture renameBasket: SourceDocument = { uri: "file:///workspace/basket.expec", text: "use Book from \"./book.expec\"\ntype Basket { book: Book }" }
+  setup renameProject(entries: List<Text>) returns Nothing
+  setup identifyRenameSource(uri: Text, identity: Text) returns Nothing
+  setup withholdRenameSourceIdentity(uri: Text) returns Nothing
+  setup changeRenameIdentityDuringNextRead(uri: Text, identity: Text) returns Nothing
+  action saveRenameSource(source: SourceDocument) returns Nothing
+  action openRenameSource(source: SourceDocument, version: Number) returns Nothing
+  action prepareSourceRename(uri: Text, version: Number, line: Number, column: Number) returns Nothing
+  action requestSourceRename(uri: Text, version: Number, line: Number, column: Number, newName: Text) returns Nothing
+  action changeRenameSourceDuringNextRead(source: SourceDocument, version: Number) returns Nothing
+  observation renamePreparedName() returns Text
+  observation renamePreparedStartOffset() returns Number
+  observation renamePreparedEndOffset() returns Number
+  observation renameChangedUris() returns List<Text>
+  observation renameAfterText(uri: Text) returns Text
+  observation renameEditVersion(uri: Text) returns Number?
+  observation renameEditHasOpenVersion(uri: Text) returns Boolean
+  observation renameRefused() returns Boolean
+  observation renameExplanationIncludes(text: Text) returns Boolean
+  observation renameInputsUnchanged() returns Boolean
+  observation renameCurrentText(uri: Text) returns Text
+
+  check expectRenamePrepared(name: Text) {
+    let actual = renamePreparedName()
+    assert actual == name
+  }
+  check expectPreparedRenameRange(start: Number, end: Number) {
+    let actualStart = renamePreparedStartOffset()
+    let actualEnd = renamePreparedEndOffset()
+    assert actualStart == start
+    assert actualEnd == end
+  }
+  check expectRenameText(uri: Text, text: Text) {
+    let actual = renameAfterText(uri)
+    assert actual == text
+  }
+  check expectRenameDocuments(uris: List<Text>) {
+    let actual = renameChangedUris()
+    assert actual == uris
+  }
+  check expectRenameVersion(uri: Text, version: Number?) {
+    let actual = renameEditVersion(uri)
+    assert actual == version
+  }
+  check expectSavedOnlyRename(uri: Text) {
+    let hasVersion = renameEditHasOpenVersion(uri)
+    assert hasVersion == false
+  }
+  check expectRenameRefused(detail: Text) {
+    let refused = renameRefused()
+    let explained = renameExplanationIncludes(detail)
+    let changes = renameChangedUris()
+    assert refused == true
+    assert explained == true
+    assert changes == noRenameDocuments
+  }
+  check expectRenameInputsUnchanged() {
+    let actual = renameInputsUnchanged()
+    assert actual == true
+  }
+  check expectCurrentRenameText(uri: Text, text: Text) {
+    let actual = renameCurrentText(uri)
+    assert actual == text
+  }
+
+  scenario "rename changes the declaration and its bound use but preserves comments and strings" {
+    given renameProject(["book.expec"])
+    when openRenameSource({ uri: renameBook.uri, text: "type Book {}\n// Book stays in this comment\ntype Basket { book: Book\n  title: Text = \"Book\" }" }, 7)
+    when prepareSourceRename(renameBook.uri, 7, 1, 6)
+    when requestSourceRename(renameBook.uri, 7, 1, 6, "Publication")
+    then expectRenamePrepared("Book")
+    then expectPreparedRenameRange(5, 9)
+    then expectRenameDocuments([renameBook.uri])
+    then expectRenameText(renameBook.uri, "type Publication {}\n// Book stays in this comment\ntype Basket { book: Publication\n  title: Text = \"Book\" }")
+    then expectRenameVersion(renameBook.uri, 7)
+    then expectRenameInputsUnchanged()
+  }
+  scenario "all configured entries include a closed reverse importer and its current unsaved target" {
+    given renameProject(["book.expec", "basket.expec"])
+    when saveRenameSource(renameBook)
+    when saveRenameSource(renameBasket)
+    when openRenameSource({ uri: renameBook.uri, text: "// unsaved 📚\ntype Book {}" }, 2)
+    when requestSourceRename(renameBook.uri, 2, 2, 6, "Publication")
+    then expectRenameDocuments([renameBasket.uri, renameBook.uri])
+    then expectRenameText(renameBook.uri, "// unsaved 📚\ntype Publication {}")
+    then expectRenameText(renameBasket.uri, "use Publication from \"./book.expec\"\ntype Basket { book: Publication }")
+    then expectRenameVersion(renameBook.uri, 2)
+    then expectSavedOnlyRename(renameBasket.uri)
+    then expectRenameInputsUnchanged()
+  }
+  scenario "declaration rename preserves a distinct import alias and its uses" {
+    given renameProject(["basket.expec"])
+    when saveRenameSource(renameBook)
+    when openRenameSource({ uri: renameBasket.uri, text: "use Book as Novel from \"./book.expec\"\ntype Basket { book: Novel }" }, 1)
+    when requestSourceRename(renameBasket.uri, 1, 1, 6, "Publication")
+    then expectRenameText(renameBook.uri, "type Publication {}")
+    then expectRenameText(renameBasket.uri, "use Publication as Novel from \"./book.expec\"\ntype Basket { book: Novel }")
+    then expectRenameInputsUnchanged()
+  }
+  scenario "same-spelled explicit alias routing is refused without guessing" {
+    given renameProject(["basket.expec"])
+    when saveRenameSource(renameBook)
+    when openRenameSource({ uri: renameBasket.uri, text: "use Book as Book from \"./book.expec\"\ntype Basket { book: Book }" }, 1)
+    when requestSourceRename(renameBasket.uri, 1, 1, 6, "Publication")
+    then expectRenameRefused("alias")
+    then expectRenameInputsUnchanged()
+  }
+  scenario "an unrelated local Book keeps its declaration and bound use" {
+    given renameProject(["book.expec"])
+    when openRenameSource({ uri: renameBook.uri, text: "type Book {}\ncomponent Store {\n  local type Book {}\n  capability stock(book: Book)\n}\ntype Basket { book: Book }" }, 1)
+    when requestSourceRename(renameBook.uri, 1, 1, 6, "Publication")
+    then expectRenameText(renameBook.uri, "type Publication {}\ncomponent Store {\n  local type Book {}\n  capability stock(book: Book)\n}\ntype Basket { book: Publication }")
+    then expectRenameInputsUnchanged()
+  }
+  scenario "a syntactically valid rename that would capture a binding is refused" {
+    given renameProject(["book.expec"])
+    when openRenameSource({ uri: renameBook.uri, text: "type Book {}\ncomponent Store {\n  local type Publication {}\n  capability stock(book: Book)\n}" }, 1)
+    when requestSourceRename(renameBook.uri, 1, 1, 6, "Publication")
+    then expectRenameRefused("Publication")
+    then expectRenameInputsUnchanged()
+  }
+  scenario "a decoded Unicode name is quoted through the real language spelling rules" {
+    given renameProject(["book.expec"])
+    when openRenameSource({ uri: renameBook.uri, text: "type Book {}\ntype Basket { book: Book }" }, 1)
+    when requestSourceRename(renameBook.uri, 1, 1, 6, "Publication 📚")
+    then expectRenameText(renameBook.uri, "type `Publication 📚` {}\ntype Basket { book: `Publication 📚` }")
+    then expectRenameInputsUnchanged()
+  }
+  scenario "a missing required configured entry refuses an otherwise valid local edit" {
+    given renameProject(["book.expec", "missing.expec"])
+    when openRenameSource(renameBook, 1)
+    when requestSourceRename(renameBook.uri, 1, 1, 6, "Publication")
+    then expectRenameRefused("file:///workspace/missing.expec")
+    then expectRenameInputsUnchanged()
+  }
+  scenario "a source changed during acquisition cannot produce an older edit" {
+    given renameProject(["book.expec", "basket.expec"])
+    when openRenameSource(renameBook, 1)
+    when saveRenameSource(renameBasket)
+    when changeRenameSourceDuringNextRead({ uri: renameBook.uri, text: "type Magazine {}" }, 2)
+    when requestSourceRename(renameBook.uri, 1, 1, 6, "Publication")
+    then expectRenameRefused("changed")
+    then expectCurrentRenameText(renameBook.uri, "type Magazine {}")
+  }
+  scenario "an ambiguous use refuses instead of choosing one imported declaration" {
+    given renameProject(["basket.expec"])
+    when saveRenameSource({ uri: "file:///workspace/first.expec", text: "type Book {}" })
+    when saveRenameSource({ uri: "file:///workspace/second.expec", text: "type Book {}" })
+    when openRenameSource({ uri: renameBasket.uri, text: "use Book from \"./first.expec\"\nuse Book from \"./second.expec\"\ntype Basket { book: Book }" }, 1)
+    when requestSourceRename(renameBasket.uri, 1, 3, 22, "Publication")
+    then expectRenameRefused("ambiguous")
+    then expectRenameInputsUnchanged()
+  }
+  scenario "an empty new name refuses without returning an edit" {
+    given renameProject(["book.expec"])
+    when openRenameSource(renameBook, 1)
+    when requestSourceRename(renameBook.uri, 1, 1, 6, "")
+    then expectRenameRefused("empty")
+    then expectRenameInputsUnchanged()
+  }
+  scenario "field rename includes checked record labels and contextual member access" {
+    given renameProject(["book.expec"])
+    when openRenameSource({ uri: renameBook.uri, text: "type Book { title: Text }\nexamples for Book {\n  fixture book: Book = { title: \"A\" }\n  fixture copied: Text = book.title\n}" }, 1)
+    when requestSourceRename(renameBook.uri, 1, 1, 13, "name")
+    then expectRenameText(renameBook.uri, "type Book { name: Text }\nexamples for Book {\n  fixture book: Book = { name: \"A\" }\n  fixture copied: Text = book.name\n}")
+    then expectRenameInputsUnchanged()
+  }
+  scenario "composition target names are renamed even after effective-model directives are omitted" {
+    given renameProject(["store.expec"])
+    when saveRenameSource({ uri: "file:///workspace/saving.expec", text: "use Store from \"./store.expec\"\nextend Store { capability save() returns Nothing }" })
+    when saveRenameSource({ uri: "file:///workspace/examples.expec", text: "examples {}" })
+    when openRenameSource({ uri: "file:///workspace/store.expec", text: "include \"./saving.expec\"\nconcept Store {}\nexamples for Store from \"./examples.expec\"" }, 1)
+    when requestSourceRename("file:///workspace/store.expec", 1, 2, 9, "Library")
+    then expectRenameDocuments(["file:///workspace/saving.expec", "file:///workspace/store.expec"])
+    then expectRenameText("file:///workspace/store.expec", "include \"./saving.expec\"\nconcept Library {}\nexamples for Library from \"./examples.expec\"")
+    then expectRenameText("file:///workspace/saving.expec", "use Library from \"./store.expec\"\nextend Library { capability save() returns Nothing }")
+    then expectRenameInputsUnchanged()
+  }
+  scenario "an included source with no names does not prevent a valid rename" {
+    given renameProject(["book.expec"])
+    when saveRenameSource({ uri: "file:///workspace/empty.expec", text: "" })
+    when openRenameSource({ uri: renameBook.uri, text: "include \"./empty.expec\"\ntype Book {}" }, 1)
+    when requestSourceRename(renameBook.uri, 1, 2, 6, "Publication")
+    then expectRenameDocuments([renameBook.uri])
+    then expectRenameText(renameBook.uri, "include \"./empty.expec\"\ntype Publication {}")
+    then expectRenameInputsUnchanged()
+  }
+  scenario "two closed routes to one physical file refuse instead of omitting an importer" {
+    given renameProject(["basket.expec", "store.expec"])
+    given identifyRenameSource(renameBook.uri, "physical-book")
+    given identifyRenameSource("file:///workspace/second.expec", "physical-book")
+    when saveRenameSource(renameBook)
+    when saveRenameSource({ uri: "file:///workspace/second.expec", text: "type Book {}" })
+    when saveRenameSource({ uri: "file:///workspace/store.expec", text: "use Book from \"./second.expec\"\ntype Store { book: Book }" })
+    when openRenameSource(renameBasket, 1)
+    when requestSourceRename(renameBasket.uri, 1, 1, 6, "Publication")
+    then expectRenameRefused("identity")
+    then expectRenameInputsUnchanged()
+  }
+  scenario "an unknown acquired physical identity refuses and leaves the host unchanged" {
+    given renameProject(["basket.expec"])
+    given withholdRenameSourceIdentity(renameBook.uri)
+    when saveRenameSource(renameBook)
+    when openRenameSource(renameBasket, 1)
+    when requestSourceRename(renameBasket.uri, 1, 1, 6, "Publication")
+    then expectRenameRefused(renameBook.uri)
+    then expectRenameInputsUnchanged()
+  }
+  scenario "equal source text with distinct physical identities keeps the other declaration and importer unchanged" {
+    given renameProject(["basket.expec", "store.expec"])
+    given identifyRenameSource(renameBook.uri, "physical-book")
+    given identifyRenameSource("file:///workspace/second.expec", "physical-second")
+    when saveRenameSource(renameBook)
+    when saveRenameSource({ uri: "file:///workspace/second.expec", text: "type Book {}" })
+    when saveRenameSource({ uri: "file:///workspace/store.expec", text: "use Book from \"./second.expec\"\ntype Store { book: Book }" })
+    when openRenameSource(renameBasket, 1)
+    when requestSourceRename(renameBasket.uri, 1, 1, 6, "Publication")
+    then expectRenameDocuments([renameBasket.uri, renameBook.uri])
+    then expectRenameText(renameBook.uri, "type Publication {}")
+    then expectRenameText(renameBasket.uri, "use Publication from \"./book.expec\"\ntype Basket { book: Publication }")
+    then expectRenameText("file:///workspace/second.expec", "type Book {}")
+    then expectRenameText("file:///workspace/store.expec", "use Book from \"./second.expec\"\ntype Store { book: Book }")
+    then expectSavedOnlyRename(renameBook.uri)
+    then expectRenameInputsUnchanged()
+  }
+  scenario "physical identity replaced during acquisition refuses even when URI text and version stay unchanged" {
+    given renameProject(["book.expec", "basket.expec"])
+    given identifyRenameSource(renameBook.uri, "physical-book-before")
+    given changeRenameIdentityDuringNextRead(renameBook.uri, "physical-book-after")
+    when saveRenameSource(renameBasket)
+    when openRenameSource(renameBook, 1)
+    when requestSourceRename(renameBook.uri, 1, 1, 6, "Publication")
+    then expectRenameRefused("changed")
+    then expectCurrentRenameText(renameBook.uri, renameBook.text)
+  }
+}
