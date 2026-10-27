@@ -2366,4 +2366,8 @@ async withholdRenameSourceIdentity(uri: string): Promise<void> {
 async changeRenameIdentityDuringNextRead(uri: string, identity: string): Promise<void> {
     this.sourceRenameRecording.changeIdentityDuringNextRead(uri, identity);
   }
+
+async connectionSavedProjectSettings(): Promise<string> {
+    throw new Error("Not implemented: workspace.connectionSavedProjectSettings");
+  }
 }
