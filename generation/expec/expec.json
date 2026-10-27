@@ -2,7 +2,12 @@
   "formatVersion": 1,
   "version": "0.1.0",
   "project": {
-    "root": "../.."
+    "root": "../..",
+    "excludePaths": [
+      "dist",
+      ".local-docs",
+      "generation/tooling"
+    ]
   },
   "build": {
     "entries": [
@@ -312,7 +317,7 @@
     {
       "alias": "expec",
       "name": "npm:executable-specification-language",
-      "version": "0.1.0-pr.68",
+      "version": "0.1.0-pr.126",
       "phases": [
         "build",
         "runtime"

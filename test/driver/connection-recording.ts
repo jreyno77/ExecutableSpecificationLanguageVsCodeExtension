@@ -178,6 +178,16 @@ export class ConnectionRecording {
     return canonical(output.options);
   }
 
+  async savedProjectSettings(): Promise<string> {
+    const saved = await this.snapshot();
+    if (saved.text === undefined) throw new Error('The saved connection metadata is absent.');
+    const project: unknown = JSON.parse(saved.text).project;
+    if (!project || typeof project !== 'object' || Array.isArray(project)) {
+      throw new Error('The saved connection has no project metadata.');
+    }
+    const { root, ...settings } = project as Record<string, unknown>;
+    return canonical(settings);
+  }
   async savedVersion(): Promise<string> {
     return (await this.savedMetadata()).version;
   }

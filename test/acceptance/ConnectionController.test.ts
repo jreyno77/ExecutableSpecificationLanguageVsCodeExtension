@@ -267,3 +267,31 @@ test("invalid metadata and disposed selection withdraw earlier usable guidance",
   await workspace.expectGuidanceNoEffects(3);
   await workspace.expectSaveRequests(0);
 });
+
+/* @expec-test "fc23e90e-ca7f-4ab1-b11e-955ed2352833" */
+test("choosing another project preserves its configured capture boundaries", async ({ workspace }) => {
+  await workspace.connectionWorkspace(workspace.scopedConnectionSettings, true);
+  await workspace.keepConnectionTargetFile("beta", "manual.txt", "Keep handwritten beta");
+  await workspace.inspectConnection();
+  await workspace.chooseProjectDirectory("beta");
+  await workspace.confirmRequestedConfigurationSave();
+  await workspace.expectConnection("connected", "beta", "beta");
+  await workspace.expectSaveRequests(1);
+  await workspace.expectRequestedProject("beta");
+  await workspace.expectSavedProjectSettings("{\"excludePaths\":[\"dist\",\".local-docs\",\"generation/tooling\"]}");
+  await workspace.expectConnectionTreesUntouched();
+});
+
+/* @expec-test "6be76cc1-9fca-45be-8a4a-cbece3722c19" */
+test("new connection choices preserve existing capture boundaries", async ({ workspace }) => {
+  await workspace.connectionWorkspace(workspace.scopedConnectionSettings, true);
+  await workspace.keepConnectionTargetFile("beta", "manual.txt", "Keep handwritten beta");
+  await workspace.inspectConnection();
+  await workspace.createProjectConnection("beta", workspace.simpleConnectionOutputs, workspace.unchangedConnectionEntries);
+  await workspace.confirmRequestedConfigurationSave();
+  await workspace.expectConnection("connected", "beta", "beta");
+  await workspace.expectSaveRequests(1);
+  await workspace.expectSavedConnection(["src/library.expec"], ["typescript", "uml"]);
+  await workspace.expectSavedProjectSettings("{\"excludePaths\":[\"dist\",\".local-docs\",\"generation/tooling\"]}");
+  await workspace.expectConnectionTreesUntouched();
+});

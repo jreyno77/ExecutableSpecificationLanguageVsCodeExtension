@@ -1,4 +1,4 @@
-// Requires the CORE-37 checked source-name query (retained in SDK 0.1.0-pr.68).
+// Requires the CORE-37 checked source-name query (retained in SDK 0.1.0-pr.126).
 use SourceDocument from "./workspace.expec"
 use SourceDefinition from "./source-navigation.expec"
 use DocumentSources from "./document-analysis.expec"

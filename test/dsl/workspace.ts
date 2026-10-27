@@ -3778,4 +3778,15 @@ async withholdRenameSourceIdentity(uri: string): Promise<void> {
 async changeRenameIdentityDuringNextRead(uri: string, identity: string): Promise<void> {
     return await this.driver.changeRenameIdentityDuringNextRead(uri, identity);
   }
+
+async connectionSavedProjectSettings(): Promise<string> {
+    return await this.driver.connectionSavedProjectSettings();
+  }
+
+async expectSavedProjectSettings(expected: string): Promise<void> {
+    const actual = await this.driver.connectionSavedProjectSettings();
+    expectData(actual, expected);
+  }
+
+readonly scopedConnectionSettings: string = "{\"formatVersion\":1,\"version\":\"1.2.3\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[],\"project\":{\"root\":\"./alpha\",\"excludePaths\":[\"dist\",\".local-docs\",\"generation/tooling\"]}}";
 }
