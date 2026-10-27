@@ -312,7 +312,7 @@
     {
       "alias": "expec",
       "name": "npm:executable-specification-language",
-      "version": "0.1.0-pr.118",
+      "version": "0.1.0-pr.68",
       "phases": [
         "build",
         "runtime"
