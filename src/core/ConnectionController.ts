@@ -80,7 +80,7 @@ export class ConnectionController {
             return;
         }
         const previous = Object.freeze({ ...this.snapshot });
-        const raw = { ...(this.raw ?? { formatVersion: 1, version: '0.1.0', build: { entries: ['src/main.expec'] }, outputs: [] }), project: { root: directory } };
+        const raw = { ...(this.raw ?? { formatVersion: 1, version: '0.1.0', build: { entries: ['src/main.expec'] }, outputs: [] }), project: { ...(this.raw?.project as Record<string, unknown> | undefined), root: directory } };
         const text = JSON.stringify(raw);
         const checked = this.reader.read({ sourceId: previous.file, text });
         const revision = this.advance();
@@ -354,7 +354,7 @@ createConnection(directory: string, outputs: Array<ConnectionOutputChoice>, entr
         }
         const previous = Object.freeze({ ...this.snapshot });
         const raw = { ...(this.raw ?? { formatVersion: 1, version: '0.1.0', build: { entries: [...entries] } }),
-            project: { root: directory }, outputs: selected };
+            project: { ...(this.raw?.project as Record<string, unknown> | undefined), root: directory }, outputs: selected };
         const text = JSON.stringify(raw);
         const checked = this.reader.read({ sourceId: previous.file, text });
         if (!checked.value) {

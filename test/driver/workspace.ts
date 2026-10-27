@@ -2368,6 +2368,6 @@ async changeRenameIdentityDuringNextRead(uri: string, identity: string): Promise
   }
 
 async connectionSavedProjectSettings(): Promise<string> {
-    throw new Error("Not implemented: workspace.connectionSavedProjectSettings");
+    return this.connectionRecording.savedProjectSettings();
   }
 }
