@@ -142,7 +142,7 @@ examples for OutputTabs {
     assert unsafe == false
     assert requests == emptyPreviewRequests
   }
-  check expectPreviewExplanation(expected: Text) {
+  check expectDocumentExplanation(expected: Text) {
     let actual = selectedOutputExplanation()
     assert actual == expected
   }
@@ -410,7 +410,7 @@ examples for OutputTabs {
   scenario "explain a missing rendered diagram without showing D2 source by default" {
     given openOutputTabs()
     when presentOutputs(previews)
-    then expectPreviewExplanation("Diagram preview unavailable. Select an SVG document or show source.")
+    then expectDocumentExplanation("Diagram preview unavailable. Select an SVG document or show source.")
     then expectDocumentTextAbsent("Book: { title: Text }")
   }
 
@@ -418,7 +418,7 @@ examples for OutputTabs {
     given openOutputTabs()
     when presentOutputs(wikiPages)
     when followDocumentLink("Missing section")
-    then expectPreviewExplanation("Anchor unavailable in supplied preview.")
+    then expectDocumentExplanation("Anchor unavailable in supplied preview.")
     then expectSelectedDocument("docs/Home.md", ["docs/reference/Book.md", "docs/Home.md"])
     then expectSafePreview()
   }
