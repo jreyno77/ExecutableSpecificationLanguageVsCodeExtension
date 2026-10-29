@@ -2,20 +2,12 @@
 // Its export is executable-specification-language/syntax/expec.tmLanguage.json.
 // Copy it under src/vscode/syntax/ with exact source/grammar hash provenance.
 // The language package generates it from the existing Langium grammar.
-// Build/runtime dependency: CI-qualified SDK 0.1.0 from passing PR129 run40964143567.
-// Producer adca526035d55b0563c1985ea46c325808a1fefa has the identical source tree
-// 69e7baa37ed75ae9ab65a4ceffe930904fd28952 as merged main fde5ee76973ee5f524f8205739c174d4a86e98ba.
-// Pin generation/tooling/executable-specification-language-ci-pr-129.tgz with its recorded SHA-512 integrity.
-// CORE-36 supplies public typeCandidates over detached facts from this same resolution.
-// Prepare eligible spelling/insertion/target facts during publication, never on requests.
-// This reviewed PROJECT-43 build queries all contract subjects within one captured
-// post-application scope, then verifies freshness before generating tests. It
-// preserves the same output adapter lifetime and all strict evidence checks.
-// Keep the complete SDK/runtime payload, source/test capture and syntax asset.
-// The unchanged CI archive SHA256 is 9f6c0ffd56a97fe9c801855d2f5f43bb45495909dfd349b170885d0e1cdf369d.
-// Its exact bytes passed both clean consumers and all six project pilots.
-// This dependency qualification is separate from the official main package release.
-// Historical failed builds remain recorded; a passing release does not repair unrelated defects.
+// Build/runtime SDK: reviewed OUT-28 source candidate 0.1.0, including merged OUT-27.
+// Producer 02a9a25e1e102d71d24c68fe76ac0762eedba5a5; normal clean build and npm pack.
+// Pin generation/tooling/executable-specification-language-out-28-02a9a25.tgz with recorded lockfile integrity.
+// SHA256 c05819eeef705a5fe719643fd30478e9c5a0a6b4a84e5bd26937d8625b2dde22.
+// Retain the complete SDK/native resources, checked source-name API and generated syntax asset.
+// This qualification is separate from the official Actions release/deployment.
 // The project generator need not export this separate language-produced syntax asset.
 // The extension copies it unchanged; it authors no grammar, keyword table or token regex.
 // Plain and quoted names have lexical entity.name.expec scopes, not semantic type claims.
