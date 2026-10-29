@@ -10,3 +10,13 @@
 .expec-diagram-controls input { width: 5rem; }
 .expec-diagram-viewport { overflow: auto; width: 100%; height: min(65vh, 30rem); border: 1px solid var(--vscode-panel-border, #a4a7ac); background: white; }
 .expec-diagram-viewport img { display: block; max-width: none; max-height: none; }
+.expec-markdown { max-width: 85ch; line-height: 1.6; overflow-wrap: anywhere; }
+.expec-markdown :is(h1,h2,h3,h4,h5,h6) { line-height: 1.25; margin: 1.5em 0 0.6em; }
+.expec-markdown h1 { border-bottom: 1px solid var(--vscode-panel-border, #a4a7ac); padding-bottom: 0.3em; }
+.expec-markdown a { color: var(--vscode-textLink-foreground, #005fb8); }
+.expec-markdown [aria-disabled="true"] { color: var(--vscode-descriptionForeground, #666); cursor: not-allowed; text-decoration: underline dotted; }
+.expec-markdown table { border-collapse: collapse; display: block; overflow-x: auto; margin: 1em 0; }
+.expec-markdown :is(th,td) { border: 1px solid var(--vscode-panel-border, #a4a7ac); padding: 0.4em 0.75em; text-align: left; }
+.expec-markdown th { background: var(--vscode-textCodeBlock-background, #f5f6f8); }
+.expec-markdown :not(pre) > code { padding: 0.1em 0.3em; background: var(--vscode-textCodeBlock-background, #f5f6f8); font-family: var(--vscode-editor-font-family, monospace); }
+.expec-markdown-anchor { scroll-margin-top: 1rem; }

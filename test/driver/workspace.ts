@@ -2372,46 +2372,46 @@ async connectionSavedProjectSettings(): Promise<string> {
   }
 
 async showOutputSource(): Promise<void> {
-    throw new Error("Not implemented: workspace.showOutputSource");
+    return this.ui.showSource();
   }
 
 async followDocumentLink(label: string): Promise<void> {
-    throw new Error("Not implemented: workspace.followDocumentLink");
+    return this.ui.followLink(label);
   }
 
 async markdownHeadings(): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.markdownHeadings");
+    return this.ui.markdownHeadings();
   }
 
 async markdownListItems(): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.markdownListItems");
+    return this.ui.markdownListItems();
   }
 
 async markdownTableRows(): Promise<Array<Array<string>>> {
-    throw new Error("Not implemented: workspace.markdownTableRows");
+    return this.ui.markdownTableRows();
   }
 
 async markdownCodeBlocks(): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.markdownCodeBlocks");
+    return this.ui.markdownCodeBlocks();
   }
 
 async markdownAnchorInView(anchor: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.markdownAnchorInView");
+    return this.ui.markdownAnchorInView(anchor);
   }
 
 async documentContainsText(text: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.documentContainsText");
+    return this.ui.documentContainsText(text);
   }
 
 async inactiveDocumentLinks(): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.inactiveDocumentLinks");
+    return this.ui.inactiveDocumentLinks();
   }
 
 async previewHasUnsafeContent(): Promise<boolean> {
-    throw new Error("Not implemented: workspace.previewHasUnsafeContent");
+    return this.ui.hasUnsafeContent();
   }
 
 async previewResourceRequests(): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.previewResourceRequests");
+    return this.ui.resourceRequests();
   }
 }
