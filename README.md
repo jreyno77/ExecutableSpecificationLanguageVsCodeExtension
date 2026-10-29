@@ -54,7 +54,9 @@ Run **.expec: Show Output Previews** from the Command Palette. Add the desired o
 }
 ```
 
-Select an output tab and then a document. Previews follow the selected `.expec` editor's unsaved text and saved output configuration. Each output shows its own progress or explanation. Diagrams start at their natural size, with scrolling, zoom and reset controls. Previewing leaves project files untouched; generated-file updates have a separate save policy.
+Select an output tab and then a document. Markdown opens at Home, which links to one specification page per `.expec` source file. Pages render headings, contents, contracts and examples; follow their links to related supplied pages and sections. UML selects the rendered SVG at its natural size, with scrolling, zoom and reset controls. If only D2 is supplied, **Show source** reveals that diagram source explicitly. TypeScript and other code outputs remain code.
+
+Previews follow the selected `.expec` editor's unsaved text and saved output configuration. Each output shows its own progress or explanation. Preview links never fetch external content; unavailable destinations have an explanation. Previewing leaves project files untouched; generated-file updates have a separate save policy.
 ## Generate on save
 
 Run **.expec: Enable Generation on Save** for the selected saved project configuration. Saving a valid `.expec` source then builds all configured saved entries and outputs, preserving handwritten implementation. Typing continues to update previews without writing generated files. Use **.expec: Disable Generation on Save** to stop automatic generation; each selected configuration retains its own choice.
