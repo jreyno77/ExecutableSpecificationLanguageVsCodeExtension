@@ -2,15 +2,19 @@
 // Its export is executable-specification-language/syntax/expec.tmLanguage.json.
 // Copy it under src/vscode/syntax/ with exact source/grammar hash provenance.
 // The language package generates it from the existing Langium grammar.
-// Build/runtime dependency: exact main 7783c3530d5d382ec361860db75b5b73d2ffa5f2, version 0.1.0-pr.126.
-// Pin generation/tooling/executable-specification-language-pr-126.tgz with its recorded SHA-512 integrity.
+// Build/runtime dependency: CI-qualified SDK 0.1.0 from passing PR129 run40964143567.
+// Producer adca526035d55b0563c1985ea46c325808a1fefa has the identical source tree
+// 69e7baa37ed75ae9ab65a4ceffe930904fd28952 as merged main fde5ee76973ee5f524f8205739c174d4a86e98ba.
+// Pin generation/tooling/executable-specification-language-ci-pr-129.tgz with its recorded SHA-512 integrity.
 // CORE-36 supplies public typeCandidates over detached facts from this same resolution.
 // Prepare eligible spelling/insertion/target facts during publication, never on requests.
 // This reviewed PROJECT-43 build queries all contract subjects within one captured
 // post-application scope, then verifies freshness before generating tests. It
 // preserves the same output adapter lifetime and all strict evidence checks.
 // Keep the complete SDK/runtime payload, source/test capture and syntax asset.
-// Exact-main tested-package provenance records commit 7783c353 and run 40587355388.
+// The unchanged CI archive SHA256 is 9f6c0ffd56a97fe9c801855d2f5f43bb45495909dfd349b170885d0e1cdf369d.
+// Its exact bytes passed both clean consumers and all six project pilots.
+// This dependency qualification is separate from the official main package release.
 // Historical failed builds remain recorded; a passing release does not repair unrelated defects.
 // The project generator need not export this separate language-produced syntax asset.
 // The extension copies it unchanged; it authors no grammar, keyword table or token regex.

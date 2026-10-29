@@ -35,7 +35,7 @@
   },
   "packageManager": "npm@11.20.0",
   "dependencies": {
-    "executable-specification-language": "file:generation/tooling/executable-specification-language-pr-126.tgz",
+    "executable-specification-language": "file:generation/tooling/executable-specification-language-ci-pr-129.tgz",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-markdown": "10.1.0",
