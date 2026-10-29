@@ -2414,4 +2414,8 @@ async previewHasUnsafeContent(): Promise<boolean> {
 async previewResourceRequests(): Promise<Array<string>> {
     return this.ui.resourceRequests();
   }
+
+async previewSource(path: string, text: string): Promise<SourceDocument> {
+    throw new Error("Not implemented: workspace.previewSource");
+  }
 }

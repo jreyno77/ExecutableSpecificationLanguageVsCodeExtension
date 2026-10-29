@@ -3887,4 +3887,8 @@ readonly emptyPreviewRequests: Array<string> = [];
 readonly readableMarkdown: Array<OutputTab> = [{ ["id"]: "markdown", ["label"]: "Markdown", ["status"]: "ready", ["documents"]: [{ ["path"]: "Books.md", ["mediaType"]: "text/markdown", ["content"]: "# Books\n\n- Dune\n- Emma\n\n| Book | Copies |\n| --- | --- |\n| Dune | 2 |\n\n```expec\ntype Book { title: Text }\n```\n" }] }];
 
 readonly wikiPages: Array<OutputTab> = [{ ["id"]: "markdown", ["label"]: "Markdown", ["status"]: "ready", ["documents"]: [{ ["path"]: "docs/reference/Book.md", ["mediaType"]: "text/markdown", ["content"]: "# Book\n\n[Home](../Home.md#expec-686f6d65)\n\n[Book details](#expec-626f6f6b)\n\n- Arrival\n- Discovery\n- Departure\n- Journey\n- Storm\n- Shelter\n- Message\n- Search\n- Meeting\n- Promise\n- Return\n- Reunion\n- Celebration\n- Tomorrow\n- Afterword\n- Credits\n\n<a id=\"expec-626f6f6b\"></a>\n\n## Book details\n\nTitle and available copies.\n" }, { ["path"]: "docs/Home.md", ["mediaType"]: "text/markdown", ["content"]: "<!-- expec-section:7b226f75747075744964223a226d61726b646f776e222c22737065634964223a22686f6d65227d -->\n\n# Library\n\n<a id=\"expec-686f6d65\"></a>\n\n[Read Book](reference/Book.md#expec-626f6f6b)\n\n[Missing section](#expec-6d697373696e67)\n\n<!-- expec-end:686f6d65 -->\n" }] }];
+
+async previewSource(path: string, text: string): Promise<SourceDocument> {
+    return await this.driver.previewSource(path, text);
+  }
 }
