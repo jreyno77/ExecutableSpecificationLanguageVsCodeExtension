@@ -2370,4 +2370,48 @@ async changeRenameIdentityDuringNextRead(uri: string, identity: string): Promise
 async connectionSavedProjectSettings(): Promise<string> {
     return this.connectionRecording.savedProjectSettings();
   }
+
+async showOutputSource(): Promise<void> {
+    throw new Error("Not implemented: workspace.showOutputSource");
+  }
+
+async followDocumentLink(label: string): Promise<void> {
+    throw new Error("Not implemented: workspace.followDocumentLink");
+  }
+
+async markdownHeadings(): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.markdownHeadings");
+  }
+
+async markdownListItems(): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.markdownListItems");
+  }
+
+async markdownTableRows(): Promise<Array<Array<string>>> {
+    throw new Error("Not implemented: workspace.markdownTableRows");
+  }
+
+async markdownCodeBlocks(): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.markdownCodeBlocks");
+  }
+
+async markdownAnchorInView(anchor: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.markdownAnchorInView");
+  }
+
+async documentContainsText(text: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.documentContainsText");
+  }
+
+async inactiveDocumentLinks(): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.inactiveDocumentLinks");
+  }
+
+async previewHasUnsafeContent(): Promise<boolean> {
+    throw new Error("Not implemented: workspace.previewHasUnsafeContent");
+  }
+
+async previewResourceRequests(): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.previewResourceRequests");
+  }
 }
