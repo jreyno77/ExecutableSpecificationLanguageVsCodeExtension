@@ -241,6 +241,22 @@
       ]
     },
     {
+      "alias": "react-markdown",
+      "name": "npm:react-markdown",
+      "version": "10.1.0",
+      "phases": [
+        "runtime"
+      ]
+    },
+    {
+      "alias": "remark-gfm",
+      "name": "npm:remark-gfm",
+      "version": "4.0.1",
+      "phases": [
+        "runtime"
+      ]
+    },
+    {
       "alias": "typescript",
       "name": "npm:typescript",
       "version": "5.9.3",
@@ -403,7 +419,9 @@
         ],
         "runtime": [
           "react",
-          "react-dom"
+          "react-dom",
+          "react-markdown",
+          "remark-gfm"
         ],
         "test": [
           "vite-react",
