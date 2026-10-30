@@ -3,14 +3,15 @@
 // Copy it under src/vscode/syntax/ with exact source/grammar hash provenance.
 // The language package generates it from the existing Langium grammar.
 // Build/runtime SDK: reviewed local OUT-31/OUT-32 candidate 0.1.0, retaining CORE-39/OUT-29.
-// Producer 87c28635aad00f3a698c2eddc8f69d3f40061a0f; normal build/package.
-// Pin generation/tooling/executable-specification-language-out31-out32-87c2863.tgz with recorded lockfile integrity.
-// SHA256 ab84ad0e784af2008df0fac68e9164194ff887248e7c880452fe8fd4b74af430.
+// Producer fc7fc82872c951bea2405b9ba9fe2f42b47b2b1a; normal build/package.
+// Pin generation/tooling/executable-specification-language-out31-out32-fc7fc82.tgz with recorded lockfile integrity.
+// SHA256 2e3fdbabcdedcd05327eac65e3f12b979afb7ca9d06a8db1dea6280f8846eea9.
 // Keep complete native resources, checked source APIs and generated syntax asset.
 // Documents retain direct Calls links and omit generated Source/disclaimer boilerplate.
 // Structural UML shows architectural containers, operation call arrows and contained
 // compact promise markers and exact image-space data, with all declared capabilities.
-// Markdown groups architectural contracts first and all data declarations in a linked glossary.
+// Markdown groups architecture first and types in a glossary; callable Inputs follow signatures.
+// Contractual promises labels promise bullets separately from failures.
 // Local qualification precedes the separate official Actions release/deployment.
 // The project generator need not export this separate language-produced syntax asset.
 // The extension copies it unchanged; it authors no grammar, keyword table or token regex.

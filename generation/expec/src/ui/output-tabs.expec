@@ -639,4 +639,12 @@ examples for OutputTabs {
     then expectPromiseBubble("ResultsRelay.download", ["Supports cancellation"], "")
   }
 
+  scenario "keep the current capability pinned when hovering its own indicator" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when pinPromise("ResultsRelay.export")
+    when hoverPromise("ResultsRelay.export")
+    then expectPromiseBubble("ResultsRelay.export", ["Delivers the result", "Cleans temporary files"], "ResultsRelay.export")
+  }
+
 }
