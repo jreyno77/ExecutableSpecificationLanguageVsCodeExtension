@@ -2420,62 +2420,68 @@ async previewSource(path: string, text: string): Promise<SourceDocument> {
   }
 
 async hoverPromiseBubble(): Promise<void> {
-    throw new Error("Not implemented: workspace.hoverPromiseBubble");
+    await this.ui.hoverPromiseBubble();
   }
 
 async hoverPromise(label: string): Promise<void> {
-    throw new Error("Not implemented: workspace.hoverPromise");
+    await this.ui.hoverPromise(label);
   }
 
 async focusPromise(label: string): Promise<void> {
-    throw new Error("Not implemented: workspace.focusPromise");
+    await this.ui.focusPromise(label);
   }
 
 async pinPromise(label: string): Promise<void> {
-    throw new Error("Not implemented: workspace.pinPromise");
+    await this.ui.pinPromise(label);
   }
 
 async pressPromiseKey(key: string): Promise<void> {
-    throw new Error("Not implemented: workspace.pressPromiseKey");
+    await this.ui.pressPromiseKey(key);
   }
 
 async leavePromises(): Promise<void> {
-    throw new Error("Not implemented: workspace.leavePromises");
+    await this.ui.leavePromises();
   }
 
 async clickOutsidePromises(): Promise<void> {
-    throw new Error("Not implemented: workspace.clickOutsidePromises");
+    await this.ui.clickOutsidePromises();
   }
 
 async previewPromiseLabels(id: string, path: string): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.previewPromiseLabels");
+    return this.previewRecording.document(id, path).diagram?.promises.map(promise => promise.label) ?? [];
   }
 
 async previewPromiseTexts(id: string, path: string, label: string): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.previewPromiseTexts");
+    return [...this.previewRecording.document(id, path).diagram?.promises.find(promise => promise.label === label)?.promises ?? []];
   }
 
 async previewPromiseGeometryReady(id: string, path: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.previewPromiseGeometryReady");
+    const document = this.previewRecording.document(id, path), diagram = document.diagram;
+    return document.mediaType === 'image/svg+xml' && diagram !== undefined
+      && [diagram.width, diagram.height].every(value => Number.isFinite(value) && value > 0)
+      && diagram.promises.length > 0 && diagram.promises.every(promise =>
+        [promise.x, promise.y, promise.width, promise.height].every(Number.isFinite)
+        && promise.x >= 0 && promise.y >= 0 && promise.width > 0 && promise.height > 0
+        && promise.x + promise.width <= diagram.width && promise.y + promise.height <= diagram.height);
   }
 
 async promiseIndicatorLabels(): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.promiseIndicatorLabels");
+    return this.ui.promiseIndicatorLabels();
   }
 
 async visiblePromiseLabel(): Promise<string> {
-    throw new Error("Not implemented: workspace.visiblePromiseLabel");
+    return this.ui.visiblePromiseLabel();
   }
 
 async visiblePromiseTexts(): Promise<Array<string>> {
-    throw new Error("Not implemented: workspace.visiblePromiseTexts");
+    return this.ui.visiblePromiseTexts();
   }
 
 async pinnedPromiseLabel(): Promise<string> {
-    throw new Error("Not implemented: workspace.pinnedPromiseLabel");
+    return this.ui.pinnedPromiseLabel();
   }
 
 async promiseIndicatorAligned(label: string): Promise<boolean> {
-    throw new Error("Not implemented: workspace.promiseIndicatorAligned");
+    return this.ui.promiseIndicatorAligned(label);
   }
 }

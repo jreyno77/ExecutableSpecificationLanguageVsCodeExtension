@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { OutputTab } from '../core/OutputTab.js';
 import type { OutputDocument } from '../core/OutputDocument.js';
 import { MarkdownDocument, type MarkdownTarget } from './MarkdownDocument.js';
+import { DiagramPromises } from './DiagramPromises.js';
 import './output-tabs.css';
 
 type Selection = { output: string | undefined; paths: Map<string, string> };
@@ -103,6 +104,7 @@ function svgSize(content: string, natural: { width: number; height: number }): {
 }
 function DiagramImage({ document }: { document: OutputDocument }) {
   const image = useRef<HTMLImageElement>(null), source = useMemo(() => svgSource(document.content), [document.content]);
+  const viewport = useRef<HTMLDivElement>(null);
   const [percent, zoom] = useState(100), [size, measure] = useState<{ width: number; height: number }>(), [failed, fail] = useState(false);
   useEffect(() => {
     const node = image.current!;
@@ -127,9 +129,13 @@ function DiagramImage({ document }: { document: OutputDocument }) {
       <button type="button" onClick={() => zoom(100)}>Reset zoom</button>
     </div>
     <p data-output-explanation>{failed ? 'Cannot display SVG image: ' + document.path + '.' : ''}</p>
-    <div className="expec-diagram-viewport" data-diagram-viewport>
-      <img ref={image} data-diagram-image src={source} alt={document.path}
-        width={size && size.width * percent / 100} height={size && size.height * percent / 100} />
+    <div ref={viewport} className="expec-diagram-viewport" data-diagram-viewport>
+      <div className="expec-diagram-canvas" style={{ width: size && size.width * percent / 100, height: size && size.height * percent / 100 }}>
+        <img ref={image} data-diagram-image src={source} alt={document.path}
+          width={size && size.width * percent / 100} height={size && size.height * percent / 100} />
+        {size && document.diagram && <DiagramPromises key={JSON.stringify(document.diagram)} diagram={document.diagram}
+          width={size.width * percent / 100} height={size.height * percent / 100} viewport={viewport} />}
+      </div>
     </div>
   </div>;
 }

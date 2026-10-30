@@ -10,6 +10,15 @@
 .expec-diagram-controls input { width: 5rem; }
 .expec-diagram-viewport { overflow: auto; width: 100%; height: min(65vh, 30rem); border: 1px solid var(--vscode-panel-border, #a4a7ac); background: white; }
 .expec-diagram-viewport img { display: block; max-width: none; max-height: none; }
+.expec-diagram-canvas { position: relative; }
+.expec-promise-row { position: absolute; box-sizing: border-box; border: 1px solid transparent; }
+.expec-promise-row:has(button:is(:hover, :focus-visible, [aria-expanded="true"])) { border-color: var(--vscode-focusBorder, #005fb8); background: #357bdd12; }
+.expec-output-tabs .expec-promise-indicator { position: absolute; right: 0; top: 50%; transform: translateY(-50%); height: min(100%, 1.9rem); padding: 0 0.35rem; min-width: 2rem; border-radius: 1rem; background: var(--vscode-editorHoverWidget-background, #fff); font-size: 0.75rem; line-height: 1; }
+.expec-promise-bubble { position: fixed; z-index: 20; box-sizing: border-box; width: max-content; max-width: min(28rem, calc(100vw - 16px)); padding: 0.85rem 1rem; border: 1px solid var(--vscode-editorHoverWidget-border, #8391a5); border-radius: 1.1rem; background: var(--vscode-editorHoverWidget-background, #fff); color: var(--vscode-editorHoverWidget-foreground, #202124); box-shadow: 0 0.35rem 1rem #0003; overflow: auto; overflow-wrap: anywhere; white-space: pre-wrap; font-size: 0.9rem; line-height: 1.5; }
+.expec-promise-bubble strong { display: inline; }
+.expec-promise-bubble ul { margin: 0.55rem 0 0; padding-left: 1.3rem; }
+.expec-promise-bubble li + li { margin-top: 0.35rem; }
+.expec-promise-pin { margin-left: 0.6rem; font-size: 0.75rem; color: var(--vscode-descriptionForeground, #666); }
 .expec-markdown { max-width: 85ch; line-height: 1.6; overflow-wrap: anywhere; }
 .expec-markdown :is(h1,h2,h3,h4,h5,h6) { line-height: 1.25; margin: 1.5em 0 0.6em; }
 .expec-markdown h1 { border-bottom: 1px solid var(--vscode-panel-border, #a4a7ac); padding-bottom: 0.3em; }
