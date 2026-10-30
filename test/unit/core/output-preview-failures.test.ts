@@ -29,7 +29,7 @@ describe('preview provider failures and owned recording cleanup', () => {
       '{"formatVersion":1,"version":"0.1.0","build":{"entries":["src/library.expec"]},"outputs":[{"id":"uml","options":{"directory":"draft/uml","views":["structure"]}},{"id":"broken","options":{}}]}',
       [umlOutput, failedOutput], 'broken',
     );
-    recording.opened({ uri: 'file:///workspace/src/library.expec', text: 'type Book { title: Text }' }, 1);
+    recording.opened({ uri: 'file:///workspace/src/library.expec', text: 'component Book { capability title() returns Text }' }, 1);
     await recording.awaitHeld('broken');
     await recording.ready('uml');
     expect(await recording.svgHasLabel('uml', 'draft/uml/structure.svg', 'Book')).toBe(true);

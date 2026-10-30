@@ -4,9 +4,9 @@ import { expectData, comparisonEqual, finiteNumber } from "../dsl/comparison.js"
 
 /* @expec-test "cc2b58d6-bd2f-4078-8ed1-11653e435600" */
 test("read actual configured outputs from an unsaved edit without writing generated files", async ({ workspace }) => {
-  await workspace.previewEditor("type Book { title: Text }", workspace.configuredPreviews);
+  await workspace.previewEditor("type Book { title: Text }\ncomponent BookIndexer {\n public find\n capability find(book: Book) returns Book\n}\ncomponent Library {\n capability find(book: Book) returns Book { calls BookIndexer.find }\n}", workspace.configuredPreviews);
   await workspace.showOutputPreviews();
-  await workspace.editPreviewWithoutSaving("type Book { title: Number }");
+  await workspace.editPreviewWithoutSaving("type Book { title: Number }\ncomponent BookIndexer {\n public find\n capability find(book: Book) returns Book\n}\ncomponent Library {\n capability find(book: Book) returns Book { calls BookIndexer.find }\n}");
   await workspace.selectPreviewOutput("typescript");
   await workspace.selectPreviewDocument("draft/types/Book.ts");
   await workspace.selectPreviewOutput("markdown");
@@ -18,8 +18,9 @@ test("read actual configured outputs from an unsaved edit without writing genera
   await workspace.expectNativePreviewText("typescript", "draft/types/Book.ts", "text/typescript", "title: number;");
   await workspace.expectNativePreviewText("markdown", "draft/docs/Home.md", "text/markdown", "Home");
   await workspace.expectNativePreviewText("markdown", "draft/docs/pages/src/library.md", "text/markdown", "type Book");
-  await workspace.expectNativePreviewDiagram("uml", "draft/uml/structure.svg", "Book");
-  await workspace.expectNativePreviewUnsaved("type Book { title: Text }", "type Book { title: Number }");
+  await workspace.expectNativePreviewDiagram("uml", "draft/uml/structure.svg", "Library");
+  await workspace.expectNativePreviewDiagram("uml", "draft/uml/structure.svg", "find calls find");
+  await workspace.expectNativePreviewUnsaved("type Book { title: Text }\ncomponent BookIndexer {\n public find\n capability find(book: Book) returns Book\n}\ncomponent Library {\n capability find(book: Book) returns Book { calls BookIndexer.find }\n}", "type Book { title: Number }\ncomponent BookIndexer {\n public find\n capability find(book: Book) returns Book\n}\ncomponent Library {\n capability find(book: Book) returns Book { calls BookIndexer.find }\n}");
 });
 
 /* @expec-test "0c5a68b5-97b3-4750-a0e5-43515a29d761" */
