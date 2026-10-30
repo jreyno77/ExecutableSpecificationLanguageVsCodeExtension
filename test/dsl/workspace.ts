@@ -3789,4 +3789,106 @@ async expectSavedProjectSettings(expected: string): Promise<void> {
   }
 
 readonly scopedConnectionSettings: string = "{\"formatVersion\":1,\"version\":\"1.2.3\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[],\"project\":{\"root\":\"./alpha\",\"excludePaths\":[\"dist\",\".local-docs\",\"generation/tooling\"]}}";
+
+async showOutputSource(): Promise<void> {
+    return await this.driver.showOutputSource();
+  }
+
+async followDocumentLink(label: string): Promise<void> {
+    return await this.driver.followDocumentLink(label);
+  }
+
+async markdownHeadings(): Promise<Array<string>> {
+    return await this.driver.markdownHeadings();
+  }
+
+async markdownListItems(): Promise<Array<string>> {
+    return await this.driver.markdownListItems();
+  }
+
+async markdownTableRows(): Promise<Array<Array<string>>> {
+    return await this.driver.markdownTableRows();
+  }
+
+async markdownCodeBlocks(): Promise<Array<string>> {
+    return await this.driver.markdownCodeBlocks();
+  }
+
+async markdownAnchorInView(anchor: string): Promise<boolean> {
+    return await this.driver.markdownAnchorInView(anchor);
+  }
+
+async documentContainsText(text: string): Promise<boolean> {
+    return await this.driver.documentContainsText(text);
+  }
+
+async inactiveDocumentLinks(): Promise<Array<string>> {
+    return await this.driver.inactiveDocumentLinks();
+  }
+
+async previewHasUnsafeContent(): Promise<boolean> {
+    return await this.driver.previewHasUnsafeContent();
+  }
+
+async previewResourceRequests(): Promise<Array<string>> {
+    return await this.driver.previewResourceRequests();
+  }
+
+async expectMarkdownHeadings(expected: Array<string>): Promise<void> {
+    const actual = await this.driver.markdownHeadings();
+    expectData(actual, expected);
+  }
+
+async expectMarkdownCodeBlocks(expected: Array<string>): Promise<void> {
+    const actual = await this.driver.markdownCodeBlocks();
+    expectData(actual, expected);
+  }
+
+async expectReadableMarkdown(): Promise<void> {
+    const headings = await this.driver.markdownHeadings();
+    const items = await this.driver.markdownListItems();
+    const rows = await this.driver.markdownTableRows();
+    const code = await this.driver.markdownCodeBlocks();
+    expectData(headings, ["Books"]);
+    expectData(items, ["Dune", "Emma"]);
+    expectData(rows, [["Book", "Copies"], ["Dune", "2"]]);
+    expectData(code, ["type Book { title: Text }\n"]);
+  }
+
+async expectDocumentAnchor(anchor: string): Promise<void> {
+    const visible = await this.driver.markdownAnchorInView(anchor);
+    expectData(visible, true);
+  }
+
+async expectDocumentTextAbsent(text: string): Promise<void> {
+    const present = await this.driver.documentContainsText(text);
+    expectData(present, false);
+  }
+
+async expectInactiveDocumentLinks(expected: Array<string>): Promise<void> {
+    const actual = await this.driver.inactiveDocumentLinks();
+    expectData(actual, expected);
+  }
+
+async expectSafePreview(): Promise<void> {
+    const unsafe = await this.driver.previewHasUnsafeContent();
+    const requests = await this.driver.previewResourceRequests();
+    expectData(unsafe, false);
+    expectData(requests, this.emptyPreviewRequests);
+  }
+
+async expectDocumentExplanation(expected: string): Promise<void> {
+    const actual = await this.driver.selectedOutputExplanation();
+    expectData(actual, expected);
+  }
+
+readonly emptyPreviewRequests: Array<string> = [];
+
+readonly readableMarkdown: Array<OutputTab> = [{ ["id"]: "markdown", ["label"]: "Markdown", ["status"]: "ready", ["documents"]: [{ ["path"]: "Books.md", ["mediaType"]: "text/markdown", ["content"]: "# Books\n\n- Dune\n- Emma\n\n| Book | Copies |\n| --- | --- |\n| Dune | 2 |\n\n```expec\ntype Book { title: Text }\n```\n" }] }];
+
+readonly wikiPages: Array<OutputTab> = [{ ["id"]: "markdown", ["label"]: "Markdown", ["status"]: "ready", ["documents"]: [{ ["path"]: "docs/reference/Book.md", ["mediaType"]: "text/markdown", ["content"]: "# Book\n\n[Home](../Home.md#expec-686f6d65)\n\n[Book details](#expec-626f6f6b)\n\n- Arrival\n- Discovery\n- Departure\n- Journey\n- Storm\n- Shelter\n- Message\n- Search\n- Meeting\n- Promise\n- Return\n- Reunion\n- Celebration\n- Tomorrow\n- Afterword\n- Credits\n\n<a id=\"expec-626f6f6b\"></a>\n\n## Book details\n\nTitle and available copies.\n" }, { ["path"]: "docs/Home.md", ["mediaType"]: "text/markdown", ["content"]: "<!-- expec-section:7b226f75747075744964223a226d61726b646f776e222c22737065634964223a22686f6d65227d -->\n\n# Library\n\n<a id=\"expec-686f6d65\"></a>\n\n[Read Book](reference/Book.md#expec-626f6f6b)\n\n[Missing section](#expec-6d697373696e67)\n\n<!-- expec-end:686f6d65 -->\n" }] }];
+
+async previewSource(path: string, text: string): Promise<SourceDocument> {
+    return await this.driver.previewSource(path, text);
+  }
 }

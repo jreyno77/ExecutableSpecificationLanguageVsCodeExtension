@@ -33,6 +33,10 @@ component OutputPreviewHost {
 // keyed by actual output ID/path for the current source; final checks can read all
 // three visited outputs. Edit/configuration/close actions record actual prior DOM
 // states before transitioning. No values come from an input copy or fixture parse.
+// This native case always edits its owned src/library.expec. Markdown pages follow
+// that source path, including when the declaration name or build entry changes.
+// Text observations read the actual rendered content container (Markdown article
+// or literal code), not a pre-only selector. The UI examples prove heading DOM.
 // It discards owned dirty editors, closes its panel and restores/removes owned files.
 // Saved-byte equality is paired with OUT-24's independent no-target-access evidence.
 examples for OutputPreviewHost {
@@ -171,12 +175,14 @@ examples for OutputPreviewHost {
     when selectPreviewOutput("typescript")
     when selectPreviewDocument("draft/types/Book.ts")
     when selectPreviewOutput("markdown")
-    when selectPreviewDocument("draft/docs/Book.md")
+    when selectPreviewDocument("draft/docs/Home.md")
+    when selectPreviewDocument("draft/docs/pages/src/library.md")
     when selectPreviewOutput("uml")
     when selectPreviewDocument("draft/uml/structure.svg")
     then expectNativePreviewOutputs(["uml", "typescript", "markdown"])
     then expectNativePreviewText("typescript", "draft/types/Book.ts", "text/typescript", "title: number;")
-    then expectNativePreviewText("markdown", "draft/docs/Book.md", "text/markdown", "type Book")
+    then expectNativePreviewText("markdown", "draft/docs/Home.md", "text/markdown", "Home")
+    then expectNativePreviewText("markdown", "draft/docs/pages/src/library.md", "text/markdown", "type Book")
     then expectNativePreviewDiagram("uml", "draft/uml/structure.svg", "Book")
     then expectNativePreviewUnsaved("type Book { title: Text }", "type Book { title: Number }")
   }
@@ -206,18 +212,20 @@ examples for OutputPreviewHost {
     when showOutputPreviews()
     when savePreviewConfiguration(revisedPreviews)
     when selectPreviewOutput("markdown")
-    when selectPreviewDocument("revised/docs/Book.md")
+    when selectPreviewDocument("revised/docs/Home.md")
+    when selectPreviewDocument("revised/docs/pages/src/library.md")
     then expectNativePreviewPriorOutputs(["uml", "typescript", "markdown"])
     then expectNativePreviewOutputs(["markdown"])
-    then expectNativePreviewText("markdown", "revised/docs/Book.md", "text/markdown", "type Book")
+    then expectNativePreviewText("markdown", "revised/docs/Home.md", "text/markdown", "Home")
+    then expectNativePreviewText("markdown", "revised/docs/pages/src/library.md", "text/markdown", "type Book")
   }
   scenario "saving the selected runtime package phase clears the warning and previews the unchanged source" {
     given previewEditor("component ReactView { requires package \"react\" for runtime }", testPackagePreview)
     when showOutputPreviews()
     when savePreviewConfiguration(runtimePackagePreview)
     when selectPreviewOutput("markdown")
-    when selectPreviewDocument("draft/docs/ReactView.md")
-    then expectNativePreviewText("markdown", "draft/docs/ReactView.md", "text/markdown", "component ReactView")
+    when selectPreviewDocument("draft/docs/pages/src/library.md")
+    then expectNativePreviewText("markdown", "draft/docs/pages/src/library.md", "text/markdown", "component ReactView")
     then expectNativePackagePreviewRecovered("component ReactView { requires package \"react\" for runtime }")
   }
   scenario "read a large real diagram at normal scale and navigate its viewport" {
@@ -268,15 +276,15 @@ examples for OutputPreviewHost {
     when showOutputPreviews()
     when editPreviewWithoutSaving("component ReactScreen { requires package \"react\" for runtime }")
     when selectPreviewOutput("markdown")
-    when selectPreviewDocument("draft/docs/ReactScreen.md")
+    when selectPreviewDocument("draft/docs/pages/src/library.md")
     when saveScopedPreviewConfiguration(invalidScopedSavedPreview)
     when observeVisibleScopeWarning()
     when saveScopedPreviewConfiguration(scopedSavedPreview)
     when selectPreviewOutput("markdown")
-    when selectPreviewDocument("draft/docs/ReactScreen.md")
+    when selectPreviewDocument("draft/docs/pages/src/library.md")
     then expectVisibleScopeWarning("unavailable-package", "\"requirements\",\"files\",0,\"test\",0")
     then expectNativeScopePreviewRecovered()
-    then expectNativePreviewText("markdown", "draft/docs/ReactScreen.md", "text/markdown", "component ReactScreen")
+    then expectNativePreviewText("markdown", "draft/docs/pages/src/library.md", "text/markdown", "component ReactScreen")
     then expectNativePreviewUnsaved("component ReactView { requires package \"react\" for runtime }", "component ReactScreen { requires package \"react\" for runtime }")
   }
 

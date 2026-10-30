@@ -10,10 +10,10 @@ const diagram = (content: string): OutputTab[] => [{
 }];
 const wide = '<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1200"><text x="20" y="40">Book</text></svg>';
 
-test('text documents remain literal instead of inserting markup', async () => {
+test('TypeScript text remains literal instead of inserting markup', async () => {
   const view = await OutputTabsBrowser.open();
   const authored = '# <img src="https://external.invalid/book.png" onerror="alert(1)">';
-  await view.present(text(authored));
+  await view.present(text(authored, 'text/typescript'));
   expect(await view.content()).toBe(authored);
   expect(await view.page.locator('[role="tabpanel"] img').count()).toBe(0);
 });
@@ -36,6 +36,23 @@ test('blocked feedback withdraws documents even if the caller retains an old pay
   expect(await view.explanation()).toBe('Source has an error.');
   expect(await view.documentPaths()).toEqual([]);
   expect(await view.content()).toBe('');
+});
+
+test('withdrawing a document discards its previous anchor-navigation feedback', async () => {
+  const view = await OutputTabsBrowser.open();
+  const ready: OutputTab[] = [{ id: 'notes', label: 'Notes', status: 'ready', documents: [
+    { path: 'Home.md', mediaType: 'text/markdown', content: '# Home\n\n[Missing](#expec-6d697373696e67)\n' },
+  ] }];
+  await view.present(ready);
+  await view.followLink('Missing');
+  expect(await view.explanation()).toBe('Anchor unavailable in supplied preview.');
+
+  await view.present([{ id: 'notes', label: 'Notes', status: 'pending', documents: [], message: 'Previewing current source.' }]);
+  expect(await view.explanation()).toBe('Previewing current source.');
+  await view.present(ready);
+
+  expect(await view.markdownHeadings()).toEqual(['Home']);
+  expect(await view.explanation()).toBe('');
 });
 
 test('UTF-8 SVG renders as an inert image without executing or fetching its embedded content', async () => {

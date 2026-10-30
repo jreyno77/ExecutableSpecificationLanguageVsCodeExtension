@@ -128,7 +128,8 @@ test("session-only disconnect keeps authored previews and cannot be reversed by 
   await workspace.previewSidebarSource("src/model.expec");
   await workspace.expectSidebarConnection("disconnected", "shop");
   await workspace.expectSidebarSavedProject("shop");
-  await workspace.expectSidebarPreviewDocument("markdown", "docs/Book.md", "# Book");
+  await workspace.expectSidebarPreviewDocument("markdown", "docs/pages/src/model.md", "type Book");
+  await workspace.expectSidebarPreviewDocument("markdown", "docs/Home.md", "Home");
   await workspace.expectSidebarTreesUntouched();
 });
 

@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import type { Connection, Disposable, DocumentDiagnosticReport } from 'vscode-languageserver/node';
 import { CancellationToken, CancellationTokenSource } from 'vscode-languageserver/node';
@@ -496,7 +497,7 @@ describe('native semantic feedback at its protocol boundary', () => {
 describe('native preview adaptation', () => {
   it('forwards actual open analysis into plain renderer feedback without replacing diagnostics', async () => {
     const server = recordedServer();
-    const source = { uri: 'file:///workspace/book.expec', text: 'type Book { title: Text }' };
+    const source = { uri: pathToFileURL(resolve('book.expec')).href, text: 'type Book { title: Text }' };
     server.notification('expec/previewConfiguration', { configuration: { file: resolve('expec.json'), writable: true, text: JSON.stringify({ formatVersion: 1, version: '0.1.0', build: { entries: ['book.expec'] }, outputs: [{ id: 'markdown', options: { directory: 'draft/docs' } }] }) } });
     server.notification('expec/previewSelection', { uri: source.uri });
     server.open(source);
@@ -506,8 +507,9 @@ describe('native preview adaptation', () => {
     expect(actual.uri).toBe(source.uri);
     expect(actual.version).toBe(1);
     expect(actual.tabs.map(tab => tab.id)).toEqual(['markdown']);
-    expect(actual.tabs[0]!.documents![0]!.path).toBe('draft/docs/Book.md');
-    expect(actual.tabs[0]!.documents![0]!.content).toContain('type Book');
+    expect(actual.tabs[0]!.documents![0]!.path).toBe('draft/docs/Home.md');
+    const sourcePage = actual.tabs[0]!.documents!.find(document => document.path === 'draft/docs/pages/book.md');
+    expect(sourcePage?.content).toContain('type Book');
     expect(JSON.parse(JSON.stringify(actual))).toEqual(actual);
     expect(actual).not.toHaveProperty('compilation');
     expect(actual).not.toHaveProperty('specification');

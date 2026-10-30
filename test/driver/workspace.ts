@@ -2370,4 +2370,52 @@ async changeRenameIdentityDuringNextRead(uri: string, identity: string): Promise
 async connectionSavedProjectSettings(): Promise<string> {
     return this.connectionRecording.savedProjectSettings();
   }
+
+async showOutputSource(): Promise<void> {
+    return this.ui.showSource();
+  }
+
+async followDocumentLink(label: string): Promise<void> {
+    return this.ui.followLink(label);
+  }
+
+async markdownHeadings(): Promise<Array<string>> {
+    return this.ui.markdownHeadings();
+  }
+
+async markdownListItems(): Promise<Array<string>> {
+    return this.ui.markdownListItems();
+  }
+
+async markdownTableRows(): Promise<Array<Array<string>>> {
+    return this.ui.markdownTableRows();
+  }
+
+async markdownCodeBlocks(): Promise<Array<string>> {
+    return this.ui.markdownCodeBlocks();
+  }
+
+async markdownAnchorInView(anchor: string): Promise<boolean> {
+    return this.ui.markdownAnchorInView(anchor);
+  }
+
+async documentContainsText(text: string): Promise<boolean> {
+    return this.ui.documentContainsText(text);
+  }
+
+async inactiveDocumentLinks(): Promise<Array<string>> {
+    return this.ui.inactiveDocumentLinks();
+  }
+
+async previewHasUnsafeContent(): Promise<boolean> {
+    return this.ui.hasUnsafeContent();
+  }
+
+async previewResourceRequests(): Promise<Array<string>> {
+    return this.ui.resourceRequests();
+  }
+
+async previewSource(path: string, text: string): Promise<SourceDocument> {
+    return this.previewRecording.source(path, text);
+  }
 }

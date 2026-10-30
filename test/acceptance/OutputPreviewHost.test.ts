@@ -10,12 +10,14 @@ test("read actual configured outputs from an unsaved edit without writing genera
   await workspace.selectPreviewOutput("typescript");
   await workspace.selectPreviewDocument("draft/types/Book.ts");
   await workspace.selectPreviewOutput("markdown");
-  await workspace.selectPreviewDocument("draft/docs/Book.md");
+  await workspace.selectPreviewDocument("draft/docs/Home.md");
+  await workspace.selectPreviewDocument("draft/docs/pages/src/library.md");
   await workspace.selectPreviewOutput("uml");
   await workspace.selectPreviewDocument("draft/uml/structure.svg");
   await workspace.expectNativePreviewOutputs(["uml", "typescript", "markdown"]);
   await workspace.expectNativePreviewText("typescript", "draft/types/Book.ts", "text/typescript", "title: number;");
-  await workspace.expectNativePreviewText("markdown", "draft/docs/Book.md", "text/markdown", "type Book");
+  await workspace.expectNativePreviewText("markdown", "draft/docs/Home.md", "text/markdown", "Home");
+  await workspace.expectNativePreviewText("markdown", "draft/docs/pages/src/library.md", "text/markdown", "type Book");
   await workspace.expectNativePreviewDiagram("uml", "draft/uml/structure.svg", "Book");
   await workspace.expectNativePreviewUnsaved("type Book { title: Text }", "type Book { title: Number }");
 });
@@ -51,10 +53,12 @@ test("saving output configuration changes the open preview without refresh", asy
   await workspace.showOutputPreviews();
   await workspace.savePreviewConfiguration(workspace.revisedPreviews);
   await workspace.selectPreviewOutput("markdown");
-  await workspace.selectPreviewDocument("revised/docs/Book.md");
+  await workspace.selectPreviewDocument("revised/docs/Home.md");
+  await workspace.selectPreviewDocument("revised/docs/pages/src/library.md");
   await workspace.expectNativePreviewPriorOutputs(["uml", "typescript", "markdown"]);
   await workspace.expectNativePreviewOutputs(["markdown"]);
-  await workspace.expectNativePreviewText("markdown", "revised/docs/Book.md", "text/markdown", "type Book");
+  await workspace.expectNativePreviewText("markdown", "revised/docs/Home.md", "text/markdown", "Home");
+  await workspace.expectNativePreviewText("markdown", "revised/docs/pages/src/library.md", "text/markdown", "type Book");
 });
 
 /* @expec-test "5cbab2c0-5987-4856-b0f7-271a54aa52d6" */
@@ -63,8 +67,8 @@ test("saving the selected runtime package phase clears the warning and previews 
   await workspace.showOutputPreviews();
   await workspace.savePreviewConfiguration(workspace.runtimePackagePreview);
   await workspace.selectPreviewOutput("markdown");
-  await workspace.selectPreviewDocument("draft/docs/ReactView.md");
-  await workspace.expectNativePreviewText("markdown", "draft/docs/ReactView.md", "text/markdown", "component ReactView");
+  await workspace.selectPreviewDocument("draft/docs/pages/src/library.md");
+  await workspace.expectNativePreviewText("markdown", "draft/docs/pages/src/library.md", "text/markdown", "component ReactView");
   await workspace.expectNativePackagePreviewRecovered("component ReactView { requires package \"react\" for runtime }");
 });
 
@@ -89,14 +93,14 @@ test("saved scope findings are visible and recovery previews the same unsaved so
   await workspace.showOutputPreviews();
   await workspace.editPreviewWithoutSaving("component ReactScreen { requires package \"react\" for runtime }");
   await workspace.selectPreviewOutput("markdown");
-  await workspace.selectPreviewDocument("draft/docs/ReactScreen.md");
+  await workspace.selectPreviewDocument("draft/docs/pages/src/library.md");
   await workspace.saveScopedPreviewConfiguration(workspace.invalidScopedSavedPreview);
   await workspace.observeVisibleScopeWarning();
   await workspace.saveScopedPreviewConfiguration(workspace.scopedSavedPreview);
   await workspace.selectPreviewOutput("markdown");
-  await workspace.selectPreviewDocument("draft/docs/ReactScreen.md");
+  await workspace.selectPreviewDocument("draft/docs/pages/src/library.md");
   await workspace.expectVisibleScopeWarning("unavailable-package", "\"requirements\",\"files\",0,\"test\",0");
   await workspace.expectNativeScopePreviewRecovered();
-  await workspace.expectNativePreviewText("markdown", "draft/docs/ReactScreen.md", "text/markdown", "component ReactScreen");
+  await workspace.expectNativePreviewText("markdown", "draft/docs/pages/src/library.md", "text/markdown", "component ReactScreen");
   await workspace.expectNativePreviewUnsaved("component ReactView { requires package \"react\" for runtime }", "component ReactScreen { requires package \"react\" for runtime }");
 });

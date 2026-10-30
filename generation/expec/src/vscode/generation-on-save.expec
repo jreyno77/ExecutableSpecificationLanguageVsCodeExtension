@@ -131,7 +131,8 @@ examples for GenerationHost {
     then expectNativeGenerationFile("src/Library.ts", "title(): string")
     then expectNativeGenerationFile("src/Library.ts", "return 41;")
     then expectNativeGenerationFile("src/Shelf.ts", "copies: string;")
-    then expectNativeGenerationFile("docs/Library.md", "title")
+    then expectNativeGenerationFile("docs/pages/authoring/main.md", "title")
+    then expectNativeGenerationFile("docs/Home.md", "pages/authoring/main.md")
     then expectNativeGenerationDiagram("Library")
     then expectNativeGenerationDiagram("title()")
   }

@@ -265,7 +265,8 @@ examples for ConnectionSidebar {
     when previewSidebarSource("src/model.expec")
     then expectSidebarConnection("disconnected", "shop")
     then expectSidebarSavedProject("shop")
-    then expectSidebarPreviewDocument("markdown", "docs/Book.md", "# Book")
+    then expectSidebarPreviewDocument("markdown", "docs/pages/src/model.md", "type Book")
+    then expectSidebarPreviewDocument("markdown", "docs/Home.md", "Home")
     then expectSidebarTreesUntouched()
   }
   scenario "reconnect verifies the latest saved target without rewriting configuration" {

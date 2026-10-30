@@ -1,15 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { OutputTab } from '../core/OutputTab.js';
 import type { OutputDocument } from '../core/OutputDocument.js';
+import { MarkdownDocument, type MarkdownTarget } from './MarkdownDocument.js';
 import './output-tabs.css';
 
 type Selection = { output: string | undefined; paths: Map<string, string> };
+type Navigation = MarkdownTarget & { output: string; content: string };
+function mediaType(document: OutputDocument): string {
+  return document.mediaType.split(';', 1)[0]!.trim().toLowerCase();
+}
+function preferredDocument(documents: OutputDocument[]): OutputDocument | undefined {
+  return documents.find(document => mediaType(document) === 'image/svg+xml')
+    ?? documents.find(document => mediaType(document) === 'text/markdown' && document.path.split('/').at(-1) === 'Home.md')
+    ?? documents[0];
+}
 function currentSelection(tabs: OutputTab[], previous: Selection): Selection {
   const output = tabs.some(tab => tab.id === previous.output) ? previous.output : tabs[0]?.id;
   const paths = new Map<string, string>();
   for (const tab of tabs) {
     const documents = tab.status === 'ready' ? tab.documents ?? [] : [];
-    const path = documents.find(document => document.path === previous.paths.get(tab.id))?.path ?? documents[0]?.path;
+    const path = documents.find(document => document.path === previous.paths.get(tab.id))?.path ?? preferredDocument(documents)?.path;
     if (path !== undefined) paths.set(tab.id, path);
   }
   return { output, paths };
@@ -21,17 +31,21 @@ function sameSelection(left: Selection, right: Selection): boolean {
 
 export function OutputTabsView({ tabs }: { tabs: OutputTab[] }) {
   const [selection, select] = useState<Selection>({ output: undefined, paths: new Map() });
+  const [navigation, navigate] = useState<Navigation>();
   const current = currentSelection(tabs, selection);
   if (!sameSelection(selection, current)) select(current);
   const selected = tabs.find(tab => tab.id === current.output);
   const documents = selected?.status === 'ready' ? selected.documents ?? [] : [];
   const document = documents.find(document => document.path === current.paths.get(selected!.id));
+  const currentNavigation = navigation?.output === selected?.id && navigation?.path === document?.path
+    && navigation?.content === document?.content ? navigation : undefined;
+  if (navigation !== currentNavigation) navigate(currentNavigation);
   const explanation = selected?.status !== 'ready' ? selected?.message ?? selected?.status ?? 'Pending preview.'
     : documents.length ? selected.message : selected.message ?? 'No authored documents';
   return <section className="expec-output-tabs">
     <div className="expec-output-buttons" role="tablist" aria-label="Configured outputs">
       {tabs.map(tab => <button key={tab.id} type="button" role="tab" data-output-id={tab.id}
-        aria-selected={tab.id === current.output} onClick={() => select({ ...current, output: tab.id })}>{tab.label}</button>)}
+        aria-selected={tab.id === current.output} onClick={() => { navigate(undefined); select({ ...current, output: tab.id }); }}>{tab.label}</button>)}
     </div>
     {selected && <section role="tabpanel" aria-label={selected.label} data-output-id={selected.id}
       data-status={selected.status ?? 'pending'} data-document-path={document?.path} data-media-type={document?.mediaType}>
@@ -39,21 +53,42 @@ export function OutputTabsView({ tabs }: { tabs: OutputTab[] }) {
       {!!documents.length && <div className="expec-document-buttons" aria-label="Output documents">
         {documents.map(document => <button key={document.path} type="button" data-document-path={document.path}
           aria-pressed={document.path === current.paths.get(selected.id)} onClick={() => {
+            navigate(undefined);
             const paths = new Map(current.paths); paths.set(selected.id, document.path); select({ ...current, paths });
           }}>{document.path}</button>)}
       </div>}
-      {document && <DocumentView key={selected.id + '\0' + document.path + '\0' + document.content} document={document} />}
+      {document && <DocumentView key={selected.id + '\0' + document.path + '\0' + document.content} document={document} documents={documents}
+        navigation={currentNavigation}
+        onNavigate={target => {
+          const paths = new Map(current.paths); paths.set(selected.id, target.path); select({ ...current, paths });
+          navigate({ ...target, output: selected.id, content: documents.find(document => document.path === target.path)!.content });
+        }} />}
     </section>}
   </section>;
 }
 
-function DocumentView({ document }: { document: OutputDocument }) {
-  const media = document.mediaType.split(';', 1)[0]!.trim().toLowerCase();
+function DocumentView({ document, documents, navigation, onNavigate }: {
+  document: OutputDocument;
+  documents: OutputDocument[];
+  navigation: MarkdownTarget | undefined;
+  onNavigate: (target: MarkdownTarget) => void;
+}) {
+  const media = mediaType(document);
   if (media === 'image/svg+xml') return <DiagramImage document={document} />;
+  if (media === 'text/markdown') return <MarkdownDocument document={document} documents={documents} navigation={navigation} onNavigate={onNavigate} />;
+  if (media === 'text/vnd.d2') return <DiagramSource document={document} />;
   if (media.startsWith('text/') || media === 'application/json' || media.endsWith('+json')) {
     return <pre data-output-content>{document.content}</pre>;
   }
   return <p data-output-explanation>Cannot display {document.path}: unsupported media type {document.mediaType}.</p>;
+}
+function DiagramSource({ document }: { document: OutputDocument }) {
+  const [visible, show] = useState(false);
+  return <>
+    <p data-output-explanation>Diagram preview unavailable. Select an SVG document or show source.</p>
+    <button type="button" onClick={() => show(true)}>Show source</button>
+    {visible && <pre data-output-content>{document.content}</pre>}
+  </>;
 }
 function svgSource(content: string): string {
   const bytes = new TextEncoder().encode(content); let binary = '';

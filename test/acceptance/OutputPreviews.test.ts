@@ -5,13 +5,15 @@ import { expectData, comparisonEqual, finiteNumber } from "../dsl/comparison.js"
 /* @expec-test "31259bb8-c60f-4a19-b6b2-c318e019c1c6" */
 test("show three registered outputs from the current unsaved text", async ({ workspace }) => {
   await workspace.previewAuthoring(workspace.threeOutputs);
-  await workspace.openPreviewSource({ ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book { title: Text }" }, 1);
-  await workspace.changePreviewSource({ ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book { title: Number }" }, 2);
+  const source = await workspace.previewSource("src/library.expec", "type Book { title: Text }");
+  await workspace.openPreviewSource(source, 1);
+  await workspace.changePreviewSource({ ["uri"]: (source)["uri"], ["text"]: "type Book { title: Number }" }, 2);
   await workspace.settleCurrentPreviews();
   await workspace.expectConfiguredOutputs(["uml", "typescript", "markdown"], ["UML", "TypeScript", "Markdown"]);
-  await workspace.expectCurrentPreviewSource("file:///workspace/src/library.expec", 2);
+  await workspace.expectCurrentPreviewSource((source)["uri"], 2);
   await workspace.expectPreviewDocument("typescript", "draft/types/Book.ts", "text/typescript", "title: number;");
-  await workspace.expectPreviewDocument("markdown", "draft/docs/Book.md", "text/markdown", "type Book");
+  await workspace.expectPreviewDocument("markdown", "draft/docs/pages/src/library.md", "text/markdown", "type Book");
+  await workspace.expectPreviewDocument("markdown", "draft/docs/Home.md", "text/markdown", "[src/library](pages/src/library.md)");
   await workspace.expectPreviewSvgLabel("uml", "draft/uml/structure.svg", "Book");
   await workspace.expectTargetsPreserved();
 });
@@ -19,20 +21,22 @@ test("show three registered outputs from the current unsaved text", async ({ wor
 /* @expec-test "ceed3fd9-2879-4634-919a-fd1764424e7b" */
 test("a supplied runtime dependency permits the actual authored Markdown preview", async ({ workspace }) => {
   await workspace.previewAuthoring(workspace.runtimeMarkdown);
-  await workspace.openPreviewSource({ ["uri"]: "file:///workspace/src/view.expec", ["text"]: "component ReactView { requires package \"react\" for runtime }" }, 1);
+  const source = await workspace.previewSource("src/view.expec", "component ReactView { requires package \"react\" for runtime }");
+  await workspace.openPreviewSource(source, 1);
   await workspace.settleCurrentPreviews();
-  await workspace.expectCurrentPreviewSource("file:///workspace/src/view.expec", 1);
+  await workspace.expectCurrentPreviewSource((source)["uri"], 1);
   await workspace.expectPreviewStatus("markdown", "ready");
-  await workspace.expectPreviewDocument("markdown", "draft/docs/ReactView.md", "text/markdown", "component ReactView");
+  await workspace.expectPreviewDocument("markdown", "draft/docs/pages/src/view.md", "text/markdown", "component ReactView");
   await workspace.expectTargetsPreserved();
 });
 
 /* @expec-test "f99a7cc1-1d30-4b37-a303-6d00da2a9416" */
 test("a rejected current edit withdraws old successful documents", async ({ workspace }) => {
   await workspace.previewAuthoring(workspace.textOutputs);
-  await workspace.openPreviewSource({ ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book { title: Text }" }, 1);
+  const source = await workspace.previewSource("src/library.expec", "type Book { title: Text }");
+  await workspace.openPreviewSource(source, 1);
   await workspace.settleCurrentPreviews();
-  await workspace.changePreviewSource({ ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book {" }, 2);
+  await workspace.changePreviewSource({ ["uri"]: (source)["uri"], ["text"]: "type Book {" }, 2);
   await workspace.settleCurrentPreviews();
   await workspace.expectPreviewStatus("typescript", "blocked");
   await workspace.expectPreviewStatus("markdown", "blocked");
@@ -44,19 +48,21 @@ test("a rejected current edit withdraws old successful documents", async ({ work
 /* @expec-test "6e8b0658-6b41-4db9-8a4b-7eea5c61e0c5" */
 test("a native mapping refusal leaves documentation available", async ({ workspace }) => {
   await workspace.previewAuthoring("{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\",\"names\":[{\"declaration\":[\"Missing\"],\"name\":\"Renamed\"}]}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}");
-  await workspace.openPreviewSource({ ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book { title: Text }" }, 1);
+  const source = await workspace.previewSource("src/library.expec", "type Book { title: Text }");
+  await workspace.openPreviewSource(source, 1);
   await workspace.settleCurrentPreviews();
   await workspace.expectPreviewStatus("typescript", "refused");
   await workspace.expectPreviewExplanation("typescript", "invalid-native-mapping");
   await workspace.expectNoPreviewDocuments("typescript");
   await workspace.expectPreviewStatus("markdown", "ready");
-  await workspace.expectPreviewDocument("markdown", "draft/docs/Book.md", "text/markdown", "type Book");
+  await workspace.expectPreviewDocument("markdown", "draft/docs/pages/src/library.md", "text/markdown", "type Book");
 });
 
 /* @expec-test "46770195-b126-401f-8c88-232097c900f4" */
 test("registered outputs sharing Markdown presentation retain distinct IDs", async ({ workspace }) => {
   await workspace.previewAuthoring("{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}},{\"id\":\"contract-list\",\"options\":{\"directory\":\"draft/contracts\"}}]}");
-  await workspace.openPreviewSource({ ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book { title: Text }" }, 1);
+  const source = await workspace.previewSource("src/library.expec", "type Book { title: Text }");
+  await workspace.openPreviewSource(source, 1);
   await workspace.settleCurrentPreviews();
   await workspace.expectConfiguredOutputs(["markdown", "contract-list"], ["Markdown", "contract-list"]);
   await workspace.expectPreviewStatus("markdown", "ready");
@@ -66,12 +72,14 @@ test("registered outputs sharing Markdown presentation retain distinct IDs", asy
 /* @expec-test "f20e87ef-7818-46f6-bc94-2f53d4cefee1" */
 test("configuration changes replace output IDs and actual document paths", async ({ workspace }) => {
   await workspace.previewAuthoring(workspace.textOutputs);
-  await workspace.openPreviewSource({ ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book { title: Text }" }, 1);
+  const source = await workspace.previewSource("src/library.expec", "type Book { title: Text }");
+  await workspace.openPreviewSource(source, 1);
   await workspace.settleCurrentPreviews();
   await workspace.changePreviewConfiguration("{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"revised/docs\"}}]}");
   await workspace.settleCurrentPreviews();
   await workspace.expectConfiguredOutputs(["markdown"], ["Markdown"]);
-  await workspace.expectPreviewDocument("markdown", "revised/docs/Book.md", "text/markdown", "type Book");
+  await workspace.expectPreviewDocument("markdown", "revised/docs/pages/src/library.md", "text/markdown", "type Book");
+  await workspace.expectPreviewDocument("markdown", "revised/docs/Home.md", "text/markdown", "[src/library](pages/src/library.md)");
 });
 
 /* @expec-test "6566f3cd-2d32-4dfe-82ba-8d59b8e21630" */
@@ -96,15 +104,33 @@ test("an empty authored projection is a visible successful result", async ({ wor
   await workspace.expectPreviewExplanation("typescript", "No authored documents");
 });
 
+/* @expec-test "7b397d84-6c8e-4717-b95c-31f93572fff4" */
+test("an empty Markdown source still has Home and its source page", async ({ workspace }) => {
+  await workspace.previewAuthoring(workspace.textOutputs);
+  const source = await workspace.previewSource("src/library.expec", "");
+  await workspace.openPreviewSource(source, 1);
+  await workspace.settleCurrentPreviews();
+  await workspace.expectCurrentPreviewSource((source)["uri"], 1);
+  await workspace.expectPreviewStatus("markdown", "ready");
+  await workspace.expectPreviewDocument("markdown", "draft/docs/Home.md", "text/markdown", "# Home");
+  await workspace.expectPreviewDocument("markdown", "draft/docs/Home.md", "text/markdown", "[src/library](pages/src/library.md)");
+  await workspace.expectPreviewDocument("markdown", "draft/docs/pages/src/library.md", "text/markdown", "# src/library");
+  await workspace.expectPreviewStatus("typescript", "ready");
+  await workspace.expectNoPreviewDocuments("typescript");
+  await workspace.expectPreviewExplanation("typescript", "No authored documents");
+  await workspace.expectTargetsPreserved();
+});
+
 /* @expec-test "a699d591-0d7a-4771-ab0c-f268e2635842" */
 test("a configured output without a preview does not hide another output", async ({ workspace }) => {
   await workspace.previewAuthoring("{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"java\",\"options\":{\"directory\":\"draft/java\",\"package\":\"example.library\"}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}");
-  await workspace.openPreviewSource({ ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book { title: Text }" }, 1);
+  const source = await workspace.previewSource("src/library.expec", "type Book { title: Text }");
+  await workspace.openPreviewSource(source, 1);
   await workspace.settleCurrentPreviews();
   await workspace.expectPreviewStatus("java", "refused");
   await workspace.expectPreviewExplanation("java", "output-preview-unavailable");
   await workspace.expectPreviewStatus("markdown", "ready");
-  await workspace.expectPreviewDocument("markdown", "draft/docs/Book.md", "text/markdown", "type Book");
+  await workspace.expectPreviewDocument("markdown", "draft/docs/pages/src/library.md", "text/markdown", "type Book");
 });
 
 /* @expec-test "618e2fe4-95c4-48fa-9de8-5f44c9b61472" */
@@ -120,16 +146,17 @@ test("an unresolved declaration blocks preview rather than succeeding empty", as
 /* @expec-test "aac70900-9ec8-4001-9ed6-f122db501733" */
 test("documentation completes while the actual TypeScript callback remains held", async ({ workspace }) => {
   await workspace.gatedPreviewAuthoring(workspace.textOutputs, "typescript");
-  await workspace.openPreviewSource({ ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book { title: Text }" }, 1);
+  const source = await workspace.previewSource("src/library.expec", "type Book { title: Text }");
+  await workspace.openPreviewSource(source, 1);
   await workspace.awaitHeldOutput("typescript");
   await workspace.awaitReadyOutput("markdown");
   await workspace.expectConfiguredOutputs(["typescript", "markdown"], ["TypeScript", "Markdown"]);
-  await workspace.expectCurrentPreviewSource("file:///workspace/src/library.expec", 1);
+  await workspace.expectCurrentPreviewSource((source)["uri"], 1);
   await workspace.expectPreviewStatus("typescript", "pending");
   await workspace.expectNoPreviewDocuments("typescript");
   await workspace.expectBoundedOutputWork("typescript", 1);
   await workspace.expectPreviewStatus("markdown", "ready");
-  await workspace.expectPreviewDocument("markdown", "draft/docs/Book.md", "text/markdown", "type Book");
+  await workspace.expectPreviewDocument("markdown", "draft/docs/pages/src/library.md", "text/markdown", "type Book");
 });
 
 /* @expec-test "c5932e2e-8dcb-4b07-a683-05d7d59f6c83" */
@@ -255,14 +282,15 @@ test("unsupported binary presentation remains visibly refused", async ({ workspa
 /* @expec-test "a5c065ee-4c87-4929-a702-01c42f188148" */
 test("a refused current source scope withdraws preview documents without inventing a compiler error", async ({ workspace }) => {
   await workspace.previewAuthoring(workspace.scopedMarkdown);
-  await workspace.previewSourcePath("file:///workspace/src/library.expec", "src/library.expec");
-  await workspace.openPreviewSource({ ["uri"]: "file:///workspace/src/library.expec", ["text"]: "type Book { title: Text }" }, 1);
+  const source = await workspace.previewSource("src/library.expec", "type Book { title: Text }");
+  await workspace.previewSourcePath((source)["uri"], "src/library.expec");
+  await workspace.openPreviewSource(source, 1);
   await workspace.settleCurrentPreviews();
-  await workspace.previewSourcePath("file:///workspace/src/library.expec", "src/../library.expec");
+  await workspace.previewSourcePath((source)["uri"], "src/../library.expec");
   await workspace.settleCurrentPreviews();
   await workspace.expectPriorScopePreviewReady("markdown");
   await workspace.expectPreviewStatus("markdown", "blocked");
   await workspace.expectPreviewExplanation("markdown", "invalid-dependency-input");
-  await workspace.expectCurrentPreviewSource("file:///workspace/src/library.expec", 1);
+  await workspace.expectCurrentPreviewSource((source)["uri"], 1);
   await workspace.expectTargetsPreserved();
 });

@@ -3,6 +3,8 @@ use OutputTab from "../core/workspace.expec"
 component OutputTabs {
   requires package "react" for runtime
   requires package "react-dom" for runtime
+  requires package "react-markdown" for runtime
+  requires package "remark-gfm" for runtime
 
   // The UI host supplies the ID of an existing empty DOM element.
   // Missing or occupied hosts are rejected; this view owns only its rendered children.
@@ -10,7 +12,11 @@ component OutputTabs {
   public present, dispose
 
   capability present(tabs: List<OutputTab>) returns Nothing {
-    promises "Present exactly the supplied output IDs/labels/order, statuses, explanations and ordered documents. Replace the previous presentation. Preserve selected output ID and document path while retained; otherwise choose the first current item. Show pending, blocked or refused explanations without old documents; ready with no documents visibly says No authored documents. Select documents by their actual paths within one output tab. Display supported text media literally, including TypeScript, Markdown, D2 and JSON. Display image/svg+xml as an inert image from its supplied UTF-8 content, never injected markup or a target-file path. Use a scroll viewport with default 100 percent scale, author-controlled zoom and reset to 100 percent; do not shrink wide images to fit. Dispose replaced image resources and bind image events to the actual content's current node. Unsupported presentation media shows a clear explanation and retains its path/type. Selection and image navigation never compile, generate, write, fetch external resources or implement report freshness."
+    promises "Present exactly the supplied output IDs/labels/order, statuses, explanations and ordered document paths. Replace the previous presentation. Preserve selected output ID and document path while retained. Otherwise choose the first output, and prefer its first supplied SVG document, then its first Markdown document named Home.md, then its first document. The Home.md filename is the final slash-separated path segment; ties retain supplied order. Show pending, blocked or refused explanations without old documents; ready with no documents visibly says No authored documents."
+    promises "Render text/markdown as a readable document with headings, lists, GFM tables and fenced code. Hide HTML comments, including expec-section, expec-fragment and expec-end ownership markers. Convert only exact generated empty anchors with an expec- prefix and lowercase hexadecimal suffix into inert DOM targets; ignore all other authored HTML and attributes. Code-fenced HTML remains visible code. Never execute authored HTML or load Markdown images; show their alt text instead."
+    promises "Markdown links resolve relative to the selected document among supplied Markdown paths within the same output. Following an available link selects that actual document path and scrolls its decoded fragment target into view; a fragment-only link stays in the current document. Never fetch a missing page or use filesystem or VS Code APIs. External, absolute, command, javascript, file and unavailable-page links remain readable and inactive with the explanation Link unavailable in supplied previews. A missing fragment visibly reports Anchor unavailable in supplied preview."
+    promises "Display TypeScript, JSON and other supported text literally. A D2 document initially shows Diagram preview unavailable. Select an SVG document or show source. Its explicit Show source control reveals the supplied D2 literally. Do not render Markdown, SVG or D2 source as the default document preview."
+    promises "Display image/svg+xml as an inert image from its supplied UTF-8 content, never injected markup or a target-file path. Use a scroll viewport with default 100 percent scale, author-controlled zoom and reset to 100 percent; do not shrink wide images to fit. Dispose replaced image resources and bind image events to the actual content's current node. Unsupported presentation media shows a clear explanation and retains its path/type. Selection, source viewing and document navigation never compile, generate, write, fetch external resources or implement report freshness."
   }
 
   capability dispose() returns Nothing {
@@ -25,6 +31,7 @@ component OutputTabs {
 // dimensions prove browser rendering here; zoom/scroll observations read actual UI.
 examples for OutputTabs {
   fixture emptyDocumentPaths: List<Text> = []
+  fixture emptyPreviewRequests: List<Text> = []
   fixture previews: List<OutputTab> = [
     { id: "uml", label: "UML", status: "ready", documents: [
       { path: "structure.d2", mediaType: "text/vnd.d2", content: "Book: { title: Text }" }
@@ -50,10 +57,24 @@ examples for OutputTabs {
     ] }
   ]
 
+  fixture readableMarkdown: List<OutputTab> = [
+    { id: "markdown", label: "Markdown", status: "ready", documents: [
+      { path: "Books.md", mediaType: "text/markdown", content: "# Books\n\n- Dune\n- Emma\n\n| Book | Copies |\n| --- | --- |\n| Dune | 2 |\n\n```expec\ntype Book { title: Text }\n```\n" }
+    ] }
+  ]
+  fixture wikiPages: List<OutputTab> = [
+    { id: "markdown", label: "Markdown", status: "ready", documents: [
+      { path: "docs/reference/Book.md", mediaType: "text/markdown", content: "# Book\n\n[Home](../Home.md#expec-686f6d65)\n\n[Book details](#expec-626f6f6b)\n\n- Arrival\n- Discovery\n- Departure\n- Journey\n- Storm\n- Shelter\n- Message\n- Search\n- Meeting\n- Promise\n- Return\n- Reunion\n- Celebration\n- Tomorrow\n- Afterword\n- Credits\n\n<a id=\"expec-626f6f6b\"></a>\n\n## Book details\n\nTitle and available copies.\n" },
+      { path: "docs/Home.md", mediaType: "text/markdown", content: "<!-- expec-section:7b226f75747075744964223a226d61726b646f776e222c22737065634964223a22686f6d65227d -->\n\n# Library\n\n<a id=\"expec-686f6d65\"></a>\n\n[Read Book](reference/Book.md#expec-626f6f6b)\n\n[Missing section](#expec-6d697373696e67)\n\n<!-- expec-end:686f6d65 -->\n" }
+    ] }
+  ]
+
   setup openOutputTabs() returns Nothing
   action presentOutputs(tabs: List<OutputTab>) returns Nothing
   action selectOutput(id: Text) returns Nothing
   action selectOutputDocument(path: Text) returns Nothing
+  action showOutputSource() returns Nothing
+  action followDocumentLink(label: Text) returns Nothing
   action setDiagramZoom(percent: Number) returns Nothing
   action resetDiagramZoom() returns Nothing
   action scrollDiagram(horizontal: Number, vertical: Number) returns Nothing
@@ -71,6 +92,60 @@ examples for OutputTabs {
   observation diagramDisplayedWidth() returns Number
   observation diagramScrollLeft() returns Number
   observation diagramScrollTop() returns Number
+  observation markdownHeadings() returns List<Text>
+  observation markdownListItems() returns List<Text>
+  observation markdownTableRows() returns List<List<Text>>
+  observation markdownCodeBlocks() returns List<Text>
+  observation markdownAnchorInView(anchor: Text) returns Boolean
+  observation documentContainsText(text: Text) returns Boolean
+  observation inactiveDocumentLinks() returns List<Text>
+  observation previewHasUnsafeContent() returns Boolean
+  observation previewResourceRequests() returns List<Text>
+
+  // Markdown observations inspect actual rendered heading/list/table/code elements.
+  // Anchor visibility reads the actual target geometry after following the link.
+  // Safety observes the preview DOM, attempted resource requests and an authored
+  // window.expecPreviewUnsafe execution probe; it never reports the supplied input.
+  check expectMarkdownHeadings(expected: List<Text>) {
+    let actual = markdownHeadings()
+    assert actual == expected
+  }
+  check expectMarkdownCodeBlocks(expected: List<Text>) {
+    let actual = markdownCodeBlocks()
+    assert actual == expected
+  }
+  check expectReadableMarkdown() {
+    let headings = markdownHeadings()
+    let items = markdownListItems()
+    let rows = markdownTableRows()
+    let code = markdownCodeBlocks()
+    assert headings == ["Books"]
+    assert items == ["Dune", "Emma"]
+    assert rows == [["Book", "Copies"], ["Dune", "2"]]
+    assert code == ["type Book { title: Text }\n"]
+  }
+  check expectDocumentAnchor(anchor: Text) {
+    let visible = markdownAnchorInView(anchor)
+    assert visible == true
+  }
+  check expectDocumentTextAbsent(text: Text) {
+    let present = documentContainsText(text)
+    assert present == false
+  }
+  check expectInactiveDocumentLinks(expected: List<Text>) {
+    let actual = inactiveDocumentLinks()
+    assert actual == expected
+  }
+  check expectSafePreview() {
+    let unsafe = previewHasUnsafeContent()
+    let requests = previewResourceRequests()
+    assert unsafe == false
+    assert requests == emptyPreviewRequests
+  }
+  check expectDocumentExplanation(expected: Text) {
+    let actual = selectedOutputExplanation()
+    assert actual == expected
+  }
 
   check expectOutputLabels(expected: List<Text>) {
     let actual = outputLabels()
@@ -138,7 +213,7 @@ examples for OutputTabs {
     ] }])
     when selectOutput("markdown")
     then expectOutputLabels(["Notes"])
-    then expectOutputContent("# Updated Book")
+    then expectMarkdownHeadings(["Updated Book"])
   }
 
   scenario "closing the tabs leaves the host available to its owner" {
@@ -158,7 +233,7 @@ examples for OutputTabs {
       { path: "Book.md", mediaType: "text/markdown", content: "# Updated Book" }
     ] }])
     then expectSelectedOutput("markdown")
-    then expectOutputContent("# Updated Book")
+    then expectMarkdownHeadings(["Updated Book"])
   }
 
   scenario "fall back to the first output when the selected ID is removed" {
@@ -169,7 +244,7 @@ examples for OutputTabs {
       { path: "Book.md", mediaType: "text/markdown", content: "# Book" }
     ] }])
     then expectSelectedOutput("markdown")
-    then expectOutputContent("# Book")
+    then expectMarkdownHeadings(["Book"])
   }
 
   scenario "readding a removed output does not resurrect its former selection" {
@@ -181,7 +256,7 @@ examples for OutputTabs {
     ] }])
     when presentOutputs(previews)
     then expectSelectedOutput("markdown")
-    then expectOutputContent("# Book")
+    then expectMarkdownHeadings(["Book"])
   }
 
   scenario "pending feedback withdraws the previous document" {
@@ -214,13 +289,14 @@ examples for OutputTabs {
     ])
     when selectOutput("markdown")
     then expectOutputLabels(["TypeScript", "Markdown"])
-    then expectOutputContent("# Book")
+    then expectMarkdownHeadings(["Book"])
   }
 
-  scenario "the first returned document path is initially selected" {
+  scenario "open the supplied UML image instead of its earlier D2 source" {
     given openOutputTabs()
     when presentOutputs(diagrams)
-    then expectSelectedDocument("structure.d2", ["structure.d2", "structure.svg"])
+    then expectSelectedDocument("structure.svg", ["structure.d2", "structure.svg"])
+    then expectLoadedDiagram(100, 1800)
   }
 
   scenario "select real document paths within one output tab" {
@@ -248,6 +324,7 @@ examples for OutputTabs {
     when presentOutputs([{ id: "uml", label: "UML", status: "ready", documents: [
       { path: "notes.d2", mediaType: "text/vnd.d2", content: "Novel: { title: Number }" }
     ] }])
+    when showOutputSource()
     then expectSelectedDocument("notes.d2", ["notes.d2"])
     then expectOutputContent("Novel: { title: Number }")
   }
@@ -276,5 +353,93 @@ examples for OutputTabs {
     given openOutputTabs()
     when presentOutputs([{ id: "typescript", label: "TypeScript", status: "ready", documents: [], `message`: "No authored documents" }])
     then expectOutputStatus("ready", "No authored documents")
+  }
+
+  scenario "read headings lists tables and code as a Markdown document" {
+    given openOutputTabs()
+    when presentOutputs(readableMarkdown)
+    then expectReadableMarkdown()
+  }
+
+  scenario "open Home before another supplied Markdown page without reordering paths" {
+    given openOutputTabs()
+    when presentOutputs(wikiPages)
+    then expectSelectedDocument("docs/Home.md", ["docs/reference/Book.md", "docs/Home.md"])
+    then expectMarkdownHeadings(["Library"])
+    then expectDocumentTextAbsent("expec-section:")
+    then expectDocumentTextAbsent("expec-end:")
+  }
+
+  scenario "follow supplied relative wiki pages and their actual anchors" {
+    given openOutputTabs()
+    when presentOutputs(wikiPages)
+    when followDocumentLink("Read Book")
+    when followDocumentLink("Book details")
+    then expectSelectedDocument("docs/reference/Book.md", ["docs/reference/Book.md", "docs/Home.md"])
+    then expectMarkdownHeadings(["Book", "Book details"])
+    then expectDocumentAnchor("expec-626f6f6b")
+    then expectSafePreview()
+  }
+
+  scenario "return to the supplied Home page through a relative parent link" {
+    given openOutputTabs()
+    when presentOutputs(wikiPages)
+    when followDocumentLink("Read Book")
+    when followDocumentLink("Home")
+    then expectSelectedDocument("docs/Home.md", ["docs/reference/Book.md", "docs/Home.md"])
+    then expectDocumentAnchor("expec-686f6d65")
+    then expectSafePreview()
+  }
+
+  scenario "retain a selected wiki page when the output is presented again" {
+    given openOutputTabs()
+    when presentOutputs(wikiPages)
+    when selectOutputDocument("docs/reference/Book.md")
+    when presentOutputs(wikiPages)
+    then expectSelectedDocument("docs/reference/Book.md", ["docs/reference/Book.md", "docs/Home.md"])
+    then expectMarkdownHeadings(["Book", "Book details"])
+  }
+
+  scenario "show D2 source only after the author asks for it" {
+    given openOutputTabs()
+    when presentOutputs(previews)
+    when showOutputSource()
+    then expectOutputContent("Book: { title: Text }")
+  }
+
+  scenario "explain a missing rendered diagram without showing D2 source by default" {
+    given openOutputTabs()
+    when presentOutputs(previews)
+    then expectDocumentExplanation("Diagram preview unavailable. Select an SVG document or show source.")
+    then expectDocumentTextAbsent("Book: { title: Text }")
+  }
+
+  scenario "explain a missing anchor without leaving the supplied document" {
+    given openOutputTabs()
+    when presentOutputs(wikiPages)
+    when followDocumentLink("Missing section")
+    then expectDocumentExplanation("Anchor unavailable in supplied preview.")
+    then expectSelectedDocument("docs/Home.md", ["docs/reference/Book.md", "docs/Home.md"])
+    then expectSafePreview()
+  }
+
+  scenario "keep hostile HTML and resource links inert in a readable document" {
+    given openOutputTabs()
+    when presentOutputs([{ id: "markdown", label: "Markdown", status: "ready", documents: [
+      { path: "Home.md", mediaType: "text/markdown", content: "# Safe document\n\n<script>window.expecPreviewUnsafe = true</script>\n\n<img src=\"https://example.invalid/pixel\" onerror=\"window.expecPreviewUnsafe = true\">\n\n![Book cover](https://example.invalid/cover.png)\n\n[Remote](https://example.invalid/)\n\n[Command](command:workbench.action.closeWindow)\n\n[Script](javascript:alert%281%29)\n\n[File](file:///tmp/book.md)\n\n[Missing](Missing.md#expec-626f6f6b)\n" }
+    ] }])
+    then expectMarkdownHeadings(["Safe document"])
+    then expectInactiveDocumentLinks(["Remote", "Command", "Script", "File", "Missing"])
+    then expectSafePreview()
+  }
+
+  scenario "keep fenced HTML visible as code without executing it" {
+    given openOutputTabs()
+    when presentOutputs([{ id: "markdown", label: "Markdown", status: "ready", documents: [
+      { path: "Home.md", mediaType: "text/markdown", content: "# Example\n\n```html\n<script>window.expecPreviewUnsafe = true</script>\n```\n" }
+    ] }])
+    then expectMarkdownHeadings(["Example"])
+    then expectMarkdownCodeBlocks(["<script>window.expecPreviewUnsafe = true</script>\n"])
+    then expectSafePreview()
   }
 }

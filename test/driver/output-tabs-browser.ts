@@ -18,7 +18,10 @@ beforeAll(async () => {
 afterAll(async () => { await (await shared?.catch(() => undefined))?.close(); });
 
 export class OutputTabsBrowser {
-  private constructor(readonly page: Page) {}
+  private readonly requests: string[] = [];
+  private constructor(readonly page: Page) {
+    page.on('request', request => this.requests.push(request.url()));
+  }
   static async open(): Promise<OutputTabsBrowser> {
     const session = inject('outputTabs');
     const browser = await shared;
@@ -78,4 +81,27 @@ export class OutputTabsBrowser {
   scrollTop(): Promise<number> { return this.page.locator('[data-diagram-viewport]').evaluate(node => node.scrollTop); }
   async dispose(): Promise<void> { await this.page.evaluate(() => window.outputTabs.dispose()); }
   async hostExists(): Promise<boolean> { return await this.page.locator('#output-host').count() === 1; }
+  async showSource(): Promise<void> { await this.page.getByRole('button', { name: 'Show source', exact: true }).click(); }
+  async followLink(label: string): Promise<void> { await this.page.getByRole('link', { name: label, exact: true }).click(); }
+  markdownHeadings(): Promise<string[]> { return this.page.locator('[data-output-content] :is(h1,h2,h3,h4,h5,h6)').allTextContents(); }
+  markdownListItems(): Promise<string[]> { return this.page.locator('[data-output-content] li').allTextContents(); }
+  markdownTableRows(): Promise<string[][]> {
+    return this.page.locator('[data-output-content] tr').evaluateAll(rows => rows.map(row => [...row.querySelectorAll('th,td')].map(cell => cell.textContent ?? '')));
+  }
+  markdownCodeBlocks(): Promise<string[]> { return this.page.locator('[data-output-content] pre code').allTextContents(); }
+  markdownAnchorInView(anchor: string): Promise<boolean> {
+    return this.page.evaluate(id => {
+      const target = document.querySelector('[data-output-content] #' + CSS.escape(id));
+      const rect = target?.getBoundingClientRect();
+      return rect !== undefined && rect.top >= 0 && rect.top < window.innerHeight;
+    }, anchor);
+  }
+  documentContainsText(text: string): Promise<boolean> { return this.page.getByRole('tabpanel').textContent().then(value => value?.includes(text) ?? false); }
+  inactiveDocumentLinks(): Promise<string[]> { return this.page.locator('[role="tabpanel"] [role="link"][aria-disabled="true"]').allTextContents(); }
+  async hasUnsafeContent(): Promise<boolean> {
+    const elements = await this.page.locator('[role="tabpanel"] script, [role="tabpanel"] iframe, [role="tabpanel"] object, [role="tabpanel"] embed, [role="tabpanel"] img:not([data-diagram-image]), [role="tabpanel"] [onerror], [role="tabpanel"] [onload]').count();
+    return elements > 0 || await this.page.evaluate(() => 'expecPreviewUnsafe' in window);
+  }
+  async resourceRequests(): Promise<string[]> { return [...this.requests]; }
+
 }

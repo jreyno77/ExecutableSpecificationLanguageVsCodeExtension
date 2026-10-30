@@ -90,6 +90,11 @@ examples for OutputPreviews {
 
   setup previewAuthoring(configuration: Text) returns Nothing
   setup gatedPreviewAuthoring(configuration: Text, id: Text) returns Nothing
+  // Arrange an unsaved source below the same owned native root as the manifest.
+  // The driver returns pathToFileURL(join(ownedRoot, path)).href and the supplied
+  // text without writing a source file. Core receives that exact SourceDocument;
+  // URI expectations observe it directly, without an inverse alias translation.
+  setup previewSource(path: Text, text: Text) returns SourceDocument
   action openPreviewSource(source: SourceDocument, version: Number) returns Nothing
   action changePreviewSource(source: SourceDocument, version: Number) returns Nothing
   action changePreviewConfiguration(configuration: Text) returns Nothing
@@ -194,31 +199,35 @@ examples for OutputPreviews {
 
   scenario "show three registered outputs from the current unsaved text" {
     given previewAuthoring(threeOutputs)
-    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
-    when changePreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Number }" }, 2)
+    given source = previewSource("src/library.expec", "type Book { title: Text }")
+    when openPreviewSource(source, 1)
+    when changePreviewSource({ uri: source.uri, text: "type Book { title: Number }" }, 2)
     when settleCurrentPreviews()
     then expectConfiguredOutputs(["uml", "typescript", "markdown"], ["UML", "TypeScript", "Markdown"])
-    then expectCurrentPreviewSource("file:///workspace/src/library.expec", 2)
+    then expectCurrentPreviewSource(source.uri, 2)
     then expectPreviewDocument("typescript", "draft/types/Book.ts", "text/typescript", "title: number;")
-    then expectPreviewDocument("markdown", "draft/docs/Book.md", "text/markdown", "type Book")
+    then expectPreviewDocument("markdown", "draft/docs/pages/src/library.md", "text/markdown", "type Book")
+    then expectPreviewDocument("markdown", "draft/docs/Home.md", "text/markdown", "[src/library](pages/src/library.md)")
     then expectPreviewSvgLabel("uml", "draft/uml/structure.svg", "Book")
     then expectTargetsPreserved()
   }
   scenario "a supplied runtime dependency permits the actual authored Markdown preview" {
     given previewAuthoring(runtimeMarkdown)
-    when openPreviewSource({ uri: "file:///workspace/src/view.expec", text: "component ReactView { requires package \"react\" for runtime }" }, 1)
+    given source = previewSource("src/view.expec", "component ReactView { requires package \"react\" for runtime }")
+    when openPreviewSource(source, 1)
     when settleCurrentPreviews()
-    then expectCurrentPreviewSource("file:///workspace/src/view.expec", 1)
+    then expectCurrentPreviewSource(source.uri, 1)
     then expectPreviewStatus("markdown", "ready")
-    then expectPreviewDocument("markdown", "draft/docs/ReactView.md", "text/markdown", "component ReactView")
+    then expectPreviewDocument("markdown", "draft/docs/pages/src/view.md", "text/markdown", "component ReactView")
     then expectTargetsPreserved()
   }
 
   scenario "a rejected current edit withdraws old successful documents" {
     given previewAuthoring(textOutputs)
-    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    given source = previewSource("src/library.expec", "type Book { title: Text }")
+    when openPreviewSource(source, 1)
     when settleCurrentPreviews()
-    when changePreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book {" }, 2)
+    when changePreviewSource({ uri: source.uri, text: "type Book {" }, 2)
     when settleCurrentPreviews()
     then expectPreviewStatus("typescript", "blocked")
     then expectPreviewStatus("markdown", "blocked")
@@ -229,18 +238,20 @@ examples for OutputPreviews {
 
   scenario "a native mapping refusal leaves documentation available" {
     given previewAuthoring("{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"typescript\",\"options\":{\"directory\":\"draft/types\",\"names\":[{\"declaration\":[\"Missing\"],\"name\":\"Renamed\"}]}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}")
-    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    given source = previewSource("src/library.expec", "type Book { title: Text }")
+    when openPreviewSource(source, 1)
     when settleCurrentPreviews()
     then expectPreviewStatus("typescript", "refused")
     then expectPreviewExplanation("typescript", "invalid-native-mapping")
     then expectNoPreviewDocuments("typescript")
     then expectPreviewStatus("markdown", "ready")
-    then expectPreviewDocument("markdown", "draft/docs/Book.md", "text/markdown", "type Book")
+    then expectPreviewDocument("markdown", "draft/docs/pages/src/library.md", "text/markdown", "type Book")
   }
 
   scenario "registered outputs sharing Markdown presentation retain distinct IDs" {
     given previewAuthoring("{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}},{\"id\":\"contract-list\",\"options\":{\"directory\":\"draft/contracts\"}}]}")
-    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    given source = previewSource("src/library.expec", "type Book { title: Text }")
+    when openPreviewSource(source, 1)
     when settleCurrentPreviews()
     then expectConfiguredOutputs(["markdown", "contract-list"], ["Markdown", "contract-list"])
     then expectPreviewStatus("markdown", "ready")
@@ -249,12 +260,14 @@ examples for OutputPreviews {
 
   scenario "configuration changes replace output IDs and actual document paths" {
     given previewAuthoring(textOutputs)
-    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    given source = previewSource("src/library.expec", "type Book { title: Text }")
+    when openPreviewSource(source, 1)
     when settleCurrentPreviews()
     when changePreviewConfiguration("{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"revised/docs\"}}]}")
     when settleCurrentPreviews()
     then expectConfiguredOutputs(["markdown"], ["Markdown"])
-    then expectPreviewDocument("markdown", "revised/docs/Book.md", "text/markdown", "type Book")
+    then expectPreviewDocument("markdown", "revised/docs/pages/src/library.md", "text/markdown", "type Book")
+    then expectPreviewDocument("markdown", "revised/docs/Home.md", "text/markdown", "[src/library](pages/src/library.md)")
   }
 
   scenario "saved imports update previews without a newer entry editor version" {
@@ -277,14 +290,31 @@ examples for OutputPreviews {
     then expectPreviewExplanation("typescript", "No authored documents")
   }
 
+  scenario "an empty Markdown source still has Home and its source page" {
+    given previewAuthoring(textOutputs)
+    given source = previewSource("src/library.expec", "")
+    when openPreviewSource(source, 1)
+    when settleCurrentPreviews()
+    then expectCurrentPreviewSource(source.uri, 1)
+    then expectPreviewStatus("markdown", "ready")
+    then expectPreviewDocument("markdown", "draft/docs/Home.md", "text/markdown", "# Home")
+    then expectPreviewDocument("markdown", "draft/docs/Home.md", "text/markdown", "[src/library](pages/src/library.md)")
+    then expectPreviewDocument("markdown", "draft/docs/pages/src/library.md", "text/markdown", "# src/library")
+    then expectPreviewStatus("typescript", "ready")
+    then expectNoPreviewDocuments("typescript")
+    then expectPreviewExplanation("typescript", "No authored documents")
+    then expectTargetsPreserved()
+  }
+
   scenario "a configured output without a preview does not hide another output" {
     given previewAuthoring("{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"java\",\"options\":{\"directory\":\"draft/java\",\"package\":\"example.library\"}},{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}]}")
-    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    given source = previewSource("src/library.expec", "type Book { title: Text }")
+    when openPreviewSource(source, 1)
     when settleCurrentPreviews()
     then expectPreviewStatus("java", "refused")
     then expectPreviewExplanation("java", "output-preview-unavailable")
     then expectPreviewStatus("markdown", "ready")
-    then expectPreviewDocument("markdown", "draft/docs/Book.md", "text/markdown", "type Book")
+    then expectPreviewDocument("markdown", "draft/docs/pages/src/library.md", "text/markdown", "type Book")
   }
 
   scenario "an unresolved declaration blocks preview rather than succeeding empty" {
@@ -298,16 +328,17 @@ examples for OutputPreviews {
 
   scenario "documentation completes while the actual TypeScript callback remains held" {
     given gatedPreviewAuthoring(textOutputs, "typescript")
-    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    given source = previewSource("src/library.expec", "type Book { title: Text }")
+    when openPreviewSource(source, 1)
     when awaitHeldOutput("typescript")
     when awaitReadyOutput("markdown")
     then expectConfiguredOutputs(["typescript", "markdown"], ["TypeScript", "Markdown"])
-    then expectCurrentPreviewSource("file:///workspace/src/library.expec", 1)
+    then expectCurrentPreviewSource(source.uri, 1)
     then expectPreviewStatus("typescript", "pending")
     then expectNoPreviewDocuments("typescript")
     then expectBoundedOutputWork("typescript", 1)
     then expectPreviewStatus("markdown", "ready")
-    then expectPreviewDocument("markdown", "draft/docs/Book.md", "text/markdown", "type Book")
+    then expectPreviewDocument("markdown", "draft/docs/pages/src/library.md", "text/markdown", "type Book")
   }
 
   scenario "a valid changed render becomes pending after a real ready preview" {
@@ -431,15 +462,16 @@ examples for OutputPreviews {
   }
   scenario "a refused current source scope withdraws preview documents without inventing a compiler error" {
     given previewAuthoring(scopedMarkdown)
-    when previewSourcePath("file:///workspace/src/library.expec", "src/library.expec")
-    when openPreviewSource({ uri: "file:///workspace/src/library.expec", text: "type Book { title: Text }" }, 1)
+    given source = previewSource("src/library.expec", "type Book { title: Text }")
+    when previewSourcePath(source.uri, "src/library.expec")
+    when openPreviewSource(source, 1)
     when settleCurrentPreviews()
-    when previewSourcePath("file:///workspace/src/library.expec", "src/../library.expec")
+    when previewSourcePath(source.uri, "src/../library.expec")
     when settleCurrentPreviews()
     then expectPriorScopePreviewReady("markdown")
     then expectPreviewStatus("markdown", "blocked")
     then expectPreviewExplanation("markdown", "invalid-dependency-input")
-    then expectCurrentPreviewSource("file:///workspace/src/library.expec", 1)
+    then expectCurrentPreviewSource(source.uri, 1)
     then expectTargetsPreserved()
   }
 

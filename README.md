@@ -54,7 +54,9 @@ Run **.expec: Show Output Previews** from the Command Palette. Add the desired o
 }
 ```
 
-Select an output tab and then a document. Previews follow the selected `.expec` editor's unsaved text and saved output configuration. Each output shows its own progress or explanation. Diagrams start at their natural size, with scrolling, zoom and reset controls. Previewing leaves project files untouched; generated-file updates have a separate save policy.
+Select an output tab and then a document. Markdown opens at Home, which links to one specification page per `.expec` source file. Pages render headings, contents, contracts and examples; follow their links to related supplied pages and sections. UML selects the rendered SVG at its natural size, with scrolling, zoom and reset controls. If only D2 is supplied, **Show source** reveals that diagram source explicitly. TypeScript and other code outputs remain code.
+
+Previews follow the selected `.expec` editor's unsaved text and saved output configuration. Each output shows its own progress or explanation. Preview links never fetch external content; unavailable destinations have an explanation. Previewing leaves project files untouched; generated-file updates have a separate save policy.
 ## Generate on save
 
 Run **.expec: Enable Generation on Save** for the selected saved project configuration. Saving a valid `.expec` source then builds all configured saved entries and outputs, preserving handwritten implementation. Typing continues to update previews without writing generated files. Use **.expec: Disable Generation on Save** to stop automatic generation; each selected configuration retains its own choice.
@@ -89,6 +91,6 @@ PR CI selects affected components on Windows and Ubuntu; main runs the full exte
 
 ## Captured language build
 
-`generation/tooling/executable-specification-language-pr-126.tgz` contains the complete tested SDK from language main commit `7783c3530d5d382ec361860db75b5b73d2ffa5f2`, built and tested by [run40587355388](https://github.com/jreyno77/ExecutableSpecificationLanguage/actions/runs/40587355388). Its SHA256 is `81f9698f5d9aec788a5a2b59ffa623a5e86f41965a11e91502cd92a3fce4da30`; `npm ci` also verifies lockfile integrity. The authored connection excludes `dist`, `.local-docs` and `generation/tooling` from editable capture, retaining native/source freshness, checked source-name queries, syntax highlighting and handwritten-code protection. The [pr-126 package release](https://github.com/jreyno77/ExecutableSpecificationLanguage/releases/tag/pr-126) must match these exact tested bytes before extension delivery.
+`generation/tooling/executable-specification-language-out-28-02a9a25.tgz` contains SDK `0.1.0` from reviewed language commit [`02a9a25`](https://github.com/jreyno77/ExecutableSpecificationLanguage/commit/02a9a25e1e102d71d24c68fe76ac0762eedba5a5), including merged PR #129 and the editor file-URI correction in [PR #131](https://github.com/jreyno77/ExecutableSpecificationLanguage/pull/131). It was produced by the normal clean build and package commands, without version rewriting. SHA256: `c05819eeef705a5fe719643fd30478e9c5a0a6b4a84e5bd26937d8625b2dde22`; `npm ci` verifies lockfile integrity. This source-candidate qualification is separate from the official Actions release/deployment. The connection excludes `dist`, `.local-docs` and `generation/tooling` from editable capture; native freshness and handwritten-code guards remain enabled.
 
 TypeScript preserves JSX for Vite's React plugin. Automatic-runtime declaration capture remains [language issue60](https://github.com/jreyno77/ExecutableSpecificationLanguage/issues/60); native freshness and writer guards remain enabled.

@@ -16,7 +16,8 @@ test("an installed save generates all saved entries and preserves manual code", 
   await workspace.expectNativeGenerationFile("src/Library.ts", "title(): string");
   await workspace.expectNativeGenerationFile("src/Library.ts", "return 41;");
   await workspace.expectNativeGenerationFile("src/Shelf.ts", "copies: string;");
-  await workspace.expectNativeGenerationFile("docs/Library.md", "title");
+  await workspace.expectNativeGenerationFile("docs/pages/authoring/main.md", "title");
+  await workspace.expectNativeGenerationFile("docs/Home.md", "pages/authoring/main.md");
   await workspace.expectNativeGenerationDiagram("Library");
   await workspace.expectNativeGenerationDiagram("title()");
 });
