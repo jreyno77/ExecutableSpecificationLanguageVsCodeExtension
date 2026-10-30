@@ -489,10 +489,10 @@ examples for OutputPreviews {
   }
   scenario "retain real renderer promise annotations in the current preview" {
     given previewAuthoring(threeOutputs)
-    given source = previewSource("src/relay.expec", "component ResultsRelay {\n capability export() { promises \"Delivers the result\" promises \"Cleans temporary files\" }\n capability download()\n}")
+    given source = previewSource("src/library.expec", "component ResultsRelay {\n capability export() {\n promises \"Delivers the result\"\n promises \"Cleans temporary files\"\n }\n capability download()\n}")
     when openPreviewSource(source, 1)
     when settleCurrentPreviews()
-    then expectRenderedPromises("uml", "draft/diagrams/structure.svg", ["ResultsRelay.export"], "ResultsRelay.export", ["Delivers the result", "Cleans temporary files"])
+    then expectRenderedPromises("uml", "draft/uml/structure.svg", ["ResultsRelay.export"], "ResultsRelay.export", ["Delivers the result", "Cleans temporary files"])
     then expectTargetsPreserved()
   }
 
