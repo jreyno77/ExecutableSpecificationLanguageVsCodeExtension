@@ -55,7 +55,7 @@ export function DiagramPromises({ diagram, width, height, viewport }: {
     return () => { area.removeEventListener('scroll', positionBubble); window.removeEventListener('resize', positionBubble); resize.disconnect(); };
   }, [active, width, height, viewport]);
 
-  const inspect = (id: string) => show(previous => previous?.pinned || previous?.id === id ? previous : { id, pinned: false });
+  const inspect = (id: string) => show(previous => previous?.id === id ? previous : { id, pinned: false });
   const leave = (target: EventTarget | null) => {
     if (target instanceof Node && popup.current?.contains(target)) return;
     if (target instanceof Element && target.closest('button[data-promise-label]')) return;
