@@ -209,7 +209,12 @@ export class OutputPreviews {
             if (!media.startsWith('text/') && media !== 'application/json' && media !== 'image/svg+xml') {
                 throw new TypeError('Unsupported document media type: ' + document.mediaType);
             }
-            return { path: document.path, mediaType: document.mediaType, content: new TextDecoder('utf-8', { fatal: true }).decode(document.bytes) };
+            return { path: document.path, mediaType: document.mediaType, content: new TextDecoder('utf-8', { fatal: true }).decode(document.bytes),
+                ...document.diagram === undefined ? {} : { diagram: {
+                    width: document.diagram.width, height: document.diagram.height,
+                    promises: document.diagram.promises.map(note => ({ ...note, promises: [...note.promises] })),
+                } },
+            };
         });
     }
     private complete(request: PreviewRequest, tab: OutputTab): void {
