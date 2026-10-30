@@ -295,3 +295,13 @@ test("a refused current source scope withdraws preview documents without inventi
   await workspace.expectCurrentPreviewSource((source)["uri"], 1);
   await workspace.expectTargetsPreserved();
 });
+
+/* @expec-test "685811c8-4ec2-43ec-a151-9d2710aa451e" */
+test("retain real renderer promise annotations in the current preview", async ({ workspace }) => {
+  await workspace.previewAuthoring(workspace.threeOutputs);
+  const source = await workspace.previewSource("src/library.expec", "component ResultsRelay {\n capability export() {\n promises \"Delivers the result\"\n promises \"Cleans temporary files\"\n }\n capability download()\n}");
+  await workspace.openPreviewSource(source, 1);
+  await workspace.settleCurrentPreviews();
+  await workspace.expectRenderedPromises("uml", "draft/uml/structure.svg", ["ResultsRelay.export"], "ResultsRelay.export", ["Delivers the result", "Cleans temporary files"]);
+  await workspace.expectTargetsPreserved();
+});

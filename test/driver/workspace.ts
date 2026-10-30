@@ -2418,4 +2418,64 @@ async previewResourceRequests(): Promise<Array<string>> {
 async previewSource(path: string, text: string): Promise<SourceDocument> {
     return this.previewRecording.source(path, text);
   }
+
+async hoverPromiseBubble(): Promise<void> {
+    throw new Error("Not implemented: workspace.hoverPromiseBubble");
+  }
+
+async hoverPromise(label: string): Promise<void> {
+    throw new Error("Not implemented: workspace.hoverPromise");
+  }
+
+async focusPromise(label: string): Promise<void> {
+    throw new Error("Not implemented: workspace.focusPromise");
+  }
+
+async pinPromise(label: string): Promise<void> {
+    throw new Error("Not implemented: workspace.pinPromise");
+  }
+
+async pressPromiseKey(key: string): Promise<void> {
+    throw new Error("Not implemented: workspace.pressPromiseKey");
+  }
+
+async leavePromises(): Promise<void> {
+    throw new Error("Not implemented: workspace.leavePromises");
+  }
+
+async clickOutsidePromises(): Promise<void> {
+    throw new Error("Not implemented: workspace.clickOutsidePromises");
+  }
+
+async previewPromiseLabels(id: string, path: string): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.previewPromiseLabels");
+  }
+
+async previewPromiseTexts(id: string, path: string, label: string): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.previewPromiseTexts");
+  }
+
+async previewPromiseGeometryReady(id: string, path: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.previewPromiseGeometryReady");
+  }
+
+async promiseIndicatorLabels(): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.promiseIndicatorLabels");
+  }
+
+async visiblePromiseLabel(): Promise<string> {
+    throw new Error("Not implemented: workspace.visiblePromiseLabel");
+  }
+
+async visiblePromiseTexts(): Promise<Array<string>> {
+    throw new Error("Not implemented: workspace.visiblePromiseTexts");
+  }
+
+async pinnedPromiseLabel(): Promise<string> {
+    throw new Error("Not implemented: workspace.pinnedPromiseLabel");
+  }
+
+async promiseIndicatorAligned(label: string): Promise<boolean> {
+    throw new Error("Not implemented: workspace.promiseIndicatorAligned");
+  }
 }

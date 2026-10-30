@@ -255,3 +255,157 @@ test("keep fenced HTML visible as code without executing it", async ({ workspace
   await workspace.expectMarkdownCodeBlocks(["<script>window.expecPreviewUnsafe = true</script>\n"]);
   await workspace.expectSafePreview();
 });
+
+/* @expec-test "a8151884-882b-4358-8529-47fa0d97b69b" */
+test("keep promise text hidden until inspected", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.expectPromiseIndicators(["ResultsRelay.export: 2 promises", "ResultsRelay.download: 1 promise"]);
+  await workspace.expectPromiseBubble("", [], "");
+});
+
+/* @expec-test "eafa28b8-36f7-4870-871d-21a177cdbda6" */
+test("inspect a capability by hovering its promise indicator", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.hoverPromise("ResultsRelay.export");
+  await workspace.expectPromiseBubble("ResultsRelay.export", ["Delivers the result", "Cleans temporary files"], "");
+});
+
+/* @expec-test "11817305-b66d-4e9b-ae69-3025f6a90d4e" */
+test("close an unpinned thought bubble when leaving it", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.hoverPromise("ResultsRelay.export");
+  await workspace.leavePromises();
+  await workspace.expectPromiseBubble("", [], "");
+});
+
+/* @expec-test "bd6c3f69-ae7e-4a93-ba1b-0ff9048ce5e1" */
+test("inspect a capability by keyboard focus", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.focusPromise("ResultsRelay.export");
+  await workspace.expectPromiseBubble("ResultsRelay.export", ["Delivers the result", "Cleans temporary files"], "");
+});
+
+/* @expec-test "1f96a5d4-7dff-4ef6-b339-a0c1df95f6b7" */
+test("pin a promise bubble with Enter", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.focusPromise("ResultsRelay.export");
+  await workspace.pressPromiseKey("Enter");
+  await workspace.leavePromises();
+  await workspace.expectPromiseBubble("ResultsRelay.export", ["Delivers the result", "Cleans temporary files"], "ResultsRelay.export");
+});
+
+/* @expec-test "7fdaaa2a-9f6b-4272-813e-7cf29359213e" */
+test("close pinned promises with Escape while focus remains on the control", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.focusPromise("ResultsRelay.export");
+  await workspace.pressPromiseKey("Enter");
+  await workspace.pressPromiseKey("Escape");
+  await workspace.expectPromiseBubble("", [], "");
+});
+
+/* @expec-test "430e647a-3a14-4a7d-848c-3f33f9e0ffab" */
+test("keep pinned promises while hovering another capability", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.pinPromise("ResultsRelay.export");
+  await workspace.hoverPromise("ResultsRelay.download");
+  await workspace.expectPromiseBubble("ResultsRelay.export", ["Delivers the result", "Cleans temporary files"], "ResultsRelay.export");
+});
+
+/* @expec-test "06ba35de-6623-49bd-8092-b2854bc79a63" */
+test("replace a pinned promise bubble by clicking another capability", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.pinPromise("ResultsRelay.export");
+  await workspace.pinPromise("ResultsRelay.download");
+  await workspace.expectPromiseBubble("ResultsRelay.download", ["Supports cancellation"], "ResultsRelay.download");
+});
+
+/* @expec-test "30abd469-6564-45b6-b691-75ab27c6b4f7" */
+test("close pinned promises with an outside click", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.pinPromise("ResultsRelay.export");
+  await workspace.clickOutsidePromises();
+  await workspace.expectPromiseBubble("", [], "");
+});
+
+/* @expec-test "99a1050d-7009-46da-9fe3-a60ac608acc2" */
+test("toggle pinned promises closed by clicking the same indicator", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.pinPromise("ResultsRelay.export");
+  await workspace.pinPromise("ResultsRelay.export");
+  await workspace.expectPromiseBubble("", [], "");
+});
+
+/* @expec-test "a632eada-8ec9-4962-a2a8-ddd2c0500e71" */
+test("keep promise controls aligned while zooming and scrolling", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.setDiagramZoom(150);
+  await workspace.scrollDiagram(120, 60);
+  await workspace.expectPromiseAlignment("ResultsRelay.export");
+});
+
+/* @expec-test "b32f8c7b-74a0-4186-a386-b51a23a2505c" */
+test("restore promise alignment when resetting zoom", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.setDiagramZoom(150);
+  await workspace.resetDiagramZoom();
+  await workspace.expectPromiseAlignment("ResultsRelay.export");
+});
+
+/* @expec-test "4dc18f71-b347-4275-b32f-f5b1b5eea273" */
+test("clear pinned promises when replacing the document", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.pinPromise("ResultsRelay.export");
+  await workspace.presentOutputs(workspace.diagrams);
+  await workspace.expectPromiseBubble("", [], "");
+  await workspace.expectPromiseIndicators([]);
+});
+
+/* @expec-test "7fd80065-1d59-4378-b38a-03e117d188cc" */
+test("clear pinned promises when only annotations change", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.pinPromise("ResultsRelay.export");
+  await workspace.presentOutputs(workspace.revisedPromisedDiagram);
+  await workspace.expectPromiseBubble("", [], "");
+});
+
+/* @expec-test "4a3548c9-e566-45c3-a9dc-376916e8753b" */
+test("show updated promises for an unchanged image", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.pinPromise("ResultsRelay.export");
+  await workspace.presentOutputs(workspace.revisedPromisedDiagram);
+  await workspace.hoverPromise("ResultsRelay.export");
+  await workspace.expectPromiseBubble("ResultsRelay.export", ["Reports delivery progress"], "");
+});
+
+/* @expec-test "7cc003b0-d0ea-4710-b86f-b9c1cef87c01" */
+test("keep the thought bubble open while reading its content", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.hoverPromise("ResultsRelay.export");
+  await workspace.hoverPromiseBubble();
+  await workspace.expectPromiseBubble("ResultsRelay.export", ["Delivers the result", "Cleans temporary files"], "");
+});
+
+/* @expec-test "2157d6a9-140d-47ba-ad02-bc6f691d3c5c" */
+test("keep promise HTML and Markdown literal and inert", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.unsafePromisedDiagram);
+  await workspace.hoverPromise("ResultsRelay.export");
+  await workspace.expectPromiseBubble("ResultsRelay.export", ["<img src=\"https://example.invalid/promise\" onerror=\"window.expecPreviewUnsafe = true\">", "**Keep this literal**"], "");
+  await workspace.expectSafePreview();
+});
