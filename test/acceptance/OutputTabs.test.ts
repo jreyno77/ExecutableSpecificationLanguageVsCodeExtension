@@ -310,12 +310,12 @@ test("close pinned promises with Escape while focus remains on the control", asy
 });
 
 /* @expec-test "430e647a-3a14-4a7d-848c-3f33f9e0ffab" */
-test("keep pinned promises while hovering another capability", async ({ workspace }) => {
+test("show only the hovered capability promises after another was pinned", async ({ workspace }) => {
   await workspace.openOutputTabs();
   await workspace.presentOutputs(workspace.promisedDiagram);
   await workspace.pinPromise("ResultsRelay.export");
   await workspace.hoverPromise("ResultsRelay.download");
-  await workspace.expectPromiseBubble("ResultsRelay.export", ["Delivers the result", "Cleans temporary files"], "ResultsRelay.export");
+  await workspace.expectPromiseBubble("ResultsRelay.download", ["Supports cancellation"], "");
 });
 
 /* @expec-test "06ba35de-6623-49bd-8092-b2854bc79a63" */
@@ -408,4 +408,31 @@ test("keep promise HTML and Markdown literal and inert", async ({ workspace }) =
   await workspace.hoverPromise("ResultsRelay.export");
   await workspace.expectPromiseBubble("ResultsRelay.export", ["<img src=\"https://example.invalid/promise\" onerror=\"window.expecPreviewUnsafe = true\">", "**Keep this literal**"], "");
   await workspace.expectSafePreview();
+});
+
+/* @expec-test "6842ed0e-58ae-4760-803c-26f4cc35c30b" */
+test("show only the focused capability promises after another was pinned", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.pinPromise("ResultsRelay.export");
+  await workspace.focusPromise("ResultsRelay.download");
+  await workspace.expectPromiseBubble("ResultsRelay.download", ["Supports cancellation"], "");
+});
+
+/* @expec-test "51cccd95-4a2c-460c-8b45-680256aa695a" */
+test("show only the newly hovered capability promises", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.hoverPromise("ResultsRelay.export");
+  await workspace.hoverPromise("ResultsRelay.download");
+  await workspace.expectPromiseBubble("ResultsRelay.download", ["Supports cancellation"], "");
+});
+
+/* @expec-test "12849392-f179-494a-878b-1dc50fc65bc1" */
+test("keep the current capability pinned when hovering its own indicator", async ({ workspace }) => {
+  await workspace.openOutputTabs();
+  await workspace.presentOutputs(workspace.promisedDiagram);
+  await workspace.pinPromise("ResultsRelay.export");
+  await workspace.hoverPromise("ResultsRelay.export");
+  await workspace.expectPromiseBubble("ResultsRelay.export", ["Delivers the result", "Cleans temporary files"], "ResultsRelay.export");
 });
