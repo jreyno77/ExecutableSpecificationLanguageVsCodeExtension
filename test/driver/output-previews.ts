@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { onTestFinished } from 'vitest';
 import type { BrowserContext, Page } from 'playwright';
 import { svgBrowser, svgTextLabels } from './svg-labels.js';
@@ -44,6 +45,10 @@ export class OutputPreviewsRecording {
   private context: BrowserContext | undefined;
   private contextClosed = false;
   private page: Page | undefined;
+
+  source(path: string, text: string): SourceDocument {
+    return { uri: pathToFileURL(join(this.root, path)).href, text };
+  }
 
   static async create(configuration: string, heldId?: string, binary?: 'text' | 'binary'): Promise<OutputPreviewsRecording> {
     const recording = new OutputPreviewsRecording(); onTestFinished(() => recording.dispose());

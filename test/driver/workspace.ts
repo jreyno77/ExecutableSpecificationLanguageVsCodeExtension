@@ -2416,6 +2416,6 @@ async previewResourceRequests(): Promise<Array<string>> {
   }
 
 async previewSource(path: string, text: string): Promise<SourceDocument> {
-    throw new Error("Not implemented: workspace.previewSource");
+    return this.previewRecording.source(path, text);
   }
 }

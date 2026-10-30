@@ -14,13 +14,13 @@ describe('preview provider failures and owned recording cleanup', () => {
       '{"formatVersion":1,"version":"0.1.0","build":{"entries":["src/library.expec"]},"outputs":[{"id":"broken","options":{}},{"id":"markdown","options":{"directory":"draft/docs"}}]}',
       [failedOutput, markdownOutput],
     );
-    recording.opened({ uri: 'file:///workspace/src/library.expec', text: 'type Book { title: Text }' }, 1);
+    recording.opened(recording.source('src/library.expec', 'type Book { title: Text }'), 1);
     await recording.settle();
     expect(recording.tab('broken').status).toBe('refused');
     expect(recording.tab('broken').documents).toEqual([]);
     expect(recording.tab('broken').message).toContain('Renderer failed after receiving the actual checked specification.');
     expect(recording.tab('markdown').status).toBe('ready');
-    expect(recording.document('markdown', 'draft/docs/Book.md').content).toContain('type Book');
+    expect(recording.document('markdown', 'draft/docs/pages/src/library.md').content).toContain('type Book');
     expect(await recording.preserved()).toBe(true);
   });
 
