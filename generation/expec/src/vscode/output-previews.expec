@@ -44,7 +44,7 @@ examples for OutputPreviewHost {
   fixture revisedPreviews: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/library.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"revised/docs\"}}]}"
   fixture testPackagePreview: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"test\"]}]}"
   fixture runtimePackagePreview: Text = "{\"formatVersion\":1,\"version\":\"0.1.0\",\"build\":{\"entries\":[\"src/view.expec\"]},\"outputs\":[{\"id\":\"markdown\",\"options\":{\"directory\":\"draft/docs\"}}],\"packages\":[{\"alias\":\"react\",\"name\":\"npm:react\",\"version\":\"19.3.0\",\"phases\":[\"runtime\"]}]}"
-  fixture largeBookSource: Text = "type Book { title: Text }\ntype Shelf1 { book: Book }\ntype Shelf2 { book: Book }\ntype Shelf3 { book: Book }\ntype Shelf4 { book: Book }\ntype Shelf5 { book: Book }\ntype Shelf6 { book: Book }\ntype Shelf7 { book: Book }\ntype Shelf8 { book: Book }\ntype Shelf9 { book: Book }\ntype Shelf10 { book: Book }\ntype Shelf11 { book: Book }\ntype Shelf12 { book: Book }\ntype Shelf13 { book: Book }\ntype Shelf14 { book: Book }\ntype Shelf15 { book: Book }\ntype Shelf16 { book: Book }\ntype Shelf17 { book: Book }\ntype Shelf18 { book: Book }\ntype Shelf19 { book: Book }\ntype Shelf20 { book: Book }"
+  fixture largeBookSource: Text = "component Book { capability title() returns Text }\ncomponent Shelf1 { depends on Book }\ncomponent Shelf2 { depends on Book }\ncomponent Shelf3 { depends on Book }\ncomponent Shelf4 { depends on Book }\ncomponent Shelf5 { depends on Book }\ncomponent Shelf6 { depends on Book }\ncomponent Shelf7 { depends on Book }\ncomponent Shelf8 { depends on Book }\ncomponent Shelf9 { depends on Book }\ncomponent Shelf10 { depends on Book }\ncomponent Shelf11 { depends on Book }\ncomponent Shelf12 { depends on Book }\ncomponent Shelf13 { depends on Book }\ncomponent Shelf14 { depends on Book }\ncomponent Shelf15 { depends on Book }\ncomponent Shelf16 { depends on Book }\ncomponent Shelf17 { depends on Book }\ncomponent Shelf18 { depends on Book }\ncomponent Shelf19 { depends on Book }\ncomponent Shelf20 { depends on Book }"
 
   setup previewEditor(initialText: Text, configuration: Text) returns Nothing
   action showOutputPreviews() returns Nothing
@@ -169,9 +169,9 @@ examples for OutputPreviewHost {
   }
 
   scenario "read actual configured outputs from an unsaved edit without writing generated files" {
-    given previewEditor("type Book { title: Text }", configuredPreviews)
+    given previewEditor("type Book { title: Text }\ncomponent BookIndexer {\n public find\n capability find(book: Book) returns Book\n}\ncomponent Library {\n capability find(book: Book) returns Book { calls BookIndexer.find }\n}", configuredPreviews)
     when showOutputPreviews()
-    when editPreviewWithoutSaving("type Book { title: Number }")
+    when editPreviewWithoutSaving("type Book { title: Number }\ncomponent BookIndexer {\n public find\n capability find(book: Book) returns Book\n}\ncomponent Library {\n capability find(book: Book) returns Book { calls BookIndexer.find }\n}")
     when selectPreviewOutput("typescript")
     when selectPreviewDocument("draft/types/Book.ts")
     when selectPreviewOutput("markdown")
@@ -183,8 +183,9 @@ examples for OutputPreviewHost {
     then expectNativePreviewText("typescript", "draft/types/Book.ts", "text/typescript", "title: number;")
     then expectNativePreviewText("markdown", "draft/docs/Home.md", "text/markdown", "Home")
     then expectNativePreviewText("markdown", "draft/docs/pages/src/library.md", "text/markdown", "type Book")
-    then expectNativePreviewDiagram("uml", "draft/uml/structure.svg", "Book")
-    then expectNativePreviewUnsaved("type Book { title: Text }", "type Book { title: Number }")
+    then expectNativePreviewDiagram("uml", "draft/uml/structure.svg", "Library")
+    then expectNativePreviewDiagram("uml", "draft/uml/structure.svg", "find calls find")
+    then expectNativePreviewUnsaved("type Book { title: Text }\ncomponent BookIndexer {\n public find\n capability find(book: Book) returns Book\n}\ncomponent Library {\n capability find(book: Book) returns Book { calls BookIndexer.find }\n}", "type Book { title: Number }\ncomponent BookIndexer {\n public find\n capability find(book: Book) returns Book\n}\ncomponent Library {\n capability find(book: Book) returns Book { calls BookIndexer.find }\n}")
   }
   scenario "a rejected unsaved edit withdraws former successful documents" {
     given previewEditor("type Book { title: Text }", configuredPreviews)

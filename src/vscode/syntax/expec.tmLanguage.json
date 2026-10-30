@@ -14,7 +14,7 @@
     },
     {
       "name": "keyword.control.expec",
-      "match": "\\b(construction|interaction|observation|participant|capability|component|interface|satisfies|examples|function|promises|requires|scenario|concept|depends|ensures|example|fixture|include|message|package|returns|runtime|action|assert|extend|opaque|public|return|build|check|class|error|fails|false|given|local|setup|from|test|then|true|type|when|with|and|for|let|not|use|as|do|on|or)\\b"
+      "match": "\\b(construction|interaction|observation|participant|capability|component|interface|satisfies|examples|function|promises|requires|scenario|concept|depends|ensures|example|fixture|include|message|package|returns|runtime|action|assert|extend|opaque|public|return|build|calls|check|class|error|fails|false|given|local|setup|from|test|then|true|type|when|with|and|for|let|not|use|as|do|on|or)\\b"
     },
     {
       "name": "string.quoted.double.expec",

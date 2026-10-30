@@ -199,16 +199,17 @@ examples for OutputPreviews {
 
   scenario "show three registered outputs from the current unsaved text" {
     given previewAuthoring(threeOutputs)
-    given source = previewSource("src/library.expec", "type Book { title: Text }")
+    given source = previewSource("src/library.expec", "type Book { title: Text }\ncomponent BookIndexer {\n public find\n capability find(book: Book) returns Book\n}\ncomponent Library {\n capability find(book: Book) returns Book { calls BookIndexer.find }\n}")
     when openPreviewSource(source, 1)
-    when changePreviewSource({ uri: source.uri, text: "type Book { title: Number }" }, 2)
+    when changePreviewSource({ uri: source.uri, text: "type Book { title: Number }\ncomponent BookIndexer {\n public find\n capability find(book: Book) returns Book\n}\ncomponent Library {\n capability find(book: Book) returns Book { calls BookIndexer.find }\n}" }, 2)
     when settleCurrentPreviews()
     then expectConfiguredOutputs(["uml", "typescript", "markdown"], ["UML", "TypeScript", "Markdown"])
     then expectCurrentPreviewSource(source.uri, 2)
     then expectPreviewDocument("typescript", "draft/types/Book.ts", "text/typescript", "title: number;")
     then expectPreviewDocument("markdown", "draft/docs/pages/src/library.md", "text/markdown", "type Book")
     then expectPreviewDocument("markdown", "draft/docs/Home.md", "text/markdown", "[src/library](pages/src/library.md)")
-    then expectPreviewSvgLabel("uml", "draft/uml/structure.svg", "Book")
+    then expectPreviewSvgLabel("uml", "draft/uml/structure.svg", "Library")
+    then expectPreviewSvgLabel("uml", "draft/uml/structure.svg", "find calls find")
     then expectTargetsPreserved()
   }
   scenario "a supplied runtime dependency permits the actual authored Markdown preview" {

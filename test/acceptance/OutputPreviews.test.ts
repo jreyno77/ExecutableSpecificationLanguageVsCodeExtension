@@ -5,16 +5,17 @@ import { expectData, comparisonEqual, finiteNumber } from "../dsl/comparison.js"
 /* @expec-test "31259bb8-c60f-4a19-b6b2-c318e019c1c6" */
 test("show three registered outputs from the current unsaved text", async ({ workspace }) => {
   await workspace.previewAuthoring(workspace.threeOutputs);
-  const source = await workspace.previewSource("src/library.expec", "type Book { title: Text }");
+  const source = await workspace.previewSource("src/library.expec", "type Book { title: Text }\ncomponent BookIndexer {\n public find\n capability find(book: Book) returns Book\n}\ncomponent Library {\n capability find(book: Book) returns Book { calls BookIndexer.find }\n}");
   await workspace.openPreviewSource(source, 1);
-  await workspace.changePreviewSource({ ["uri"]: (source)["uri"], ["text"]: "type Book { title: Number }" }, 2);
+  await workspace.changePreviewSource({ ["uri"]: (source)["uri"], ["text"]: "type Book { title: Number }\ncomponent BookIndexer {\n public find\n capability find(book: Book) returns Book\n}\ncomponent Library {\n capability find(book: Book) returns Book { calls BookIndexer.find }\n}" }, 2);
   await workspace.settleCurrentPreviews();
   await workspace.expectConfiguredOutputs(["uml", "typescript", "markdown"], ["UML", "TypeScript", "Markdown"]);
   await workspace.expectCurrentPreviewSource((source)["uri"], 2);
   await workspace.expectPreviewDocument("typescript", "draft/types/Book.ts", "text/typescript", "title: number;");
   await workspace.expectPreviewDocument("markdown", "draft/docs/pages/src/library.md", "text/markdown", "type Book");
   await workspace.expectPreviewDocument("markdown", "draft/docs/Home.md", "text/markdown", "[src/library](pages/src/library.md)");
-  await workspace.expectPreviewSvgLabel("uml", "draft/uml/structure.svg", "Book");
+  await workspace.expectPreviewSvgLabel("uml", "draft/uml/structure.svg", "Library");
+  await workspace.expectPreviewSvgLabel("uml", "draft/uml/structure.svg", "find calls find");
   await workspace.expectTargetsPreserved();
 });
 
