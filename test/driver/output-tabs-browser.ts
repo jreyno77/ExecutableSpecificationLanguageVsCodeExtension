@@ -104,4 +104,64 @@ export class OutputTabsBrowser {
   }
   async resourceRequests(): Promise<string[]> { return [...this.requests]; }
 
+  private async promiseButton(label: string) {
+    const selector = await this.page.evaluate(label => 'button[data-promise-label="' + CSS.escape(label) + '"]', label);
+    return this.page.locator(selector);
+  }
+  async hoverPromise(label: string): Promise<void> { await (await this.promiseButton(label)).hover(); }
+  async focusPromise(label: string): Promise<void> { await (await this.promiseButton(label)).focus(); }
+  async pinPromise(label: string): Promise<void> { await (await this.promiseButton(label)).click(); }
+  async pressPromiseKey(key: string): Promise<void> { await this.page.keyboard.press(key); }
+  async hoverPromiseBubble(): Promise<void> { await this.page.locator('[data-promise-bubble]').hover(); }
+  async leavePromises(): Promise<void> {
+    await this.page.mouse.move(4, 4);
+    await this.page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  }
+  async clickOutsidePromises(): Promise<void> { await this.page.mouse.click(4, 4); }
+  async promiseIndicatorLabels(): Promise<string[]> {
+    if (await this.page.locator('img[data-diagram-image]').count()) await this.imageLoaded();
+    return this.page.locator('button[data-promise-label]').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label') ?? ''));
+  }
+  private async promiseBubble() {
+    const bubble = this.page.locator('[data-promise-bubble]'), count = await bubble.count();
+    if (count > 1) throw new Error('More than one promise bubble is visible.');
+    if (count && !await bubble.isVisible()) throw new Error('The promise bubble exists but is not visible.');
+    return count ? bubble : undefined;
+  }
+  async visiblePromiseLabel(): Promise<string> { return await (await this.promiseBubble())?.getAttribute('data-promise-label') ?? ''; }
+  async visiblePromiseTexts(): Promise<string[]> { return await (await this.promiseBubble())?.locator('[data-promise-text]').allTextContents() ?? []; }
+  async pinnedPromiseLabel(): Promise<string> {
+    const bubble = await this.promiseBubble();
+    return await bubble?.getAttribute('data-promise-pinned') === 'true' ? await bubble!.getAttribute('data-promise-label') ?? '' : '';
+  }
+  async promiseIndicatorAligned(label: string): Promise<boolean> {
+    if (!await this.imageLoaded()) return false;
+    return this.page.evaluate(label => {
+      const image = document.querySelector<HTMLImageElement>('img[data-diagram-image]');
+      const control = document.querySelector<HTMLElement>('button[data-promise-label="' + CSS.escape(label) + '"]');
+      const highlight = document.querySelector<HTMLElement>('[data-promise-row="' + CSS.escape(label) + '"]');
+      if (!image || !control || !highlight) return false;
+      const source = new DOMParser().parseFromString(atob(image.src.split(',', 2)[1]!), 'image/svg+xml');
+      const svg = source.documentElement as unknown as SVGSVGElement;
+      const text = [...source.querySelectorAll('text')].find(node => node.textContent === label.split('.').at(-1) + '()');
+      if (!text) return false;
+      const tx = Number(text.getAttribute('x')), ty = Number(text.getAttribute('y'));
+      const row = [...source.querySelectorAll('rect')].find(node => {
+        const x = Number(node.getAttribute('x') ?? 0), y = Number(node.getAttribute('y') ?? 0);
+        return x <= tx && tx <= x + Number(node.getAttribute('width')) && y <= ty && ty <= y + Number(node.getAttribute('height'));
+      });
+      if (!row) return false;
+      const surface = svg.viewBox.baseVal, displayed = image.getBoundingClientRect(), actual = highlight.getBoundingClientRect();
+      const expected = {
+        x: displayed.x + (Number(row.getAttribute('x') ?? 0) - surface.x) * displayed.width / surface.width,
+        y: displayed.y + (Number(row.getAttribute('y') ?? 0) - surface.y) * displayed.height / surface.height,
+        width: Number(row.getAttribute('width')) * displayed.width / surface.width,
+        height: Number(row.getAttribute('height')) * displayed.height / surface.height,
+      };
+      const button = control.getBoundingClientRect();
+      return Object.entries(expected).every(([key, value]) => Math.abs(actual[key as keyof typeof expected] - value) < 1)
+        && button.height > 0 && button.y >= actual.y - 1 && button.bottom <= actual.bottom + 1;
+    }, label);
+  }
+
 }

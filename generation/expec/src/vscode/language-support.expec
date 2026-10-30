@@ -2,14 +2,16 @@
 // Its export is executable-specification-language/syntax/expec.tmLanguage.json.
 // Copy it under src/vscode/syntax/ with exact source/grammar hash provenance.
 // The language package generates it from the existing Langium grammar.
-// Build/runtime SDK: reviewed local CORE-39/OUT-29 candidate 0.1.0, retaining OUT-27/28.
-// Producer 4354888f1a1a1ff13a754c541cbed98bcaf0414b; normal clean build/package.
-// Pin generation/tooling/executable-specification-language-core-39-4354888.tgz with recorded lockfile integrity.
-// SHA256 f3b4eac33ed61020907e816f459368bc4e467519cdf4778fb547018ffb0286a9.
+// Build/runtime SDK: reviewed local OUT-31/OUT-32 candidate 0.1.0, retaining CORE-39/OUT-29.
+// Producer fc7fc82872c951bea2405b9ba9fe2f42b47b2b1a; normal build/package.
+// Pin generation/tooling/executable-specification-language-out31-out32-fc7fc82.tgz with recorded lockfile integrity.
+// SHA256 2e3fdbabcdedcd05327eac65e3f12b979afb7ca9d06a8db1dea6280f8846eea9.
 // Keep complete native resources, checked source APIs and generated syntax asset.
 // Documents retain direct Calls links and omit generated Source/disclaimer boilerplate.
 // Structural UML shows architectural containers, operation call arrows and contained
-// promises, with all declared capabilities and visibility but no data-type clutter.
+// compact promise markers and exact image-space data, with all declared capabilities.
+// Markdown groups architecture first and types in a glossary; callable Inputs follow signatures.
+// Contractual promises labels promise bullets separately from failures.
 // Local qualification precedes the separate official Actions release/deployment.
 // The project generator need not export this separate language-produced syntax asset.
 // The extension copies it unchanged; it authors no grammar, keyword table or token regex.

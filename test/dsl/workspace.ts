@@ -3891,4 +3891,98 @@ readonly wikiPages: Array<OutputTab> = [{ ["id"]: "markdown", ["label"]: "Markdo
 async previewSource(path: string, text: string): Promise<SourceDocument> {
     return await this.driver.previewSource(path, text);
   }
+
+async hoverPromiseBubble(): Promise<void> {
+    return await this.driver.hoverPromiseBubble();
+  }
+
+async hoverPromise(label: string): Promise<void> {
+    return await this.driver.hoverPromise(label);
+  }
+
+async focusPromise(label: string): Promise<void> {
+    return await this.driver.focusPromise(label);
+  }
+
+async pinPromise(label: string): Promise<void> {
+    return await this.driver.pinPromise(label);
+  }
+
+async pressPromiseKey(key: string): Promise<void> {
+    return await this.driver.pressPromiseKey(key);
+  }
+
+async leavePromises(): Promise<void> {
+    return await this.driver.leavePromises();
+  }
+
+async clickOutsidePromises(): Promise<void> {
+    return await this.driver.clickOutsidePromises();
+  }
+
+async previewPromiseLabels(id: string, path: string): Promise<Array<string>> {
+    return await this.driver.previewPromiseLabels(id, path);
+  }
+
+async previewPromiseTexts(id: string, path: string, label: string): Promise<Array<string>> {
+    return await this.driver.previewPromiseTexts(id, path, label);
+  }
+
+async previewPromiseGeometryReady(id: string, path: string): Promise<boolean> {
+    return await this.driver.previewPromiseGeometryReady(id, path);
+  }
+
+async promiseIndicatorLabels(): Promise<Array<string>> {
+    return await this.driver.promiseIndicatorLabels();
+  }
+
+async visiblePromiseLabel(): Promise<string> {
+    return await this.driver.visiblePromiseLabel();
+  }
+
+async visiblePromiseTexts(): Promise<Array<string>> {
+    return await this.driver.visiblePromiseTexts();
+  }
+
+async pinnedPromiseLabel(): Promise<string> {
+    return await this.driver.pinnedPromiseLabel();
+  }
+
+async promiseIndicatorAligned(label: string): Promise<boolean> {
+    return await this.driver.promiseIndicatorAligned(label);
+  }
+
+async expectRenderedPromises(id: string, path: string, labels: Array<string>, label: string, texts: Array<string>): Promise<void> {
+    const actualLabels = await this.driver.previewPromiseLabels(id, path);
+    const actualTexts = await this.driver.previewPromiseTexts(id, path, label);
+    const hasGeometry = await this.driver.previewPromiseGeometryReady(id, path);
+    expectData(actualLabels, labels);
+    expectData(actualTexts, texts);
+    expectData(hasGeometry, true);
+  }
+
+async expectPromiseBubble(label: string, texts: Array<string>, pinned: string): Promise<void> {
+    const actualLabel = await this.driver.visiblePromiseLabel();
+    const actualTexts = await this.driver.visiblePromiseTexts();
+    const actualPinned = await this.driver.pinnedPromiseLabel();
+    expectData(actualLabel, label);
+    expectData(actualTexts, texts);
+    expectData(actualPinned, pinned);
+  }
+
+async expectPromiseIndicators(labels: Array<string>): Promise<void> {
+    const actual = await this.driver.promiseIndicatorLabels();
+    expectData(actual, labels);
+  }
+
+async expectPromiseAlignment(label: string): Promise<void> {
+    const actual = await this.driver.promiseIndicatorAligned(label);
+    expectData(actual, true);
+  }
+
+readonly promisedDiagram: Array<OutputTab> = [{ ["id"]: "uml", ["label"]: "UML", ["status"]: "ready", ["documents"]: [{ ["path"]: "structure.svg", ["mediaType"]: "image/svg+xml", ["content"]: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"900\" height=\"600\" viewBox=\"0 0 900 600\"><rect x=\"30\" y=\"60\" width=\"320\" height=\"40\" fill=\"white\"/><text x=\"40\" y=\"85\">export()</text><text x=\"40\" y=\"165\">download()</text></svg>", ["diagram"]: { ["width"]: 900, ["height"]: 600, ["promises"]: [{ ["id"]: "export", ["label"]: "ResultsRelay.export", ["x"]: 30, ["y"]: 60, ["width"]: 320, ["height"]: 40, ["promises"]: ["Delivers the result", "Cleans temporary files"] }, { ["id"]: "download", ["label"]: "ResultsRelay.download", ["x"]: 30, ["y"]: 140, ["width"]: 320, ["height"]: 40, ["promises"]: ["Supports cancellation"] }] } }] }];
+
+readonly revisedPromisedDiagram: Array<OutputTab> = [{ ["id"]: "uml", ["label"]: "UML", ["status"]: "ready", ["documents"]: [{ ["path"]: "structure.svg", ["mediaType"]: "image/svg+xml", ["content"]: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"900\" height=\"600\" viewBox=\"0 0 900 600\"><rect x=\"30\" y=\"60\" width=\"320\" height=\"40\" fill=\"white\"/><text x=\"40\" y=\"85\">export()</text><text x=\"40\" y=\"165\">download()</text></svg>", ["diagram"]: { ["width"]: 900, ["height"]: 600, ["promises"]: [{ ["id"]: "export", ["label"]: "ResultsRelay.export", ["x"]: 30, ["y"]: 60, ["width"]: 320, ["height"]: 40, ["promises"]: ["Reports delivery progress"] }, { ["id"]: "download", ["label"]: "ResultsRelay.download", ["x"]: 30, ["y"]: 140, ["width"]: 320, ["height"]: 40, ["promises"]: ["Supports cancellation"] }] } }] }];
+
+readonly unsafePromisedDiagram: Array<OutputTab> = [{ ["id"]: "uml", ["label"]: "UML", ["status"]: "ready", ["documents"]: [{ ["path"]: "structure.svg", ["mediaType"]: "image/svg+xml", ["content"]: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"900\" height=\"600\" viewBox=\"0 0 900 600\"><rect x=\"30\" y=\"60\" width=\"320\" height=\"40\" fill=\"white\"/><text x=\"40\" y=\"85\">export()</text><text x=\"40\" y=\"165\">download()</text></svg>", ["diagram"]: { ["width"]: 900, ["height"]: 600, ["promises"]: [{ ["id"]: "export", ["label"]: "ResultsRelay.export", ["x"]: 30, ["y"]: 60, ["width"]: 320, ["height"]: 40, ["promises"]: ["<img src=\"https://example.invalid/promise\" onerror=\"window.expecPreviewUnsafe = true\">", "**Keep this literal**"] }, { ["id"]: "download", ["label"]: "ResultsRelay.download", ["x"]: 30, ["y"]: 140, ["width"]: 320, ["height"]: 40, ["promises"]: ["Supports cancellation"] }] } }] }];
 }

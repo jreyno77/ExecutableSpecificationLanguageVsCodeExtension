@@ -2418,4 +2418,70 @@ async previewResourceRequests(): Promise<Array<string>> {
 async previewSource(path: string, text: string): Promise<SourceDocument> {
     return this.previewRecording.source(path, text);
   }
+
+async hoverPromiseBubble(): Promise<void> {
+    await this.ui.hoverPromiseBubble();
+  }
+
+async hoverPromise(label: string): Promise<void> {
+    await this.ui.hoverPromise(label);
+  }
+
+async focusPromise(label: string): Promise<void> {
+    await this.ui.focusPromise(label);
+  }
+
+async pinPromise(label: string): Promise<void> {
+    await this.ui.pinPromise(label);
+  }
+
+async pressPromiseKey(key: string): Promise<void> {
+    await this.ui.pressPromiseKey(key);
+  }
+
+async leavePromises(): Promise<void> {
+    await this.ui.leavePromises();
+  }
+
+async clickOutsidePromises(): Promise<void> {
+    await this.ui.clickOutsidePromises();
+  }
+
+async previewPromiseLabels(id: string, path: string): Promise<Array<string>> {
+    return this.previewRecording.document(id, path).diagram?.promises.map(promise => promise.label) ?? [];
+  }
+
+async previewPromiseTexts(id: string, path: string, label: string): Promise<Array<string>> {
+    return [...this.previewRecording.document(id, path).diagram?.promises.find(promise => promise.label === label)?.promises ?? []];
+  }
+
+async previewPromiseGeometryReady(id: string, path: string): Promise<boolean> {
+    const document = this.previewRecording.document(id, path), diagram = document.diagram;
+    return document.mediaType === 'image/svg+xml' && diagram !== undefined
+      && [diagram.width, diagram.height].every(value => Number.isFinite(value) && value > 0)
+      && diagram.promises.length > 0 && diagram.promises.every(promise =>
+        [promise.x, promise.y, promise.width, promise.height].every(Number.isFinite)
+        && promise.x >= 0 && promise.y >= 0 && promise.width > 0 && promise.height > 0
+        && promise.x + promise.width <= diagram.width && promise.y + promise.height <= diagram.height);
+  }
+
+async promiseIndicatorLabels(): Promise<Array<string>> {
+    return this.ui.promiseIndicatorLabels();
+  }
+
+async visiblePromiseLabel(): Promise<string> {
+    return this.ui.visiblePromiseLabel();
+  }
+
+async visiblePromiseTexts(): Promise<Array<string>> {
+    return this.ui.visiblePromiseTexts();
+  }
+
+async pinnedPromiseLabel(): Promise<string> {
+    return this.ui.pinnedPromiseLabel();
+  }
+
+async promiseIndicatorAligned(label: string): Promise<boolean> {
+    return this.ui.promiseIndicatorAligned(label);
+  }
 }
