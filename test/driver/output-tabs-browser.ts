@@ -125,6 +125,7 @@ export class OutputTabsBrowser {
   private async promiseBubble() {
     const bubble = this.page.locator('[data-promise-bubble]'), count = await bubble.count();
     if (count > 1) throw new Error('More than one promise bubble is visible.');
+    if (count && !await bubble.isVisible()) throw new Error('The promise bubble exists but is not visible.');
     return count ? bubble : undefined;
   }
   async visiblePromiseLabel(): Promise<string> { return await (await this.promiseBubble())?.getAttribute('data-promise-label') ?? ''; }
