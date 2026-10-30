@@ -16,9 +16,12 @@ component OutputTabs {
     promises "Render text/markdown as a readable document with headings, lists, GFM tables and fenced code. Hide HTML comments, including expec-section, expec-fragment and expec-end ownership markers. Convert only exact generated empty anchors with an expec- prefix and lowercase hexadecimal suffix into inert DOM targets; ignore all other authored HTML and attributes. Code-fenced HTML remains visible code. Never execute authored HTML or load Markdown images; show their alt text instead."
     promises "Markdown links resolve relative to the selected document among supplied Markdown paths within the same output. Following an available link selects that actual document path and scrolls its decoded fragment target into view; a fragment-only link stays in the current document. Never fetch a missing page or use filesystem or VS Code APIs. External, absolute, command, javascript, file and unavailable-page links remain readable and inactive with the explanation Link unavailable in supplied previews. A missing fragment visibly reports Anchor unavailable in supplied preview."
     promises "Display TypeScript, JSON and other supported text literally. A D2 document initially shows Diagram preview unavailable. Select an SVG document or show source. Its explicit Show source control reveals the supplied D2 literally. Do not render Markdown, SVG or D2 source as the default document preview."
+    promises "When an SVG supplies diagram annotations, show a compact promise count button beside each annotated capability row; hide full promise text by default. Use renderer coordinates for the row highlight and button at every zoom level and while scrolling. Hover or keyboard focus shows the exact promises as readable plain text in an anchored thought bubble. Click or Enter pins it; clicking another indicator replaces the pinned bubble. Escape, an outside click or clicking the pinned indicator closes it. Only one bubble is visible; pointer leave or focus leave closes an unpinned bubble. The bubble stays open when its content is hovered. Keep long text wrapped and independently scrollable. Never interpret promise text as HTML or Markdown."
+    promises "The promise state belongs only to the current image and annotations. Switching documents/outputs, replacing content or annotations, withdrawing a ready preview and disposal clear it. Show no controls for unannotated SVGs or operations without promises. Keep indicators keyboard accessible with the capability label and promise count, aria-expanded state and an accessible popup label. Escape returns to the closed state without reopening just because focus remains on the indicator."
     promises "Display image/svg+xml as an inert image from its supplied UTF-8 content, never injected markup or a target-file path. Use a scroll viewport with default 100 percent scale, author-controlled zoom and reset to 100 percent; do not shrink wide images to fit. Dispose replaced image resources and bind image events to the actual content's current node. Unsupported presentation media shows a clear explanation and retains its path/type. Selection, source viewing and document navigation never compile, generate, write, fetch external resources or implement report freshness."
   }
 
+  // Diagram interactions are presentation state; no language resolution or generation occurs.
   capability dispose() returns Nothing {
     promises "Unmount this view and release its handlers and owned image resources. Keep the supplied host element in the page. Repeated disposal is harmless; present after disposal reports a clear error."
   }
@@ -442,4 +445,183 @@ examples for OutputTabs {
     then expectMarkdownCodeBlocks(["<script>window.expecPreviewUnsafe = true</script>\n"])
     then expectSafePreview()
   }
+  fixture promisedDiagram: List<OutputTab> = [
+    { id: "uml", label: "UML", status: "ready", documents: [
+      { path: "structure.svg", mediaType: "image/svg+xml", content: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"900\" height=\"600\" viewBox=\"0 0 900 600\"><rect x=\"30\" y=\"60\" width=\"320\" height=\"40\" fill=\"white\"/><text x=\"40\" y=\"85\">export()</text><text x=\"40\" y=\"165\">download()</text></svg>",
+        diagram: { width: 900, height: 600, `promises`: [
+          { id: "export", label: "ResultsRelay.export", x: 30, y: 60, width: 320, height: 40, `promises`: ["Delivers the result", "Cleans temporary files"] },
+          { id: "download", label: "ResultsRelay.download", x: 30, y: 140, width: 320, height: 40, `promises`: ["Supports cancellation"] }
+        ] }
+      }
+    ] }
+  ]
+  fixture revisedPromisedDiagram: List<OutputTab> = [
+    { id: "uml", label: "UML", status: "ready", documents: [
+      { path: "structure.svg", mediaType: "image/svg+xml", content: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"900\" height=\"600\" viewBox=\"0 0 900 600\"><rect x=\"30\" y=\"60\" width=\"320\" height=\"40\" fill=\"white\"/><text x=\"40\" y=\"85\">export()</text><text x=\"40\" y=\"165\">download()</text></svg>",
+        diagram: { width: 900, height: 600, `promises`: [
+          { id: "export", label: "ResultsRelay.export", x: 30, y: 60, width: 320, height: 40, `promises`: ["Reports delivery progress"] },
+          { id: "download", label: "ResultsRelay.download", x: 30, y: 140, width: 320, height: 40, `promises`: ["Supports cancellation"] }
+        ] }
+      }
+    ] }
+  ]
+  fixture unsafePromisedDiagram: List<OutputTab> = [
+    { id: "uml", label: "UML", status: "ready", documents: [
+      { path: "structure.svg", mediaType: "image/svg+xml", content: "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"900\" height=\"600\" viewBox=\"0 0 900 600\"><rect x=\"30\" y=\"60\" width=\"320\" height=\"40\" fill=\"white\"/><text x=\"40\" y=\"85\">export()</text><text x=\"40\" y=\"165\">download()</text></svg>",
+        diagram: { width: 900, height: 600, `promises`: [
+          { id: "export", label: "ResultsRelay.export", x: 30, y: 60, width: 320, height: 40, `promises`: ["<img src=\"https://example.invalid/promise\" onerror=\"window.expecPreviewUnsafe = true\">", "**Keep this literal**"] },
+          { id: "download", label: "ResultsRelay.download", x: 30, y: 140, width: 320, height: 40, `promises`: ["Supports cancellation"] }
+        ] }
+      }
+    ] }
+  ]
+  action hoverPromiseBubble() returns Nothing
+  action hoverPromise(label: Text) returns Nothing
+  action focusPromise(label: Text) returns Nothing
+  action pinPromise(label: Text) returns Nothing
+  action pressPromiseKey(key: Text) returns Nothing
+  action leavePromises() returns Nothing
+  action clickOutsidePromises() returns Nothing
+  observation promiseIndicatorLabels() returns List<Text>
+  observation visiblePromiseLabel() returns Text
+  observation visiblePromiseTexts() returns List<Text>
+  observation pinnedPromiseLabel() returns Text
+  observation promiseIndicatorAligned(label: Text) returns Boolean
+  check expectPromiseBubble(label: Text, texts: List<Text>, pinned: Text) {
+    let actualLabel = visiblePromiseLabel()
+    let actualTexts = visiblePromiseTexts()
+    let actualPinned = pinnedPromiseLabel()
+    assert actualLabel == label
+    assert actualTexts == texts
+    assert actualPinned == pinned
+  }
+  check expectPromiseIndicators(labels: List<Text>) {
+    let actual = promiseIndicatorLabels()
+    assert actual == labels
+  }
+  check expectPromiseAlignment(label: Text) {
+    let actual = promiseIndicatorAligned(label)
+    assert actual == true
+  }
+  scenario "keep promise text hidden until inspected" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    then expectPromiseIndicators(["ResultsRelay.export: 2 promises", "ResultsRelay.download: 1 promise"])
+    then expectPromiseBubble("", [], "")
+  }
+  scenario "inspect a capability by hovering its promise indicator" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when hoverPromise("ResultsRelay.export")
+    then expectPromiseBubble("ResultsRelay.export", ["Delivers the result", "Cleans temporary files"], "")
+  }
+  scenario "close an unpinned thought bubble when leaving it" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when hoverPromise("ResultsRelay.export")
+    when leavePromises()
+    then expectPromiseBubble("", [], "")
+  }
+  scenario "inspect a capability by keyboard focus" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when focusPromise("ResultsRelay.export")
+    then expectPromiseBubble("ResultsRelay.export", ["Delivers the result", "Cleans temporary files"], "")
+  }
+  scenario "pin a promise bubble with Enter" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when focusPromise("ResultsRelay.export")
+    when pressPromiseKey("Enter")
+    when leavePromises()
+    then expectPromiseBubble("ResultsRelay.export", ["Delivers the result", "Cleans temporary files"], "ResultsRelay.export")
+  }
+  scenario "close pinned promises with Escape while focus remains on the control" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when focusPromise("ResultsRelay.export")
+    when pressPromiseKey("Enter")
+    when pressPromiseKey("Escape")
+    then expectPromiseBubble("", [], "")
+  }
+  scenario "keep pinned promises while hovering another capability" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when pinPromise("ResultsRelay.export")
+    when hoverPromise("ResultsRelay.download")
+    then expectPromiseBubble("ResultsRelay.export", ["Delivers the result", "Cleans temporary files"], "ResultsRelay.export")
+  }
+  scenario "replace a pinned promise bubble by clicking another capability" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when pinPromise("ResultsRelay.export")
+    when pinPromise("ResultsRelay.download")
+    then expectPromiseBubble("ResultsRelay.download", ["Supports cancellation"], "ResultsRelay.download")
+  }
+  scenario "close pinned promises with an outside click" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when pinPromise("ResultsRelay.export")
+    when clickOutsidePromises()
+    then expectPromiseBubble("", [], "")
+  }
+  scenario "toggle pinned promises closed by clicking the same indicator" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when pinPromise("ResultsRelay.export")
+    when pinPromise("ResultsRelay.export")
+    then expectPromiseBubble("", [], "")
+  }
+  scenario "keep promise controls aligned while zooming and scrolling" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when setDiagramZoom(150)
+    when scrollDiagram(120, 60)
+    then expectPromiseAlignment("ResultsRelay.export")
+  }
+  scenario "restore promise alignment when resetting zoom" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when setDiagramZoom(150)
+    when resetDiagramZoom()
+    then expectPromiseAlignment("ResultsRelay.export")
+  }
+  scenario "clear pinned promises when replacing the document" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when pinPromise("ResultsRelay.export")
+    when presentOutputs(diagrams)
+    then expectPromiseBubble("", [], "")
+    then expectPromiseIndicators([])
+  }
+  scenario "clear pinned promises when only annotations change" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when pinPromise("ResultsRelay.export")
+    when presentOutputs(revisedPromisedDiagram)
+    then expectPromiseBubble("", [], "")
+  }
+  scenario "show updated promises for an unchanged image" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when pinPromise("ResultsRelay.export")
+    when presentOutputs(revisedPromisedDiagram)
+    when hoverPromise("ResultsRelay.export")
+    then expectPromiseBubble("ResultsRelay.export", ["Reports delivery progress"], "")
+  }
+  scenario "keep the thought bubble open while reading its content" {
+    given openOutputTabs()
+    when presentOutputs(promisedDiagram)
+    when hoverPromise("ResultsRelay.export")
+    when hoverPromiseBubble()
+    then expectPromiseBubble("ResultsRelay.export", ["Delivers the result", "Cleans temporary files"], "")
+  }
+  scenario "keep promise HTML and Markdown literal and inert" {
+    given openOutputTabs()
+    when presentOutputs(unsafePromisedDiagram)
+    when hoverPromise("ResultsRelay.export")
+    then expectPromiseBubble("ResultsRelay.export", ["<img src=\"https://example.invalid/promise\" onerror=\"window.expecPreviewUnsafe = true\">", "**Keep this literal**"], "")
+    then expectSafePreview()
+  }
+
 }

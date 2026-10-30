@@ -7,10 +7,28 @@ type SourceDocument {
 
 // Supported registered UTF-8 text/SVG documents, decoded strictly without replacement.
 // Paths/media types/content retain the real renderer reply; no target files are read.
+// Renderer-provided image coordinates, never inferred by the UI from source text.
+// Bounds use a zero-origin surface; promises preserve exact authored strings.
+type DiagramPromise {
+  id: Text
+  label: Text
+  x: Number
+  y: Number
+  width: Number
+  height: Number
+  `promises`: List<Text>
+}
+type DiagramPreview {
+  width: Number
+  height: Number
+  `promises`: List<DiagramPromise>
+}
+
 type OutputDocument {
   path: Text
   mediaType: Text
   content: Text
+  diagram: DiagramPreview?
 }
 
 type OutputTab {
